@@ -114,6 +114,36 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
+// Static landing pages
+app.get('/programs', (req, res) => {
+  res.render('index', { user: req.session.user, section: 'programs' });
+});
+
+app.get('/about', (req, res) => {
+  res.render('index', { user: req.session.user, section: 'about' });
+});
+
+app.get('/events', (req, res) => {
+  res.render('index', { user: req.session.user, section: 'events' });
+});
+
+app.get('/faq', (req, res) => {
+  res.render('index', { user: req.session.user, section: 'faq' });
+});
+
+app.get('/contact', (req, res) => {
+  res.render('index', { user: req.session.user, section: 'contact' });
+});
+
+app.post('/contact', (req, res) => {
+  // In a production app, you would save this to a database or send an email
+  const { name, email, subject, message } = req.body;
+  console.log(`Contact form submission: ${name} (${email}) - ${subject}`);
+  // For now, redirect to index with a success message in the session
+  req.session.contactMessage = `Thank you ${name}, we received your message and will get back to you soon!`;
+  res.redirect('/#contact');
+});
+
 app.get('/dashboard', requireAuth, (req, res) => {
   res.render('dashboard', {
     user: req.session.user,

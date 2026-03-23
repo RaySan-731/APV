@@ -1,19 +1,16 @@
 {
-  "name": "apv-ventures-backend",
+  "name": "apv-ventures",
   "version": "1.0.0",
-  "description": "Arrow-Park Ventures Management System - Node.js Backend",
+  "description": "Arrow-Park Ventures Management System - HTML, CSS, Node.js",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "echo 'No build step required'",
     "migrate": "node scripts/migrate_to_mongodb.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "mongoose": "^8.0.3",
-    "body-parser": "^1.20.2",
-    "cors": "^2.8.5",
     "express-session": "^1.17.3",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.3.1",
@@ -22,7 +19,7 @@
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["ventures", "management", "business", "node.js", "mongodb"],
+  "keywords": ["ventures", "management", "business", "node.js", "mongodb", "html", "css"],
   "author": "Arrow-Park Ventures",
   "license": "MIT"
 }

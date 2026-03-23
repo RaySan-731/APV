@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Users</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Manage Users</h1>
+    <p>Signed in as <strong><%= user.name %></strong> (<%= user.email %>)</p>
+
+    <section class="card">
+      <div class="card-header"><h3>Create User</h3></div>
+      <div class="card-content">
+        <form action="/admin/users/create" method="POST">
+          <div class="form-group">
+            <label>Email</label>
+            <input name="email" type="email" required class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input name="password" type="password" required class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Name</label>
+            <input name="name" type="text" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <select name="role" class="form-input">
+              <option value="rover">rover</option>
+              <option value="training_officer">training_officer</option>
+              <option value="medical">medical</option>
+              <option value="commissioner">commissioner</option>
+              <option value="founder">founder</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit">Create User</button>
+        </form>
+      </div>
+    </section>
+
+    <section style="margin-top:1.5rem;">
+      <div class="card-header"><h3>Existing Users</h3></div>
+      <div class="card-content">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:0.5rem;">Email</th>
+              <th style="text-align:left; padding:0.5rem;">Name</th>
+              <th style="text-align:left; padding:0.5rem;">Role</th>
+              <th style="text-align:left; padding:0.5rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(u){ %>
+              <tr>
+                <td style="padding:0.5rem;">"><%= u.email %></td>
+                <td style="padding:0.5rem;"><%= u.name %></td>
+                <td style="padding:0.5rem;"><%= u.role %></td>
+                <td style="padding:0.5rem;">
+                  <form action="/admin/users/delete" method="POST" style="display:inline-block;">
+                    <input type="hidden" name="email" value="<%= u.email %>">
+                    <button class="btn btn-outline" type="submit">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <p style="margin-top:1rem;"><a href="/dashboard">Back to Dashboard</a></p>
+  </div>
+</body>
+</html>

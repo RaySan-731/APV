@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin - Bookings</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container" style="padding:2rem 1rem;">
+    <a href="/dashboard" style="display:inline-block; margin-bottom:1rem;">← Back</a>
+    <h1>Bookings</h1>
+
+    <section class="card">
+      <div class="card-content">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="padding:0.5rem; text-align:left;">ID</th>
+              <th style="padding:0.5rem; text-align:left;">Program</th>
+              <th style="padding:0.5rem; text-align:left;">For</th>
+              <th style="padding:0.5rem; text-align:left;">Date</th>
+              <th style="padding:0.5rem; text-align:left;">Participants</th>
+              <th style="padding:0.5rem; text-align:left;">Requester</th>
+              <th style="padding:0.5rem; text-align:left;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% bookings.forEach(function(b){ %>
+              <tr>
+                <td style="padding:0.5rem;"><%= b.id %></td>
+                <td style="padding:0.5rem;"><%= b.program %></td>
+                <td style="padding:0.5rem;"><%= b.type %></td>
+                <td style="padding:0.5rem;"><%= b.date %></td>
+                <td style="padding:0.5rem;"><%= b.participants %></td>
+                <td style="padding:0.5rem;"><%= b.userEmail %></td>
+                <td style="padding:0.5rem;">
+                  <form action="/admin/bookings/delete" method="POST" style="display:inline-block;">
+                    <input type="hidden" name="id" value="<%= b.id %>">
+                    <button class="btn btn-outline" type="submit">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

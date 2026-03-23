@@ -1,0 +1,3 @@
+{
+  "note": "This project has been migrated to a plain Node.js + EJS + static CSS/JS setup. Frontend build configs were removed or neutralized."
+}

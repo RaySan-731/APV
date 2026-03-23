@@ -1,0 +1,20 @@
+[
+  {
+    "email": "founder@apventures.com",
+    "password": "$2a$10$rF4O3pMvUCa.50ft4e5/3.TVG0UjIMLcWKQzsSdXj0q8Ik1pisuiS",
+    "name": "Founder",
+    "role": "founder",
+    "isActive": true,
+    "createdAt": "2026-01-16T16:33:58.805Z",
+    "updatedAt": "2026-01-16T16:33:58.807Z"
+  },
+  {
+    "email": "member@apventures.com",
+    "password": "$2a$10$JLvlPUFBP8ikW.wli49Oq.2Knu/wBWnfC2nMEybhKEfzUyjPaoFoG",
+    "name": "Regular Member",
+    "role": "rover",
+    "isActive": true,
+    "createdAt": "2026-01-16T16:34:07.391Z",
+    "updatedAt": "2026-01-16T16:34:07.391Z"
+  }
+]

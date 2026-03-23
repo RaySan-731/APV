@@ -1,0 +1,26 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /dashboard
+Disallow: /api/
+
+# Allow major search engines
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Allow social media crawlers for Open Graph
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+# Sitemap (to be added later)
+# Sitemap: https://yourdomain.com/sitemap.xml
+Allow: /
+
+User-agent: *
+Allow: /

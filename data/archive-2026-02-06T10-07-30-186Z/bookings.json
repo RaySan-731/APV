@@ -1,0 +1,33 @@
+[
+  {
+    "id": "b_1769263660404",
+    "program": "Leadership Training",
+    "type": "school",
+    "date": "2026-02-15",
+    "participants": "30",
+    "notes": "Test booking",
+    "userEmail": "guest",
+    "createdAt": "2026-01-24T14:07:40.405Z"
+  },
+  {
+    "id": "b_1769264331481",
+    "program": "Leadership Training",
+    "type": "school",
+    "date": "2026-02-15",
+    "participants": "30",
+    "notes": "Test booking",
+    "userEmail": "guest",
+    "createdAt": "2026-01-24T14:18:51.481Z"
+  },
+  {
+    "id": "b_1769771130040",
+    "program": "Outdoor Education",
+    "type": "school",
+    "date": "2026-01-30",
+    "participants": "20",
+    "notes": "special need kids",
+    "userEmail": "contact@apventures.com",
+    "requesterName": "wafula",
+    "createdAt": "2026-01-30T11:05:30.041Z"
+  }
+]

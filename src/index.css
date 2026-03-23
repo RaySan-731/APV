@@ -1,0 +1,126 @@
+/* Tailwind directives removed — this file is preserved for design tokens but
+  Tailwind is no longer used in the runtime. The variables below are kept
+  for reference; public/css/styles.css is the active stylesheet. */
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Core colors - Nature & Adventure Theme */
+    --background: 60 20% 99%;
+    --foreground: 140 30% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 140 30% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 140 30% 15%;
+
+    /* Forest Green Primary */
+    --primary: 140 45% 28%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 140 50% 23%;
+    --primary-glow: 140 45% 35%;
+
+    /* Earth tone secondary */
+    --secondary: 30 35% 92%;
+    --secondary-foreground: 140 30% 20%;
+
+    --muted: 60 10% 95%;
+    --muted-foreground: 140 15% 45%;
+
+    /* Sunset orange accent */
+    --accent: 25 85% 55%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 25 90% 50%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 140 20% 90%;
+    --input: 140 20% 95%;
+    --ring: 140 45% 28%;
+
+    --radius: 0.75rem;
+
+    /* Custom gradients */
+    --gradient-forest: linear-gradient(135deg, hsl(140 45% 28%), hsl(160 40% 35%));
+    --gradient-sunset: linear-gradient(135deg, hsl(25 85% 55%), hsl(35 80% 60%));
+    --gradient-earth: linear-gradient(180deg, hsl(30 35% 92%), hsl(40 30% 88%));
+    --gradient-hero: linear-gradient(135deg, hsl(140 45% 28%), hsl(25 85% 55%));
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 14px -2px hsl(140 45% 28% / 0.1);
+    --shadow-glow: 0 0 30px hsl(140 45% 35% / 0.2);
+    --shadow-card: 0 10px 40px -10px hsl(140 30% 15% / 0.15);
+    
+    /* Transitions */
+    --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+    /* Sidebar */
+    --sidebar-background: 140 45% 28%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 25 85% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 140 40% 23%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 140 40% 23%;
+    --sidebar-ring: 25 85% 55%;
+  }
+
+  .dark {
+    --background: 140 30% 10%;
+    --foreground: 60 10% 95%;
+
+    --card: 140 25% 13%;
+    --card-foreground: 60 10% 95%;
+
+    --popover: 140 25% 13%;
+    --popover-foreground: 60 10% 95%;
+
+    --primary: 140 45% 35%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 140 50% 40%;
+    --primary-glow: 140 45% 45%;
+
+    --secondary: 140 20% 20%;
+    --secondary-foreground: 60 10% 95%;
+
+    --muted: 140 20% 18%;
+    --muted-foreground: 140 10% 60%;
+
+    --accent: 25 85% 55%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 25 90% 60%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 140 20% 20%;
+    --input: 140 20% 18%;
+    --ring: 140 45% 35%;
+    
+    --sidebar-background: 140 30% 8%;
+    --sidebar-foreground: 60 10% 95%;
+    --sidebar-primary: 25 85% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 140 25% 15%;
+    --sidebar-accent-foreground: 60 10% 95%;
+    --sidebar-border: 140 20% 15%;
+    --sidebar-ring: 25 85% 55%;
+  }
+}
+
+/* Apply simple fallbacks without Tailwind for legacy variables */
+* {
+  /* border color fallback using CSS variable */
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}

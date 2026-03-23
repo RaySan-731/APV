@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Book a Program - Arrow-Park Ventures</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .inline-error { color: #b91c1c; font-size: 0.9rem; margin-top: 0.25rem; }
+    .form-group { margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="container" style="padding:2rem 1rem;">
+    <a href="/" style="display:inline-block; margin-bottom:1rem;">← Back</a>
+    <h1>Book a Program</h1>
+    <p>Select a program and provide booking details.</p>
+
+    <section class="card" style="margin-bottom:1.5rem;">
+      <div class="card-header"><h3>Available Programs</h3></div>
+      <div class="card-content">
+        <ul>
+          <% const programsList = ['Leadership Training','Outdoor Education','Team Building','Scout Training Sessions']; %>
+          <% programsList.forEach(function(p){ %>
+            <li style="padding:0.5rem 0;"><strong><%= p %></strong></li>
+          <% }) %>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header"><h3>Book Now</h3></div>
+      <div class="card-content">
+        <form id="bookingForm" action="/book/submit" method="POST">
+          <div class="form-group">
+            <label for="program">Program</label>
+            <select id="program" name="program" class="form-input" required>
+              <option value="Leadership Training">Leadership Training</option>
+              <option value="Outdoor Education">Outdoor Education</option>
+              <option value="Team Building">Team Building</option>
+              <option value="Scout Training Sessions">Scout Training Sessions</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>For</label>
+            <div>
+              <label style="margin-right:1rem;"><input type="radio" name="type" value="school" checked> School</label>
+              <label><input type="radio" name="type" value="group"> Group</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="date">Preferred Date</label>
+            <input id="date" name="date" type="date" class="form-input" required>
+          </div>
+
+          <div class="form-group">
+            <label for="participants">Number of participants</label>
+            <input id="participants" name="participants" type="number" min="1" value="20" class="form-input" required>
+          </div>
+
+          <div class="form-group">
+            <label for="notes">Notes</label>
+            <textarea id="notes" name="notes" class="form-input" rows="4" placeholder="Any special requests or notes"></textarea>
+          </div>
+
+          <% if (user && user.email) { %>
+            <div class="form-group">
+              <label>Your Name</label>
+              <input type="text" class="form-input" value="<%= user.name %>" readonly>
+            </div>
+            <div class="form-group">
+              <label>Your Email</label>
+              <input type="email" class="form-input" value="<%= user.email %>" readonly>
+              <input type="hidden" name="userEmail" value="<%= user.email %>">
+            </div>
+          <% } else { %>
+            <div class="form-group">
+              <label for="name">Your Name</label>
+              <input id="name" name="name" type="text" class="form-input" placeholder="Full name" required>
+              <div class="inline-error" id="err-name"></div>
+            </div>
+            <div class="form-group">
+              <label for="email">Your Email</label>
+              <input id="email" name="email" type="email" class="form-input" placeholder="you@example.com" required>
+              <div class="inline-error" id="err-email"></div>
+            </div>
+          <% } %>
+
+          <input type="hidden" name="userEmail" value="<%= (user && user.email) || '' %>">
+
+          <div class="form-group">
+            <div class="inline-error" id="err-form"></div>
+            <button type="submit" class="btn btn-primary">Request Booking</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

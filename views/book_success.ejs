@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Booking Confirmed - Arrow-Park Ventures</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container" style="padding:2rem 1rem;">
+    <a href="/" style="display:inline-block; margin-bottom:1rem;">← Back</a>
+    <h1>Booking Request Received</h1>
+    <p>Thank you. Your booking request has been recorded.</p>
+
+    <section class="card">
+      <div class="card-content">
+        <ul>
+          <li><strong>Program:</strong> <%= booking.program %></li>
+          <li><strong>For:</strong> <%= booking.type %></li>
+          <li><strong>Date:</strong> <%= booking.date %></li>
+          <li><strong>Participants:</strong> <%= booking.participants %></li>
+          <li><strong>Requested by:</strong> <%= booking.userEmail || 'Guest' %></li>
+          <li><strong>Notes:</strong> <%= booking.notes || '-' %></li>
+        </ul>
+      </div>
+    </section>
+
+    <p style="margin-top:1rem;"><a href="/book">Make another booking</a></p>
+  </div>
+</body>
+</html>

@@ -45,6 +45,8 @@ const User = require('./models/User');
 const Booking = require('./models/Booking');
 const Program = require('./models/Program');
 const School = require('./models/School');
+const Staff = require('./models/Staff');
+const Event = require('./models/Event');
 
 // MongoDB connection
 if (process.env.MONGODB_URI) {
@@ -256,17 +258,117 @@ app.post('/admin/bookings/delete', requireAuth, requireFounder, async (req, res)
   }
 });
 
-app.get('/dashboard/:page', requireAuth, (req, res) => {
-  const page = req.params.page;
-  const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health'];
+// Add staff from dashboard page
+app.post('/dashboard/staff/add', requireAuth, async (req, res) => {
+  try {
+    const { name, email, role, zone, status } = req.body;
+    const staff = new Staff({ name, email, role, zone, status, lastActive: new Date() });
+    await staff.save();
+    res.redirect('/dashboard/staff');
+  } catch (err) {
+    console.error('Error saving staff:', err);
+    res.redirect('/dashboard/staff');
+  }
+});
 
-  if (allowedPages.includes(page)) {
+app.post('/dashboard/schools/add', requireAuth, async (req, res) => {
+  try {
+    const { name, street, city, state, zipCode, country, contactName, contactEmail, contactPhone, studentCount, status } = req.body;
+    const school = new School({
+      name,
+      address: { street, city, state, zipCode, country: country || 'Kenya' },
+      contactPerson: { name: contactName, email: contactEmail, phone: contactPhone },
+      studentCount: parseInt(studentCount, 10) || 0,
+      status: status || 'active'
+    });
+    await school.save();
+    res.redirect('/dashboard/schools');
+  } catch (err) {
+    console.error('Error saving school:', err);
+    res.redirect('/dashboard/schools');
+  }
+});
+
+app.post('/dashboard/events/add', requireAuth, async (req, res) => {
+  try {
+    const { name, date, location, team, registeredCount, status } = req.body;
+    const event = new Event({
+      name,
+      date: date ? new Date(date) : new Date(),
+      location,
+      team,
+      registeredCount: parseInt(registeredCount, 10) || 0,
+      status: status || 'Planning'
+    });
+    await event.save();
+    res.redirect('/dashboard/events');
+  } catch (err) {
+    console.error('Error saving event:', err);
+    res.redirect('/dashboard/events');
+  }
+});
+
+app.post('/dashboard/programs/add', requireAuth, async (req, res) => {
+  try {
+    const { name, description, category, ageMin, ageMax, duration, maxParticipants, priceAmount, priceCurrency, status } = req.body;
+    const program = new Program({
+      name,
+      description,
+      category,
+      ageGroup: { min: parseInt(ageMin, 10) || 8, max: parseInt(ageMax, 10) || 16 },
+      duration,
+      maxParticipants: parseInt(maxParticipants, 10) || 10,
+      price: { amount: parseFloat(priceAmount) || 0, currency: priceCurrency || 'USD' },
+      status: status || 'active'
+    });
+    await program.save();
+    res.redirect('/dashboard/programs');
+  } catch (err) {
+    console.error('Error saving program:', err);
+    res.redirect('/dashboard/programs');
+  }
+});
+
+app.get('/dashboard/:page', requireAuth, async (req, res) => {
+  try {
+    const page = req.params.page;
+    const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health'];
+
+    if (!allowedPages.includes(page)) {
+      return res.status(404).render('404', { user: req.session.user });
+    }
+
+    const modelData = {
+      staffList: [],
+      schoolList: [],
+      eventList: [],
+      programList: []
+    };
+
+    if (page === 'staff') {
+      modelData.staffList = await Staff.find().sort({ createdAt: -1 }).lean();
+    }
+
+    if (page === 'schools') {
+      modelData.schoolList = await School.find().sort({ createdAt: -1 }).lean();
+    }
+
+    if (page === 'events') {
+      modelData.eventList = await Event.find().sort({ date: 1 }).lean();
+    }
+
+    if (page === 'programs') {
+      modelData.programList = await Program.find().sort({ updatedAt: -1 }).lean();
+    }
+
     res.render('dashboard', {
       user: req.session.user,
-      page: page
+      page: page,
+      ...modelData
     });
-  } else {
-    res.status(404).render('404', { user: req.session.user });
+  } catch (err) {
+    console.error('Error loading dashboard page data:', err);
+    res.status(500).render('404', { user: req.session.user });
   }
 });
 

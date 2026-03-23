@@ -232,37 +232,211 @@
                             </div>
                         </div>
                     </div>
-                <% } else { %>
-                    <!-- Placeholder content for other pages -->
+                <% } else if (page === 'analytics') { %>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon">📊</div><div><div class="stat-number">96%</div><div class="stat-label">Platform Uptime</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">⏱</div><div><div class="stat-number">0.28s</div><div class="stat-label">Avg Response Time</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">📈</div><div><div class="stat-number">128</div><div class="stat-label">Reports Generated</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">💬</div><div><div class="stat-number">72</div><div class="stat-label">Active Communications</div></div></div>
+                    </div>
+                    <div class="content-card"><div class="card-header"><h3>Analytics Insights</h3></div><div class="card-content"><p>Real-time KPIs include staff productivity, school participation, and event engagement. Use this dashboard to identify bottlenecks and improve turn-around time for program booking.</p></div></div>
+                <% } else if (page === 'staff') { %>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon">👥</div><div><div class="stat-number">48</div><div class="stat-label">Total Staff</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🟢</div><div><div class="stat-number">39</div><div class="stat-label">Active Staff</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🛑</div><div><div class="stat-number">5</div><div class="stat-label">On Leave</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">📌</div><div><div class="stat-number">4</div><div class="stat-label">Pending Approvals</div></div></div>
+                    </div>
                     <div class="content-card">
-                        <div class="card-header">
-                            <h3>
-                                <% if (page === 'analytics') { %>Analytics Overview<% } %>
-                                <% if (page === 'staff') { %>Staff Management<% } %>
-                                <% if (page === 'schools') { %>Schools<% } %>
-                                <% if (page === 'events') { %>Events<% } %>
-                                <% if (page === 'programs') { %>Programs<% } %>
-                                <% if (page === 'settings') { %>Settings<% } %>
-                                <% if (page === 'trainers') { %>Trainers<% } %>
-                                <% if (page === 'schedule') { %>Training Schedule<% } %>
-                                <% if (page === 'health') { %>Health Records<% } %>
-                            </h3>
-                        </div>
+                        <div class="card-header"><h3>Staff Directory</h3></div>
                         <div class="card-content">
-                            <p class="placeholder-text">
-                                <% if (page === 'analytics') { %>Analytics dashboard content will be displayed here.<% } %>
-                                <% if (page === 'staff') { %>Staff management interface will be displayed here.<% } %>
-                                <% if (page === 'schools') { %>School management interface will be displayed here.<% } %>
-                                <% if (page === 'events') { %>Events management interface will be displayed here.<% } %>
-                                <% if (page === 'programs') { %>Programs management interface will be displayed here.<% } %>
-                                <% if (page === 'settings') { %>Application settings will be displayed here.<% } %>
-                                <% if (page === 'trainers') { %>Trainers management interface will be displayed here.<% } %>
-                                <% if (page === 'schedule') { %>Training schedule will be displayed here.<% } %>
-                                <% if (page === 'health') { %>Health records will be displayed here.<% } %>
-                            </p>
+                            <table class="data-table">
+                                <thead><tr><th>Name</th><th>Role</th><th>Zone</th><th>Status</th><th>Last Active</th></tr></thead>
+                                <tbody>
+                                <% if (staffList && staffList.length > 0) { %>
+                                    <% staffList.forEach(staff => { %>
+                                        <tr>
+                                            <td><%= staff.name %></td>
+                                            <td><%= staff.role %></td>
+                                            <td><%= staff.zone || '—' %></td>
+                                            <td><%= staff.status %></td>
+                                            <td><%= staff.lastActive ? new Date(staff.lastActive).toLocaleString() : 'N/A' %></td>
+                                        </tr>
+                                    <% }) %>
+                                <% } else { %>
+                                    <tr><td colspan="5" class="placeholder-text">No staff entries found yet.</td></tr>
+                                <% } %>
+                            </tbody>
+                            </table>
                         </div>
                     </div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Add New Staff Member</h3></div>
+                        <div class="card-content">
+                            <form action="/dashboard/staff/add" method="POST" class="form-grid">
+                                <label>Name<input type="text" name="name" required></label>
+                                <label>Email<input type="email" name="email" required></label>
+                                <label>Role<input type="text" name="role" required></label>
+                                <label>Zone<input type="text" name="zone" required></label>
+                                <label>Status<select name="status"><option>Active</option><option>On Leave</option><option>Inactive</option></select></label>
+                                <button type="submit" class="btn btn-primary">Add Staff</button>
+                            </form>
+                        </div>
+                    </div>
+                <% } else if (page === 'schools') { %>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon">🏫</div><div><div class="stat-number">32</div><div class="stat-label">Partner Schools</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">👧</div><div><div class="stat-number">930</div><div class="stat-label">Students Enrolled</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">📆</div><div><div class="stat-number">18</div><div class="stat-label">Active Programs</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">📍</div><div><div class="stat-number">10</div><div class="stat-label">Regions Covered</div></div></div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>School Participation</h3></div>
+                        <div class="card-content">
+                            <table class="data-table">
+                                <thead><tr><th>School</th><th>County</th><th>Programs</th><th>Progress</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    <% if (schoolList && schoolList.length > 0) { %>
+                                        <% schoolList.forEach(school => { %>
+                                            <tr>
+                                                <td><%= school.name %></td>
+                                                <td><%= (school.address && school.address.city) || '—' %></td>
+                                                <td><%= (school.programsEnrolled && school.programsEnrolled.length > 0) ? school.programsEnrolled.length : '0' %></td>
+                                                <td><%= school.studentCount || 0 %></td>
+                                                <td><%= school.status %></td>
+                                            </tr>
+                                        <% }) %>
+                                    <% } else { %>
+                                        <tr><td colspan="5" class="placeholder-text">No partner schools found yet.</td></tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Add Partner School</h3></div>
+                        <div class="card-content">
+                            <form action="/dashboard/schools/add" method="POST" class="form-grid">
+                                <label>Name<input type="text" name="name" required></label>
+                                <label>Street<input type="text" name="street"></label>
+                                <label>City<input type="text" name="city"></label>
+                                <label>State<input type="text" name="state"></label>
+                                <label>Zip Code<input type="text" name="zipCode"></label>
+                                <label>Country<input type="text" name="country" value="Kenya"></label>
+                                <label>Contact Name<input type="text" name="contactName"></label>
+                                <label>Contact Email<input type="email" name="contactEmail"></label>
+                                <label>Contact Phone<input type="text" name="contactPhone"></label>
+                                <label>Student Count<input type="number" name="studentCount" min="0" value="0"></label>
+                                <label>Status<select name="status"><option value="active">Active</option><option value="pending">Pending</option><option value="inactive">Inactive</option></select></label>
+                                <button type="submit" class="btn btn-primary">Add School</button>
+                            </form>
+                        </div>
+                    </div>
+                <% } else if (page === 'events') { %>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon">📅</div><div><div class="stat-number">14</div><div class="stat-label">Upcoming Events</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🚩</div><div><div class="stat-number">4</div><div class="stat-label">Pending Approvals</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🎓</div><div><div class="stat-number">520</div><div class="stat-label">Registered Scouts</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">⏳</div><div><div class="stat-number">3</div><div class="stat-label">Events this Week</div></div></div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Event Schedule</h3></div>
+                        <div class="card-content">
+                            <table class="data-table">
+                                <thead><tr><th>Event</th><th>Date</th><th>Location</th><th>Team</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    <% if (eventList && eventList.length > 0) { %>
+                                        <% eventList.forEach(event => { %>
+                                            <tr>
+                                                <td><%= event.name %></td>
+                                                <td><%= event.date ? new Date(event.date).toLocaleDateString() : 'TBD' %></td>
+                                                <td><%= event.location %></td>
+                                                <td><%= event.team || 'TBD' %></td>
+                                                <td><%= event.status %></td>
+                                            </tr>
+                                        <% }) %>
+                                    <% } else { %>
+                                        <tr><td colspan="5" class="placeholder-text">No events scheduled yet.</td></tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Add Event</h3></div>
+                        <div class="card-content">
+                            <form action="/dashboard/events/add" method="POST" class="form-grid">
+                                <label>Event Name<input type="text" name="name" required></label>
+                                <label>Date<input type="date" name="date" required></label>
+                                <label>Location<input type="text" name="location" required></label>
+                                <label>Team<input type="text" name="team"></label>
+                                <label>Registered Count<input type="number" min="0" name="registeredCount" value="0"></label>
+                                <label>Status<select name="status"><option>Planning</option><option>Confirmed</option><option>Completed</option><option>Cancelled</option></select></label>
+                                <button type="submit" class="btn btn-primary">Add Event</button>
+                            </form>
+                        </div>
+                    </div>
+                <% } else if (page === 'programs') { %>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon">📚</div><div><div class="stat-number">28</div><div class="stat-label">Program Offerings</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🏕</div><div><div class="stat-number">9</div><div class="stat-label">Live Programs</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🕒</div><div><div class="stat-number">12</div><div class="stat-label">Upcoming Starts</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🧾</div><div><div class="stat-number">5</div><div class="stat-label">New Proposals</div></div></div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Program Catalog</h3></div>
+                        <div class="card-content">
+                            <table class="data-table">
+                                <thead><tr><th>Name</th><th>Category</th><th>Duration</th><th>Enrollment</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    <% if (programList && programList.length > 0) { %>
+                                        <% programList.forEach(program => { %>
+                                            <tr>
+                                                <td><%= program.name %></td>
+                                                <td><%= program.category %></td>
+                                                <td><%= program.duration %></td>
+                                                <td><%= program.maxParticipants %></td>
+                                                <td><%= program.status %></td>
+                                            </tr>
+                                        <% }) %>
+                                    <% } else { %>
+                                        <tr><td colspan="5" class="placeholder-text">No programs available yet.</td></tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Add Program</h3></div>
+                        <div class="card-content">
+                            <form action="/dashboard/programs/add" method="POST" class="form-grid">
+                                <label>Name<input type="text" name="name" required></label>
+                                <label>Description<textarea name="description" rows="2" required></textarea></label>
+                                <label>Category<select name="category" required><option value="leadership">Leadership</option><option value="outdoor">Outdoor</option><option value="team-building">Team Building</option><option value="first-aid">First Aid</option><option value="environmental">Environmental</option><option value="community-service">Community Service</option></select></label>
+                                <label>Age Min<input type="number" name="ageMin" min="5" max="18" value="8"></label>
+                                <label>Age Max<input type="number" name="ageMax" min="5" max="18" value="16"></label>
+                                <label>Duration<select name="duration"><option value="half-day">Half Day</option><option value="full-day">Full Day</option><option value="weekend">Weekend</option><option value="week">Week</option><option value="month">Month</option></select></label>
+                                <label>Max Participants<input type="number" name="maxParticipants" min="1" value="10"></label>
+                                <label>Price Amount<input type="number" step="0.01" name="priceAmount" min="0" value="0"></label>
+                                <label>Price Currency<input type="text" name="priceCurrency" value="USD"></label>
+                                <label>Status<select name="status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="draft">Draft</option></select></label>
+                                <button type="submit" class="btn btn-primary">Add Program</button>
+                            </form>
+                        </div>
+                    </div>
+                <% } else { %>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Page Coming Soon</h3></div>
+                        <div class="card-content"><p class="placeholder-text">This section is under construction. Come back soon.</p></div>
+                    </div>
                 <% } %>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>
             </div>
         </main>
     </div>

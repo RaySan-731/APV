@@ -98,6 +98,17 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a href="/dashboard/trainers" class="nav-link <%= page === 'trainers' ? 'active' : '' %>">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                                Trainers
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a href="/dashboard/settings" class="nav-link <%= page === 'settings' ? 'active' : '' %>">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="3"></circle>
@@ -251,20 +262,24 @@
                         <div class="card-header"><h3>Staff Directory</h3></div>
                         <div class="card-content">
                             <table class="data-table">
-                                <thead><tr><th>Name</th><th>Role</th><th>Zone</th><th>Status</th><th>Last Active</th></tr></thead>
+                                <thead><tr><th>ID Number</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
                                 <tbody>
                                 <% if (staffList && staffList.length > 0) { %>
                                     <% staffList.forEach(staff => { %>
                                         <tr>
+                                            <td><%= staff.idNumber || '—' %></td>
                                             <td><%= staff.name %></td>
+                                            <td><%= staff.email %></td>
                                             <td><%= staff.role %></td>
-                                            <td><%= staff.zone || '—' %></td>
                                             <td><%= staff.status %></td>
-                                            <td><%= staff.lastActive ? new Date(staff.lastActive).toLocaleString() : 'N/A' %></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline" onclick="editStaff('<%= staff._id %>', '<%= staff.idNumber || '' %>', '<%= staff.name %>', '<%= staff.email %>', '<%= staff.role %>', '<%= staff.status %>')">Edit</button>
+                                                <button type="button" class="btn btn-sm btn-outline" onclick="deleteStaff('<%= staff._id %>')">Delete</button>
+                                            </td>
                                         </tr>
                                     <% }) %>
                                 <% } else { %>
-                                    <tr><td colspan="5" class="placeholder-text">No staff entries found yet.</td></tr>
+                                    <tr><td colspan="6" class="placeholder-text">No staff entries found yet.</td></tr>
                                 <% } %>
                             </tbody>
                             </table>
@@ -274,13 +289,42 @@
                         <div class="card-header"><h3>Add New Staff Member</h3></div>
                         <div class="card-content">
                             <form action="/dashboard/staff/add" method="POST" class="form-grid">
+                                <label>ID Number<input type="text" name="idNumber"></label>
                                 <label>Name<input type="text" name="name" required></label>
                                 <label>Email<input type="email" name="email" required></label>
                                 <label>Role<input type="text" name="role" required></label>
-                                <label>Zone<input type="text" name="zone" required></label>
                                 <label>Status<select name="status"><option>Active</option><option>On Leave</option><option>Inactive</option></select></label>
                                 <button type="submit" class="btn btn-primary">Add Staff</button>
                             </form>
+                        </div>
+                    </div>
+
+                    <!-- Edit Staff Modal -->
+                    <div id="editStaffModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Edit Staff Member</h3>
+                                <button type="button" class="close-btn" onclick="closeEditStaffModal()">×</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="editStaffForm" class="form-grid">
+                                    <input type="hidden" id="editStaffId" name="staffId">
+                                    <label>ID Number<input type="text" id="editIdNumber" name="idNumber"></label>
+                                    <label>Name<input type="text" id="editName" name="name" required></label>
+                                    <label>Email<input type="email" id="editEmail" name="email" required></label>
+                                    <label>Role<input type="text" id="editRole" name="role" required></label>
+                                    <label>Status<select id="editStatus" name="status">
+                                        <option>Active</option>
+                                        <option>On Leave</option>
+                                        <option>Inactive</option>
+                                    </select></label>
+                                    <div id="editMessage" class="message" style="display: none; grid-column: 1 / -1; margin-top: 1rem;"></div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeEditStaffModal()">Cancel</button>
+                                <button type="button" class="btn btn-primary" onclick="saveEditStaff()">Save Changes</button>
+                            </div>
                         </div>
                     </div>
                 <% } else if (page === 'schools') { %>
@@ -422,6 +466,98 @@
                                 <label>Status<select name="status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="draft">Draft</option></select></label>
                                 <button type="submit" class="btn btn-primary">Add Program</button>
                             </form>
+                        </div>
+                    </div>
+                <% } else if (page === 'trainers') { %>
+                    <% 
+                        let totalTrainers = trainersList ? trainersList.length : 0;
+                        let activeTrainers = trainersList ? trainersList.filter(t => t.status === 'Active').length : 0;
+                        let onLeaveTrainers = trainersList ? trainersList.filter(t => t.status === 'On Leave').length : 0;
+                        let certifiedTrainers = Math.floor(totalTrainers * 0.75); // Placeholder calculation
+                    %>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon">👨‍🏫</div><div><div class="stat-number"><%= totalTrainers %></div><div class="stat-label">Total Trainers</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">🟢</div><div><div class="stat-number"><%= activeTrainers %></div><div class="stat-label">Active Trainers</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">⭐</div><div><div class="stat-number"><%= totalTrainers > 0 ? ((activeTrainers / totalTrainers * 100).toFixed(0) + '%') : '0%' %></div><div class="stat-label">Active Rate</div></div></div>
+                        <div class="stat-card"><div class="stat-icon">📊</div><div><div class="stat-number"><%= onLeaveTrainers %></div><div class="stat-label">On Leave</div></div></div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>Trainers Directory</h3>
+                        </div>
+                        <div class="card-content">
+                            <table class="data-table">
+                                <thead><tr><th>ID Number</th><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
+                                <tbody>
+                                <% if (trainersList && trainersList.length > 0) { %>
+                                    <% trainersList.forEach(trainer => { %>
+                                        <tr>
+                                            <td><%= trainer.idNumber || '—' %></td>
+                                            <td><%= trainer.name %></td>
+                                            <td><%= trainer.email %></td>
+                                            <td><%= trainer.phone || '—' %></td>
+                                            <td><span class="badge badge-<%= trainer.status === 'Active' ? 'success' : trainer.status === 'On Leave' ? 'warning' : 'danger' %>"><%= trainer.status %></span></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline" onclick="editTrainer('<%= trainer._id %>', '<%= trainer.idNumber || '' %>', '<%= trainer.name %>', '<%= trainer.email %>', '<%= trainer.phone || '' %>', '<%= trainer.status %>')">Edit</button>
+                                                <button type="button" class="btn btn-sm btn-outline" onclick="deleteTrainer('<%= trainer._id %>')">Delete</button>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                <% } else { %>
+                                    <tr><td colspan="6" class="placeholder-text">No trainers found. Add one to get started!</td></tr>
+                                <% } %>
+                            </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>Add New Trainer</h3>
+                        </div>
+                        <div class="card-content">
+                            <form action="/dashboard/trainer/add" method="POST" class="form-grid">
+                                <label>ID Number<input type="text" name="idNumber" placeholder="e.g., TRN001"></label>
+                                <label>Name<input type="text" name="name" required placeholder="Full Name"></label>
+                                <label>Email<input type="email" name="email" required placeholder="trainer@example.com"></label>
+                                <label>Phone<input type="tel" name="phone" placeholder="+254712345678"></label>
+                                <label>Status<select name="status" required>
+                                    <option value="">Select Status</option>
+                                    <option value="Active">Active</option>
+                                    <option value="On Leave">On Leave</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select></label>
+                                <label>Password<input type="password" name="password" required placeholder="Set initial password"></label>
+                                <button type="submit" class="btn btn-primary">Add Trainer</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Edit Trainer Modal -->
+                    <div id="editTrainerModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Edit Trainer</h3>
+                                <button type="button" class="close-btn" onclick="closeEditTrainerModal()">×</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="editTrainerForm" class="form-grid">
+                                    <input type="hidden" id="editTrainerId" name="trainerId">
+                                    <label>ID Number<input type="text" id="editTrainerIdNumber" name="idNumber"></label>
+                                    <label>Name<input type="text" id="editTrainerName" name="name" required></label>
+                                    <label>Email<input type="email" id="editTrainerEmail" name="email" required></label>
+                                    <label>Phone<input type="tel" id="editTrainerPhone" name="phone"></label>
+                                    <label>Status<select id="editTrainerStatus" name="status" required>
+                                        <option value="Active">Active</option>
+                                        <option value="On Leave">On Leave</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select></label>
+                                    <div id="editTrainerMessage" class="message" style="display: none; grid-column: 1 / -1; margin-top: 1rem;"></div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeEditTrainerModal()">Cancel</button>
+                                <button type="button" class="btn btn-primary" onclick="saveEditTrainer()">Save Changes</button>
+                            </div>
                         </div>
                     </div>
                 <% } else { %>

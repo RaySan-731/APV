@@ -109,6 +109,262 @@ function updateActivities(activities) {
     });
 }
 
+// ============= STAFF MANAGEMENT FUNCTIONS =============
+
+// Open edit staff modal
+function editStaff(staffId, idNumber, name, email, role, status) {
+    document.getElementById('editStaffId').value = staffId;
+    document.getElementById('editIdNumber').value = idNumber;
+    document.getElementById('editName').value = name;
+    document.getElementById('editEmail').value = email;
+    document.getElementById('editRole').value = role;
+    document.getElementById('editStatus').value = status;
+    
+    // Clear any previous messages
+    const messageEl = document.getElementById('editMessage');
+    messageEl.style.display = 'none';
+    messageEl.textContent = '';
+    
+    // Show the modal
+    const modal = document.getElementById('editStaffModal');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+// Close edit staff modal
+function closeEditStaffModal() {
+    const modal = document.getElementById('editStaffModal');
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+}
+
+// Close modal when clicking outside of it
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('editStaffModal');
+    if (event.target === modal) {
+        closeEditStaffModal();
+    }
+});
+
+// Save edited staff
+async function saveEditStaff() {
+    const staffId = document.getElementById('editStaffId').value;
+    const idNumber = document.getElementById('editIdNumber').value;
+    const name = document.getElementById('editName').value;
+    const email = document.getElementById('editEmail').value;
+    const role = document.getElementById('editRole').value;
+    const status = document.getElementById('editStatus').value;
+    
+    const messageEl = document.getElementById('editMessage');
+    
+    // Validate required fields
+    if (!name || !email || !role) {
+        messageEl.textContent = '✗ Please fill in all required fields';
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.borderLeft = '4px solid #f5c6cb';
+        messageEl.style.display = 'block';
+        return;
+    }
+    
+    try {
+        const response = await fetch('/dashboard/staff/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                staffId,
+                idNumber: idNumber || null,
+                name,
+                email,
+                role,
+                status
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            messageEl.textContent = '✓ Staff member updated successfully';
+            messageEl.style.backgroundColor = '#d4edda';
+            messageEl.style.color = '#155724';
+            messageEl.style.borderLeft = '4px solid #28a745';
+            messageEl.style.display = 'block';
+            
+            // Reload page after 1.5 seconds
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            messageEl.textContent = '✗ ' + (data.error || 'Error updating staff member');
+            messageEl.style.backgroundColor = '#f8d7da';
+            messageEl.style.color = '#721c24';
+            messageEl.style.borderLeft = '4px solid #f5c6cb';
+            messageEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error updating staff:', error);
+        messageEl.textContent = '✗ Network error: ' + error.message;
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.borderLeft = '4px solid #f5c6cb';
+        messageEl.style.display = 'block';
+    }
+}
+
+// Delete staff
+async function deleteStaff(staffId) {
+    if (confirm('Are you sure you want to delete this staff member?')) {
+        try {
+            const response = await fetch('/dashboard/staff/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ staffId })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                alert('Staff member deleted successfully');
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to delete staff member'));
+            }
+        } catch (error) {
+            console.error('Error deleting staff:', error);
+            alert('Network error while deleting staff member');
+        }
+    }
+}
+
+// ============ TRAINER MANAGEMENT FUNCTIONS ============
+
+// Edit trainer
+function editTrainer(trainerId, idNumber, name, email, phone, status) {
+    document.getElementById('editTrainerId').value = trainerId;
+    document.getElementById('editTrainerIdNumber').value = idNumber;
+    document.getElementById('editTrainerName').value = name;
+    document.getElementById('editTrainerEmail').value = email;
+    document.getElementById('editTrainerPhone').value = phone;
+    document.getElementById('editTrainerStatus').value = status;
+
+    // Clear previous messages
+    const messageEl = document.getElementById('editTrainerMessage');
+    messageEl.style.display = 'none';
+    messageEl.textContent = '';
+
+    // Show modal
+    const modal = document.getElementById('editTrainerModal');
+    modal.style.display = 'block';
+}
+
+// Close trainer edit modal
+function closeEditTrainerModal() {
+    const modal = document.getElementById('editTrainerModal');
+    modal.style.display = 'none';
+}
+
+// Click outside modal to close
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('editTrainerModal');
+    if (modal && event.target === modal) {
+        closeEditTrainerModal();
+    }
+});
+
+// Save edited trainer
+async function saveEditTrainer() {
+    const trainerId = document.getElementById('editTrainerId').value;
+    const idNumber = document.getElementById('editTrainerIdNumber').value;
+    const name = document.getElementById('editTrainerName').value;
+    const email = document.getElementById('editTrainerEmail').value;
+    const phone = document.getElementById('editTrainerPhone').value;
+    const status = document.getElementById('editTrainerStatus').value;
+    const messageEl = document.getElementById('editTrainerMessage');
+
+    // Validation
+    if (!name || !email || !status) {
+        messageEl.textContent = 'Please fill in all required fields (Name, Email, Status)';
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.borderLeft = '4px solid #f5c6cb';
+        messageEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch('/dashboard/trainer/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                trainerId,
+                idNumber,
+                name,
+                email,
+                phone,
+                status
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            messageEl.textContent = '✓ Trainer updated successfully!';
+            messageEl.style.backgroundColor = '#d4edda';
+            messageEl.style.color = '#155724';
+            messageEl.style.borderLeft = '4px solid #c3e6cb';
+            messageEl.style.display = 'block';
+            
+            // Reload after 1 second
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            messageEl.textContent = '✗ ' + (data.error || 'Error updating trainer');
+            messageEl.style.backgroundColor = '#f8d7da';
+            messageEl.style.color = '#721c24';
+            messageEl.style.borderLeft = '4px solid #f5c6cb';
+            messageEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error updating trainer:', error);
+        messageEl.textContent = '✗ Network error: ' + error.message;
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.borderLeft = '4px solid #f5c6cb';
+        messageEl.style.display = 'block';
+    }
+}
+
+// Delete trainer
+async function deleteTrainer(trainerId) {
+    if (confirm('Are you sure you want to delete this trainer?')) {
+        try {
+            const response = await fetch('/dashboard/trainer/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ trainerId })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                alert('Trainer deleted successfully');
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to delete trainer'));
+            }
+        } catch (error) {
+            console.error('Error deleting trainer:', error);
+            alert('Network error while deleting trainer');
+        }
+    }
+}
+
 // Chart functionality (placeholder for future implementation)
 function initializeCharts() {
     // This would initialize charts using a library like Chart.js

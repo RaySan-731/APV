@@ -261,13 +261,249 @@ app.post('/admin/bookings/delete', requireAuth, requireFounder, async (req, res)
 // Add staff from dashboard page
 app.post('/dashboard/staff/add', requireAuth, async (req, res) => {
   try {
-    const { name, email, role, zone, status } = req.body;
-    const staff = new Staff({ name, email, role, zone, status, lastActive: new Date() });
+    const { idNumber, name, email, role, status } = req.body;
+    console.log('=== STAFF ADD REQUEST ===');
+    console.log('Full req.body:', JSON.stringify(req.body, null, 2));
+    console.log('Extracted values:', { idNumber, name, email, role, status });
+    
+    if (!name || !email || !role) {
+      console.error('Missing required fields:', { name, email, role });
+      return res.status(400).send('Missing required fields: name, email, role');
+    }
+    
+    const staffData = {
+      idNumber: idNumber && idNumber.trim() ? idNumber.trim() : null,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      role: role.trim(),
+      status: status || 'Active',
+      lastActive: new Date()
+    };
+    
+    console.log('Staff data to save:', JSON.stringify(staffData, null, 2));
+    const staff = new Staff(staffData);
+    
     await staff.save();
+    console.log('✓ Staff saved successfully:', staff._id, staff.idNumber, staff.name);
+    console.log('=== END STAFF ADD REQUEST ===\n');
+    
     res.redirect('/dashboard/staff');
   } catch (err) {
-    console.error('Error saving staff:', err);
-    res.redirect('/dashboard/staff');
+    console.error('✗ Error saving staff:', err.message);
+    console.error('Stack:', err.stack);
+    console.log('=== END STAFF ADD REQUEST ===\n');
+    res.status(500).send('Error saving staff: ' + err.message);
+  }
+});
+
+// Update staff member
+app.post('/dashboard/staff/update', requireAuth, async (req, res) => {
+  try {
+    const { staffId, idNumber, name, email, role, status } = req.body;
+    console.log('=== STAFF UPDATE REQUEST ===');
+    console.log('Staff ID:', staffId);
+    console.log('Update data:', { idNumber, name, email, role, status });
+    
+    if (!staffId || !name || !email || !role) {
+      console.error('Missing required fields');
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    
+    const updateData = {
+      idNumber: idNumber && idNumber.trim() ? idNumber.trim() : null,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      role: role.trim(),
+      status: status || 'Active'
+    };
+    
+    const staff = await Staff.findByIdAndUpdate(
+      staffId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!staff) {
+      console.error('Staff member not found:', staffId);
+      return res.status(404).json({ success: false, error: 'Staff member not found' });
+    }
+    
+    console.log('✓ Staff updated successfully:', staff._id, staff.name);
+    console.log('=== END STAFF UPDATE REQUEST ===\n');
+    
+    res.json({ success: true, message: 'Staff member updated successfully', staff });
+  } catch (err) {
+    console.error('✗ Error updating staff:', err.message);
+    console.error('Stack:', err.stack);
+    console.log('=== END STAFF UPDATE REQUEST ===\n');
+    res.status(500).json({ success: false, error: 'Error updating staff: ' + err.message });
+  }
+});
+
+// Delete staff member
+app.post('/dashboard/staff/delete', requireAuth, async (req, res) => {
+  try {
+    const { staffId } = req.body;
+    console.log('=== STAFF DELETE REQUEST ===');
+    console.log('Staff ID:', staffId);
+    
+    if (!staffId) {
+      return res.status(400).json({ success: false, error: 'Staff ID is required' });
+    }
+    
+    const staff = await Staff.findByIdAndDelete(staffId);
+    
+    if (!staff) {
+      console.error('Staff member not found:', staffId);
+      return res.status(404).json({ success: false, error: 'Staff member not found' });
+    }
+    
+    console.log('✓ Staff deleted successfully:', staff._id, staff.name);
+    console.log('=== END STAFF DELETE REQUEST ===\n');
+    
+    res.json({ success: true, message: 'Staff member deleted successfully' });
+  } catch (err) {
+    console.error('✗ Error deleting staff:', err.message);
+    console.error('Stack:', err.stack);
+    console.log('=== END STAFF DELETE REQUEST ===\n');
+    res.status(500).json({ success: false, error: 'Error deleting staff: ' + err.message });
+  }
+});
+
+// ============ TRAINER MANAGEMENT ROUTES ============
+
+// Add new trainer
+app.post('/dashboard/trainer/add', requireAuth, async (req, res) => {
+  try {
+    console.log('=== START ADD TRAINER REQUEST ===');
+    const { idNumber, name, email, phone, status, password } = req.body;
+    console.log('Received body:', { idNumber, name, email, phone, status });
+
+    // Validation
+    if (!name || !email || !status) {
+      console.log('✗ Missing required fields');
+      return res.status(400).json({ success: false, error: 'Name, email, and status are required' });
+    }
+
+    // Hash password if provided
+    const bcrypt = require('bcryptjs');
+    let passwordHash = '';
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      passwordHash = await bcrypt.hash(password, salt);
+      console.log('Password hashed successfully');
+    }
+
+    const trainerData = {
+      idNumber: idNumber ? idNumber.trim() : undefined,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone ? phone.trim() : undefined,
+      role: 'trainer', // Explicitly set role to 'trainer'
+      status: status.trim()
+    };
+
+    if (passwordHash) {
+      trainerData.password = passwordHash;
+    }
+
+    console.log('Creating trainer with data:', { ...trainerData, password: '***' });
+    const trainer = new Staff(trainerData);
+    await trainer.save();
+
+    console.log('✓ Trainer created successfully:', trainer._id, trainer.name);
+    console.log('=== END ADD TRAINER REQUEST ===\n');
+
+    res.json({ 
+      success: true, 
+      message: 'Trainer added successfully',
+      trainer: trainer 
+    });
+  } catch (err) {
+    console.error('✗ Error adding trainer:', err.message);
+    console.error('Stack:', err.stack);
+    console.log('=== END ADD TRAINER REQUEST ===\n');
+    res.status(500).json({ success: false, error: 'Error adding trainer: ' + err.message });
+  }
+});
+
+// Update trainer
+app.post('/dashboard/trainer/update', requireAuth, async (req, res) => {
+  try {
+    console.log('=== START UPDATE TRAINER REQUEST ===');
+    const { trainerId, idNumber, name, email, phone, status } = req.body;
+    console.log('Received body:', { trainerId, idNumber, name, email, phone, status });
+
+    // Validation
+    if (!trainerId || !name || !email || !status) {
+      console.log('✗ Missing required fields (trainerId, name, email, status required)');
+      return res.status(400).json({ success: false, error: 'Trainer ID, name, email, and status are required' });
+    }
+
+    const updateData = {
+      idNumber: idNumber ? idNumber.trim() : undefined,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone ? phone.trim() : undefined,
+      status: status.trim()
+    };
+
+    console.log('Updating trainer', trainerId, 'with data:', updateData);
+    const updatedTrainer = await Staff.findByIdAndUpdate(
+      trainerId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedTrainer) {
+      console.log('✗ Trainer not found');
+      return res.status(404).json({ success: false, error: 'Trainer not found' });
+    }
+
+    console.log('✓ Trainer updated successfully:', updatedTrainer._id, updatedTrainer.name);
+    console.log('=== END UPDATE TRAINER REQUEST ===\n');
+
+    res.json({ 
+      success: true, 
+      message: 'Trainer updated successfully',
+      trainer: updatedTrainer 
+    });
+  } catch (err) {
+    console.error('✗ Error updating trainer:', err.message);
+    console.error('Stack:', err.stack);
+    console.log('=== END UPDATE TRAINER REQUEST ===\n');
+    res.status(500).json({ success: false, error: 'Error updating trainer: ' + err.message });
+  }
+});
+
+// Delete trainer
+app.post('/dashboard/trainer/delete', requireAuth, async (req, res) => {
+  try {
+    console.log('=== START DELETE TRAINER REQUEST ===');
+    const { trainerId } = req.body;
+    console.log('Trainer ID to delete:', trainerId);
+
+    if (!trainerId) {
+      console.log('✗ Trainer ID is required');
+      return res.status(400).json({ success: false, error: 'Trainer ID is required' });
+    }
+
+    const trainer = await Staff.findByIdAndDelete(trainerId);
+
+    if (!trainer) {
+      console.log('✗ Trainer not found');
+      return res.status(404).json({ success: false, error: 'Trainer not found' });
+    }
+
+    console.log('✓ Trainer deleted successfully:', trainer._id, trainer.name);
+    console.log('=== END DELETE TRAINER REQUEST ===\n');
+
+    res.json({ success: true, message: 'Trainer deleted successfully' });
+  } catch (err) {
+    console.error('✗ Error deleting trainer:', err.message);
+    console.error('Stack:', err.stack);
+    console.log('=== END DELETE TRAINER REQUEST ===\n');
+    res.status(500).json({ success: false, error: 'Error deleting trainer: ' + err.message });
   }
 });
 
@@ -340,6 +576,7 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
 
     const modelData = {
       staffList: [],
+      trainersList: [],
       schoolList: [],
       eventList: [],
       programList: []
@@ -347,6 +584,13 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
 
     if (page === 'staff') {
       modelData.staffList = await Staff.find().sort({ createdAt: -1 }).lean();
+    }
+
+    if (page === 'trainers') {
+      // Fetch all staff members with role 'trainer'
+      modelData.trainersList = await Staff.find({ role: 'trainer' }).sort({ createdAt: -1 }).lean();
+      console.log('=== TRAINERS PAGE FETCH ===');
+      console.log('Found trainers:', modelData.trainersList.length);
     }
 
     if (page === 'schools') {

@@ -22,6 +22,11 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  idNumber: {
+    type: String,
+    trim: true,
+    sparse: true
+  },
   role: {
     type: String,
     enum: ['founder', 'commissioner', 'training_officer', 'medical', 'rover'],

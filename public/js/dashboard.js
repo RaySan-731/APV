@@ -365,6 +365,131 @@ async function deleteTrainer(trainerId) {
     }
 }
 
+// ============ SCHOOL ALLOCATION FUNCTIONS ============
+
+// Open allocate schools modal
+async function openAllocateSchoolsModal(trainerId, trainerName) {
+    document.getElementById('allocateTrainerName').textContent = trainerName;
+    document.getElementById('allocateTrainerId').value = trainerId;
+
+    const messageEl = document.getElementById('allocateMessage');
+    messageEl.style.display = 'none';
+
+    // Load schools
+    try {
+        const response = await fetch(`/dashboard/trainer/${trainerId}/schools`);
+        const data = await response.json();
+
+        if (data.success) {
+            renderSchoolsList(data.schools, data.allocatedSchools || []);
+            const modal = document.getElementById('allocateSchoolsModal');
+            modal.style.display = 'block';
+        } else {
+            messageEl.textContent = '✗ Error loading schools: ' + (data.error || 'Unknown error');
+            messageEl.style.backgroundColor = '#f8d7da';
+            messageEl.style.color = '#721c24';
+            messageEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error loading schools:', error);
+        messageEl.textContent = '✗ Network error: ' + error.message;
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.display = 'block';
+    }
+}
+
+// Render schools list with checkboxes
+function renderSchoolsList(schools, allocatedSchools) {
+    const listContainer = document.getElementById('allocateSchoolsList');
+    
+    if (!schools || schools.length === 0) {
+        listContainer.innerHTML = '<p class="placeholder-text">No schools available.</p>';
+        return;
+    }
+
+    let html = '<div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem;">';
+    
+    schools.forEach(school => {
+        const isAllocated = allocatedSchools.some(s => s._id === school._id || s === school._id);
+        html += `
+            <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 0.5rem; transition: background-color 0.2s;">
+                <input type="checkbox" name="school" value="${school._id}" ${isAllocated ? 'checked' : ''} 
+                    style="cursor: pointer; width: 18px; height: 18px;">
+                <div>
+                    <strong>${school.name}</strong>
+                    <br>
+                    <small style="color: #666;">${school.address?.city || 'Location not specified'}</small>
+                </div>
+            </label>
+        `;
+    });
+    
+    html += '</div>';
+    listContainer.innerHTML = html;
+}
+
+// Close allocate schools modal
+function closeAllocateSchoolsModal() {
+    const modal = document.getElementById('allocateSchoolsModal');
+    modal.style.display = 'none';
+}
+
+// Click outside modal to close
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('allocateSchoolsModal');
+    if (modal && event.target === modal) {
+        closeAllocateSchoolsModal();
+    }
+});
+
+// Save school allocation
+async function saveSchoolAllocation() {
+    const trainerId = document.getElementById('allocateTrainerId').value;
+    const checkboxes = document.querySelectorAll('input[name="school"]:checked');
+    const selectedSchools = Array.from(checkboxes).map(cb => cb.value);
+    const messageEl = document.getElementById('allocateMessage');
+
+    try {
+        const response = await fetch('/dashboard/trainer/allocate-schools', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                trainerId,
+                schoolIds: selectedSchools
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            messageEl.textContent = '✓ Schools allocated successfully!';
+            messageEl.style.backgroundColor = '#d4edda';
+            messageEl.style.color = '#155724';
+            messageEl.style.borderLeft = '4px solid #c3e6cb';
+            messageEl.style.display = 'block';
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            messageEl.textContent = '✗ ' + (data.error || 'Error allocating schools');
+            messageEl.style.backgroundColor = '#f8d7da';
+            messageEl.style.color = '#721c24';
+            messageEl.style.borderLeft = '4px solid #f5c6cb';
+            messageEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error allocating schools:', error);
+        messageEl.textContent = '✗ Network error: ' + error.message;
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.borderLeft = '4px solid #f5c6cb';
+        messageEl.style.display = 'block';
+    }
+}
+
 // Chart functionality (placeholder for future implementation)
 function initializeCharts() {
     // This would initialize charts using a library like Chart.js

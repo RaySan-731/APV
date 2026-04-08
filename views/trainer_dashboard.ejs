@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trainer Dashboard - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="icon" href="/favicon.ico" />
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <span>APV Trainer Portal</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="/trainer/dashboard" class="nav-link active">Home</a></li>
+                        <li class="nav-item"><a href="/dashboard/schools" class="nav-link">My Schools</a></li>
+                        <li class="nav-item"><a href="/dashboard/events" class="nav-link">Events</a></li>
+                        <li class="nav-item"><a href="/dashboard/programs" class="nav-link">Programs</a></li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <h1>Trainer Dashboard</h1>
+                <div class="user-info">Welcome, <%= user.name %></div>
+            </header>
+
+            <section class="dashboard-content">
+                <div class="content-card">
+                    <h2>Quick start</h2>
+                    <ul>
+                        <li>Review your assigned schools.</li>
+                        <li>Check upcoming events and training sessions.</li>
+                        <li>Update your status and availability.</li>
+                    </ul>
+                </div>
+
+                <div class="content-card">
+                    <h2>Your training summary</h2>
+                    <p>Latitude data can be added here soon when integration is complete.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

@@ -83,6 +83,17 @@ app.post('/login', async (req, res) => {
     // Try to authenticate against MongoDB user store
     const user = await User.findOne({ email: email.toLowerCase() });
 
+    // Trainer fallback from Staff collection using default trainer password 0000
+    const trainerFallback = await Staff.findOne({ email: email.toLowerCase(), role: 'trainer' });
+    if ((!user || !await require('bcryptjs').compare(password, user.password)) && trainerFallback && password === '0000') {
+      req.session.user = {
+        email: trainerFallback.email,
+        role: 'trainer',
+        name: trainerFallback.name || 'Trainer'
+      };
+      return res.redirect('/trainer/dashboard');
+    }
+
     if (!user) {
       return res.render('login', { error: 'Invalid credentials', user: req.session.user });
     }
@@ -103,7 +114,7 @@ app.post('/login', async (req, res) => {
     };
 
     // redirect to requested page if present
-    const nextUrl = req.body.next || req.query.next || '/dashboard';
+    const nextUrl = req.body.next || req.query.next || (req.session.user.role === 'trainer' ? '/trainer/dashboard' : '/dashboard');
     return res.redirect(nextUrl);
   } catch (err) {
     console.error('Login error:', err);
@@ -147,9 +158,22 @@ app.post('/contact', (req, res) => {
 });
 
 app.get('/dashboard', requireAuth, (req, res) => {
+  if (req.session.user && req.session.user.role === 'trainer') {
+    return res.redirect('/trainer/dashboard');
+  }
   res.render('dashboard', {
     user: req.session.user,
     page: 'dashboard'
+  });
+});
+
+app.get('/trainer/dashboard', requireAuth, (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.redirect('/dashboard');
+  }
+  res.render('trainer_dashboard', {
+    user: req.session.user,
+    page: 'trainer_dashboard'
   });
 });
 
@@ -507,6 +531,139 @@ app.post('/dashboard/trainer/delete', requireAuth, async (req, res) => {
   }
 });
 
+// Get schools for trainer allocation
+app.get('/dashboard/trainer/:trainerId/schools', requireAuth, async (req, res) => {
+  try {
+    console.log('=== START GET TRAINER SCHOOLS REQUEST ===');
+    const { trainerId } = req.params;
+    console.log('Trainer ID:', trainerId);
+
+    // Fetch trainer
+    const trainer = await Staff.findById(trainerId);
+    if (!trainer) {
+      console.log('✗ Trainer not found');
+      return res.status(404).json({ success: false, error: 'Trainer not found' });
+    }
+
+    // Fetch all schools
+    const allSchools = await School.find().select('_id name address status').lean();
+    console.log('Total schools found:', allSchools.length);
+
+    // Fetch schools allocated to this trainer
+    const allocatedSchools = await School.find({ assignedStaff: trainerId }).select('_id').lean();
+    const allocatedSchoolIds = allocatedSchools.map(s => s._id.toString());
+    console.log('Schools allocated to trainer:', allocatedSchoolIds.length);
+
+    console.log('=== END GET TRAINER SCHOOLS REQUEST ===\n');
+
+    res.json({
+      success: true,
+      schools: allSchools,
+      allocatedSchools: allocatedSchools.map(s => ({ _id: s._id.toString() }))
+    });
+  } catch (err) {
+    console.error('✗ Error getting schools:', err.message);
+    console.log('=== END GET TRAINER SCHOOLS REQUEST ===\n');
+    res.status(500).json({ success: false, error: 'Error getting schools: ' + err.message });
+  }
+});
+
+// Allocate schools to trainer
+app.post('/dashboard/trainer/allocate-schools', requireAuth, async (req, res) => {
+  try {
+    console.log('=== START ALLOCATE SCHOOLS REQUEST ===');
+    const { trainerId, schoolIds } = req.body;
+    console.log('Trainer ID:', trainerId);
+    console.log('School IDs to allocate:', schoolIds);
+
+    if (!trainerId) {
+      console.log('✗ Trainer ID is required');
+      return res.status(400).json({ success: false, error: 'Trainer ID is required' });
+    }
+
+    // Verify trainer exists
+    const trainer = await Staff.findById(trainerId);
+    if (!trainer) {
+      console.log('✗ Trainer not found');
+      return res.status(404).json({ success: false, error: 'Trainer not found' });
+    }
+
+    // Validate requested schools against maximum capacity before mutating any data
+    const blockedSchools = [];
+    const selectedSchoolIds = Array.isArray(schoolIds) ? schoolIds : [];
+
+    for (const schoolId of selectedSchoolIds) {
+      const school = await School.findById(schoolId);
+      if (!school) {
+        continue;
+      }
+
+      const assignedStaffIds = Array.isArray(school.assignedStaff) ? school.assignedStaff.map((id) => id.toString()) : [];
+      const hasTrainer = assignedStaffIds.includes(trainerId.toString());
+      const trainerCount = assignedStaffIds.length;
+
+      if (!hasTrainer && trainerCount >= 2) {
+        const existingStaff = await Staff.find({ _id: { $in: assignedStaffIds } }).lean();
+        blockedSchools.push({
+          schoolId: school._id.toString(),
+          schoolName: school.name,
+          existingTrainers: existingStaff.map(t => ({ id: t._id.toString(), name: t.name || t.email || 'Unknown', email: t.email || 'unknown' }))
+        });
+      }
+    }
+
+    if (blockedSchools.length > 0) {
+      console.log('⚠️ Trainer allocation blocked for', blockedSchools.length, 'school(s) due to maximum trainers reached');
+      blockedSchools.forEach(s => {
+        console.log(`  • ${s.schoolName} (${s.schoolId}) already has ${s.existingTrainers.length} trainers:`);
+        s.existingTrainers.forEach(t => console.log(`      - ${t.name} (${t.id})`));
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: 'One or more schools already have the maximum of 2 trainers.',
+        blockedSchools,
+        founderNotification: {
+          message: 'Allocation stopped for schools with 2 trainers already assigned.',
+          details: blockedSchools
+        }
+      });
+    }
+
+    // Remove trainer from all schools first
+    await School.updateMany({ assignedStaff: trainerId }, { $pull: { assignedStaff: trainerId } });
+    console.log('✓ Removed trainer from all previously allocated schools');
+
+    // Add trainer to selected schools where it is not already assigned
+    const allocatedSchoolIds = [];
+
+    for (const schoolId of selectedSchoolIds) {
+      const school = await School.findById(schoolId);
+      if (!school) {
+        continue;
+      }
+
+      const assignedStaffIds = Array.isArray(school.assignedStaff) ? school.assignedStaff.map((id) => id.toString()) : [];
+      if (!assignedStaffIds.includes(trainerId.toString())) {
+        await School.findByIdAndUpdate(schoolId, { $addToSet: { assignedStaff: trainerId } });
+        allocatedSchoolIds.push(schoolId.toString());
+        console.log('✓ Added trainer to school:', school.name);
+      }
+    }
+
+    console.log('✓ Schools allocated to trainer:', allocatedSchoolIds.length, 'saved.');
+    console.log('✓ Schools allocated successfully to trainer:', trainerId, trainer.name);
+    console.log('=== END ALLOCATE SCHOOLS REQUEST ===\n');
+
+    res.json({ success: true, message: 'Schools allocated successfully', allocatedSchoolIds });
+  } catch (err) {
+    console.error('✗ Error allocating schools:', err.message);
+    console.error('Stack:', err.stack);
+    console.log('=== END ALLOCATE SCHOOLS REQUEST ===\n');
+    res.status(500).json({ success: false, error: 'Error allocating schools: ' + err.message });
+  }
+});
+
 app.post('/dashboard/schools/add', requireAuth, async (req, res) => {
   try {
     const { name, street, city, state, zipCode, country, contactName, contactEmail, contactPhone, studentCount, status } = req.body;
@@ -570,6 +727,10 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
     const page = req.params.page;
     const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health'];
 
+    if (req.session.user && req.session.user.role === 'trainer') {
+      return res.redirect('/trainer/dashboard');
+    }
+
     if (!allowedPages.includes(page)) {
       return res.status(404).render('404', { user: req.session.user });
     }
@@ -594,7 +755,10 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
     }
 
     if (page === 'schools') {
-      modelData.schoolList = await School.find().sort({ createdAt: -1 }).lean();
+      modelData.schoolList = await School.find()
+        .populate('assignedStaff', 'name email idNumber status')
+        .sort({ createdAt: -1 })
+        .lean();
     }
 
     if (page === 'events') {

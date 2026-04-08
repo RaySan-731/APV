@@ -157,6 +157,13 @@ body {
     border: 1px solid #bee5eb;
 }
 
+.trainer-list {
+    margin-top: 0.5rem;
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.95rem;
+}
+
 .card {
     background: var(--card);
     border-radius: var(--radius);

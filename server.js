@@ -573,6 +573,7 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, async (req, res) =>
   try {
     console.log('=== START ALLOCATE SCHOOLS REQUEST ===');
     const { trainerId, schoolIds } = req.body;
+    const trainerObjectId = new mongoose.Types.ObjectId(trainerId);
     console.log('Trainer ID:', trainerId);
     console.log('School IDs to allocate:', schoolIds);
 
@@ -631,7 +632,11 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, async (req, res) =>
     }
 
     // Remove trainer from all schools first
-    await School.updateMany({ assignedStaff: trainerId }, { $pull: { assignedStaff: trainerId } });
+    const schoolsWithTrainer = await School.find({ assignedStaff: trainerObjectId });
+    for (const sch of schoolsWithTrainer) {
+      sch.assignedStaff = sch.assignedStaff.filter(id => !id.equals(trainerObjectId));
+      await sch.save();
+    }
     console.log('✓ Removed trainer from all previously allocated schools');
 
     // Add trainer to selected schools where it is not already assigned
@@ -643,9 +648,10 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, async (req, res) =>
         continue;
       }
 
-      const assignedStaffIds = Array.isArray(school.assignedStaff) ? school.assignedStaff.map((id) => id.toString()) : [];
-      if (!assignedStaffIds.includes(trainerId.toString())) {
-        await School.findByIdAndUpdate(schoolId, { $addToSet: { assignedStaff: trainerId } });
+      school.assignedStaff = school.assignedStaff || [];
+      if (!school.assignedStaff.some(id => id.equals(trainerObjectId))) {
+        school.assignedStaff.push(trainerObjectId);
+        await school.save();
         allocatedSchoolIds.push(schoolId.toString());
         console.log('✓ Added trainer to school:', school.name);
       }
@@ -722,6 +728,36 @@ app.post('/dashboard/programs/add', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/dashboard/schools', requireAuth, async (req, res) => {
+  if (req.session.user && req.session.user.role === 'trainer') {
+    return res.redirect('/trainer/dashboard');
+  }
+
+  try {
+    const schoolList = await School.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const assignedIds = [...new Set((schoolList || []).flatMap(school => (school.assignedStaff || []).map(String)))];
+    const trainers = assignedIds.length > 0
+      ? await Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber status').lean()
+      : [];
+    const trainerMap = new Map(trainers.map(trainer => [trainer._id.toString(), trainer]));
+    schoolList.forEach(school => {
+      school.assignedStaff = (school.assignedStaff || []).map(id => trainerMap.get(id.toString())).filter(Boolean);
+    });
+
+    res.render('dashboard', {
+      user: req.session.user,
+      page: 'schools',
+      schoolList
+    });
+  } catch (err) {
+    console.error('Error loading schools page:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
 app.get('/dashboard/:page', requireAuth, async (req, res) => {
   try {
     const page = req.params.page;
@@ -755,10 +791,15 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
     }
 
     if (page === 'schools') {
-      modelData.schoolList = await School.find()
-        .populate('assignedStaff', 'name email idNumber status')
-        .sort({ createdAt: -1 })
-        .lean();
+      modelData.schoolList = await School.find().sort({ createdAt: -1 }).lean();
+      const assignedIds = [...new Set((modelData.schoolList || []).flatMap(school => (school.assignedStaff || []).map(String)))];
+      const trainers = assignedIds.length > 0
+        ? await Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber status').lean()
+        : [];
+      const trainerMap = new Map(trainers.map(trainer => [trainer._id.toString(), trainer]));
+      modelData.schoolList.forEach(school => {
+        school.assignedStaff = (school.assignedStaff || []).map(id => trainerMap.get(id.toString())).filter(Boolean);
+      });
     }
 
     if (page === 'events') {

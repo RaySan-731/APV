@@ -464,15 +464,15 @@ async function saveSchoolAllocation() {
 
         const data = await response.json();
         if (data.success) {
-            messageEl.textContent = '✓ Schools allocated successfully!';
+            messageEl.textContent = '✓ Schools allocated successfully! Redirecting to schools page...';
             messageEl.style.backgroundColor = '#d4edda';
             messageEl.style.color = '#155724';
             messageEl.style.borderLeft = '4px solid #c3e6cb';
             messageEl.style.display = 'block';
 
             setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+                window.location.href = '/dashboard/schools';
+            }, 800);
         } else {
             messageEl.textContent = '✗ ' + (data.error || 'Error allocating schools');
             messageEl.style.backgroundColor = '#f8d7da';
@@ -495,6 +495,78 @@ function initializeCharts() {
     // This would initialize charts using a library like Chart.js
     console.log('Charts initialization placeholder');
 }
+
+// School sorting functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // School sorting
+    const schoolSelect = document.getElementById('schoolSortOrder');
+    const schoolTable = document.querySelector('#schools-table .data-table tbody');
+    
+    if (schoolSelect && schoolTable) {
+        schoolSelect.addEventListener('change', function() {
+            const rows = Array.from(schoolTable.querySelectorAll('tr'));
+            const order = this.value;
+            
+            rows.sort((a, b) => {
+                const textA = a.cells[0].textContent.trim().toLowerCase().replace(this.value, '');
+                const textB = b.cells[0].textContent.trim().toLowerCase().replace(this.value, '');
+                
+                if (order === 'asc') {
+                    return textA.localeCompare(textB);
+                } else {
+                    return textB.localeCompare(textA);
+                }
+            });
+            
+            rows.forEach(row => schoolTable.appendChild(row));
+        });
+    }
+    
+    // Staff sorting
+    const staffSelect = document.getElementById('staffSortOrder');
+    const staffTable = document.querySelector('#staff-table .data-table tbody');
+    
+    if (staffSelect && staffTable) {
+        staffSelect.addEventListener('change', function() {
+            const rows = Array.from(staffTable.querySelectorAll('tr'));
+            const order = this.value;
+            
+            rows.sort((a, b) => {
+                const textA = a.cells[1].textContent.trim().toLowerCase();
+                const textB = b.cells[1].textContent.trim().toLowerCase();
+                
+                if (order === 'asc') {
+                    return textA.localeCompare(textB);
+                } else {
+                    return textB.localeCompare(textA);
+                }
+            });
+            
+            rows.forEach(row => staffTable.appendChild(row));
+        });
+    }
+    
+    if (sortSelect && schoolTable) {
+        sortSelect.addEventListener('change', function() {
+            const rows = Array.from(schoolTable.querySelectorAll('tr'));
+            const order = this.value;
+            
+            rows.sort((a, b) => {
+                const textA = a.cells[0].textContent.trim().toLowerCase();
+                const textB = b.cells[0].textContent.trim().toLowerCase();
+                
+                if (order === 'asc') {
+                    return textA.localeCompare(textB);
+                } else {
+                    return textB.localeCompare(textA);
+                }
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => schoolTable.appendChild(row));
+        });
+    }
+});
 
 // Export functions for potential use in other scripts
 window.DashboardUtils = {

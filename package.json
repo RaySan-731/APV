@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "migrate": "node scripts/migrate_to_mongodb.js"
+    "migrate": "node scripts/migrate_to_mongodb.js",
+    "normalize-db": "node scripts/normalize_db_records.js"
   },
   "dependencies": {
     "express": "^4.18.2",

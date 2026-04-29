@@ -43,6 +43,16 @@ const schoolSchema = new mongoose.Schema({
     enum: ['active', 'inactive', 'pending'],
     default: 'active'
   },
+  assignedStaff: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Staff'
+  }],
+  scoutGroups: [{
+    name: String,
+    leader: String,
+    size: Number,
+    advancement: String
+  }],
   notes: String,
   createdAt: {
     type: Date,
@@ -64,5 +74,4 @@ schoolSchema.pre('save', function(next) {
 schoolSchema.index({ name: 1 });
 schoolSchema.index({ 'address.city': 1 });
 schoolSchema.index({ status: 1 });
-
-module.exports = mongoose.model('School', schoolSchema);
+module.exports = mongoose.model('School', schoolSchema);     

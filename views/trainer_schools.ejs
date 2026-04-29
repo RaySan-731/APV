@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Schools - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="icon" href="/favicon.ico" />
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <span>APV Trainer Portal</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="/trainer/dashboard" class="nav-link">Home</a></li>
+                        <li class="nav-item"><a href="/dashboard/schools" class="nav-link active">My Schools</a></li>
+                        <li class="nav-item"><a href="/dashboard/events" class="nav-link">Events</a></li>
+                        <li class="nav-item"><a href="/dashboard/programs" class="nav-link">Programs</a></li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <h1>My Schools</h1>
+                <div class="user-info">Welcome, <%= user.name %></div>
+            </header>
+
+            <section class="dashboard-content">
+                <% if (schoolList && schoolList.length > 0) { %>
+                    <% schoolList.forEach(school => { %>
+                        <div class="content-card school-card">
+                            <div class="card-header">
+                                <h3><%= school.name %></h3>
+                                <div class="school-status">
+                                    <span class="badge badge-<%= school.status === 'active' ? 'success' : school.status === 'pending' ? 'warning' : 'danger' %>">
+                                        <%= school.status %>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-content">
+                                <div class="school-info-grid">
+                                    <div class="info-section">
+                                        <h4>Contact Details</h4>
+                                        <% if (school.contactPerson) { %>
+                                            <p><strong><%= school.contactPerson.name %></strong></p>
+                                            <% if (school.contactPerson.email) { %>
+                                                <p>Email: <a href="mailto:<%= school.contactPerson.email %>"><%= school.contactPerson.email %></a></p>
+                                            <% } %>
+                                            <% if (school.contactPerson.phone) { %>
+                                                <p>Phone: <a href="tel:<%= school.contactPerson.phone %>"><%= school.contactPerson.phone %></a></p>
+                                            <% } %>
+                                        <% } else { %>
+                                            <p>No contact details available</p>
+                                        <% } %>
+                                    </div>
+                                    <div class="info-section">
+                                        <h4>Address</h4>
+                                        <% if (school.address) { %>
+                                            <p><%= school.address.street %></p>
+                                            <p><%= school.address.city %>, <%= school.address.state %> <%= school.address.zipCode %></p>
+                                            <p><%= school.address.country %></p>
+                                            <button class="btn btn-secondary" onclick="viewMap('<%= school.address.street %>, <%= school.address.city %>, <%= school.address.state %>')">View Map</button>
+                                        <% } else { %>
+                                            <p>No address available</p>
+                                        <% } %>
+                                    </div>
+                                    <div class="info-section">
+                                        <h4>School Info</h4>
+                                        <p>Students: <%= school.studentCount || 0 %></p>
+                                        <p>Programs: <%= (school.programsEnrolled && school.programsEnrolled.length) || 0 %></p>
+                                    </div>
+                                </div>
+
+                                <div class="school-actions">
+                                    <button class="btn btn-primary" onclick="logVisit('<%= school._id %>')">Log Visit</button>
+                                    <button class="btn btn-info" onclick="viewScoutGroups('<%= school._id %>')">Scout Groups</button>
+                                    <button class="btn btn-warning" onclick="submitFeedback('<%= school._id %>')">Submit Feedback</button>
+                                    <button class="btn btn-secondary" onclick="viewVisitLogs('<%= school._id %>')">Visit Logs</button>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="content-card">
+                        <p>No schools assigned to you yet.</p>
+                    </div>
+                <% } %>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals for actions -->
+    <div id="visitLogModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('visitLogModal')">&times;</span>
+            <h3>Log School Visit</h3>
+            <form id="visitLogForm">
+                <input type="hidden" id="visitSchoolId" name="schoolId">
+                <label>Date<input type="date" name="date" required></label>
+                <label>Purpose<textarea name="purpose" required></textarea></label>
+                <label>Who was met<input type="text" name="metWith"></label>
+                <label>What was discussed<textarea name="discussed"></textarea></label>
+                <label>Action Items<textarea name="actionItems"></textarea></label>
+                <button type="submit" class="btn btn-primary">Save Visit Log</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="feedbackModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('feedbackModal')">&times;</span>
+            <h3>Submit School Feedback</h3>
+            <form id="feedbackForm">
+                <input type="hidden" id="feedbackSchoolId" name="schoolId">
+                <label>Engagement Level<select name="engagementLevel" required>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select></label>
+                <label>Concerns<textarea name="concerns"></textarea></label>
+                <label>Suggestions<textarea name="suggestions"></textarea></label>
+                <button type="submit" class="btn btn-primary">Submit Feedback</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="scoutGroupsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('scoutGroupsModal')">&times;</span>
+            <h3>Scout Groups</h3>
+            <div id="scoutGroupsContent">
+                <!-- Scout groups will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="visitLogsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('visitLogsModal')">&times;</span>
+            <h3>Visit Logs</h3>
+            <div id="visitLogsContent">
+                <!-- Visit logs will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function viewMap(address) {
+            const encodedAddress = encodeURIComponent(address);
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+        }
+
+        function logVisit(schoolId) {
+            document.getElementById('visitSchoolId').value = schoolId;
+            document.getElementById('visitLogModal').style.display = 'block';
+        }
+
+        function submitFeedback(schoolId) {
+            document.getElementById('feedbackSchoolId').value = schoolId;
+            document.getElementById('feedbackModal').style.display = 'block';
+        }
+
+        function viewScoutGroups(schoolId) {
+            // Load scout groups for the school
+            fetch(`/api/schools/${schoolId}/scout-groups`)
+                .then(response => response.json())
+                .then(data => {
+                    const content = document.getElementById('scoutGroupsContent');
+                    if (data.groups && data.groups.length > 0) {
+                        content.innerHTML = data.groups.map(group => `
+                            <div class="scout-group">
+                                <h4>${group.name}</h4>
+                                <p>Leader: ${group.leader}</p>
+                                <p>Size: ${group.size}</p>
+                                <p>Advancement: ${group.advancement}</p>
+                            </div>
+                        `).join('');
+                    } else {
+                        content.innerHTML = '<p>No scout groups found.</p>';
+                    }
+                    document.getElementById('scoutGroupsModal').style.display = 'block';
+                });
+        }
+
+        function viewVisitLogs(schoolId) {
+            // Load visit logs for the school
+            fetch(`/api/schools/${schoolId}/visit-logs`)
+                .then(response => response.json())
+                .then(data => {
+                    const content = document.getElementById('visitLogsContent');
+                    if (data.logs && data.logs.length > 0) {
+                        content.innerHTML = data.logs.map(log => `
+                            <div class="visit-log">
+                                <h4>${new Date(log.date).toLocaleDateString()}</h4>
+                                <p><strong>Purpose:</strong> ${log.purpose}</p>
+                                <p><strong>Met with:</strong> ${log.metWith}</p>
+                                <p><strong>Discussed:</strong> ${log.discussed}</p>
+                                <p><strong>Action Items:</strong> ${log.actionItems}</p>
+                            </div>
+                        `).join('');
+                    } else {
+                        content.innerHTML = '<p>No visit logs found.</p>';
+                    }
+                    document.getElementById('visitLogsModal').style.display = 'block';
+                });
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Form submissions
+        document.getElementById('visitLogForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            fetch('/api/visit-logs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(response => response.json()).then(() => {
+                closeModal('visitLogModal');
+                alert('Visit log saved!');
+            });
+        });
+
+        document.getElementById('feedbackForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(response => response.json()).then(() => {
+                closeModal('feedbackModal');
+                alert('Feedback submitted!');
+            });
+        });
+    </script>
+</body>
+</html>

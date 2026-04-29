@@ -50,8 +50,268 @@
                     <h2>Your training summary</h2>
                     <p>Latitude data can be added here soon when integration is complete.</p>
                 </div>
+
+                <div class="content-card">
+                    <h2>Availability & Leave Management</h2>
+                    <div class="availability-section">
+                        <div class="calendar-container">
+                            <div class="calendar-header">
+                                <button id="prevMonth" class="btn btn-sm">‹</button>
+                                <h3 id="currentMonth">Month Year</h3>
+                                <button id="nextMonth" class="btn btn-sm">›</button>
+                            </div>
+                            <div class="calendar-grid">
+                                <div class="calendar-day header">Sun</div>
+                                <div class="calendar-day header">Mon</div>
+                                <div class="calendar-day header">Tue</div>
+                                <div class="calendar-day header">Wed</div>
+                                <div class="calendar-day header">Thu</div>
+                                <div class="calendar-day header">Fri</div>
+                                <div class="calendar-day header">Sat</div>
+                                <!-- Calendar days will be populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <div class="leave-requests">
+                            <h3>Leave Requests</h3>
+                            <form id="leaveRequestForm" class="form-grid">
+                                <label>Leave Type<select id="leaveType" required>
+                                    <option value="">Select Type</option>
+                                    <option value="annual">Annual Leave</option>
+                                    <option value="sick">Sick Leave</option>
+                                    <option value="maternity">Maternity Leave</option>
+                                    <option value="emergency">Emergency Leave</option>
+                                    <option value="training">Training Leave</option>
+                                </select></label>
+                                <label>Start Date<input type="date" id="leaveStartDate" required></label>
+                                <label>End Date<input type="date" id="leaveEndDate" required></label>
+                                <label>Notes<textarea id="leaveNotes" rows="2" placeholder="Reason for leave..."></textarea></label>
+                                <div>
+                                    <button type="submit" class="btn btn-primary">Submit Leave Request</button>
+                                </div>
+                            </form>
+
+                            <div class="leave-history">
+                                <h4>Leave History</h4>
+                                <div id="leaveHistoryList">
+                                    <!-- Leave history will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
+
+    <script>
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                opacity: 0;
+                transform: translateY(-20px);
+                transition: all 0.3s ease;
+            `;
+
+            if (type === 'success') toast.style.backgroundColor = '#28a745';
+            else if (type === 'error') toast.style.backgroundColor = '#dc3545';
+            else if (type === 'warning') toast.style.backgroundColor = '#ffc107';
+            else toast.style.backgroundColor = '#6c757d';
+
+            document.body.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+            }, 10);
+
+            // Animate out
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, duration);
+        }
+
+        // Calendar functionality
+        let currentDate = new Date();
+        let availabilityData = {};
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAvailability();
+            loadLeaveHistory();
+            renderCalendar();
+
+            // Calendar navigation
+            document.getElementById('prevMonth').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                renderCalendar();
+            });
+
+            document.getElementById('nextMonth').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                renderCalendar();
+            });
+
+            // Leave request form
+            document.getElementById('leaveRequestForm').addEventListener('submit', submitLeaveRequest);
+        });
+
+        async function loadAvailability() {
+            try {
+                const response = await fetch('/api/availability');
+                const data = await response.json();
+                availabilityData = {};
+                data.forEach(item => {
+                    const dateKey = new Date(item.date).toDateString();
+                    availabilityData[dateKey] = item.status;
+                });
+                renderCalendar();
+            } catch (error) {
+                console.error('Error loading availability:', error);
+            }
+        }
+
+        async function loadLeaveHistory() {
+            try {
+                const response = await fetch('/api/leave-history');
+                const leaveHistory = await response.json();
+                const container = document.getElementById('leaveHistoryList');
+
+                if (leaveHistory.length === 0) {
+                    container.innerHTML = '<p>No leave requests found.</p>';
+                    return;
+                }
+
+                container.innerHTML = leaveHistory.map(leave => `
+                    <div class="leave-item">
+                        <strong>${leave.type} Leave</strong><br>
+                        ${new Date(leave.startDate).toLocaleDateString()} - ${new Date(leave.endDate).toLocaleDateString()}<br>
+                        Status: <span class="badge badge-${leave.status === 'approved' ? 'success' : leave.status === 'pending' ? 'warning' : 'danger'}">${leave.status}</span>
+                        ${leave.notes ? `<br>Notes: ${leave.notes}` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading leave history:', error);
+            }
+        }
+
+        function renderCalendar() {
+            const month = currentDate.getMonth();
+            const year = currentDate.getFullYear();
+
+            document.getElementById('currentMonth').textContent = 
+                `${currentDate.toLocaleString('default', { month: 'long' })} ${year}`;
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+            const calendarGrid = document.querySelector('.calendar-grid');
+            const dayElements = calendarGrid.querySelectorAll('.calendar-day:not(.header)');
+            dayElements.forEach(el => el.remove());
+
+            let current = new Date(startDate);
+            for (let i = 0; i < 42; i++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                dayElement.textContent = current.getDate();
+
+                const dateKey = current.toDateString();
+                const status = availabilityData[dateKey];
+
+                if (status) {
+                    dayElement.classList.add(status);
+                } else if (current >= new Date() && current.getMonth() === month) {
+                    dayElement.classList.add('available'); // Default to available
+                }
+
+                if (current.getMonth() !== month) {
+                    dayElement.classList.add('other-month');
+                    dayElement.style.opacity = '0.5';
+                } else {
+                    dayElement.addEventListener('click', () => toggleAvailability(current));
+                }
+
+                calendarGrid.appendChild(dayElement);
+                current.setDate(current.getDate() + 1);
+            }
+        }
+
+        async function toggleAvailability(date) {
+            const dateKey = date.toDateString();
+            const currentStatus = availabilityData[dateKey] || 'available';
+            const statuses = ['available', 'unavailable', 'leave', 'training'];
+            const nextStatus = statuses[(statuses.indexOf(currentStatus) + 1) % statuses.length];
+
+            try {
+                const response = await fetch('/api/availability/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date: date.toISOString().split('T')[0],
+                        status: nextStatus
+                    })
+                });
+
+                if (response.ok) {
+                    availabilityData[dateKey] = nextStatus;
+                    renderCalendar();
+                } else {
+                    showToast('Failed to update availability', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating availability:', error);
+                showToast('Error updating availability', 'error');
+            }
+        }
+
+        async function submitLeaveRequest(e) {
+            e.preventDefault();
+
+            const leaveType = document.getElementById('leaveType').value;
+            const startDate = document.getElementById('leaveStartDate').value;
+            const endDate = document.getElementById('leaveEndDate').value;
+            const notes = document.getElementById('leaveNotes').value;
+
+            try {
+                const response = await fetch('/api/leave/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: leaveType,
+                        startDate,
+                        endDate,
+                        notes
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Leave request submitted successfully', 'success');
+                    document.getElementById('leaveRequestForm').reset();
+                    loadLeaveHistory();
+                } else {
+                    showToast('Error: ' + (data.error || 'Failed to submit leave request'), 'error');
+                }
+            } catch (error) {
+                console.error('Error submitting leave request:', error);
+                showToast('Network error while submitting leave request', 'error');
+            }
+        }
+    </script>
 </body>
 </html>

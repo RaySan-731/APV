@@ -1,58 +1,56 @@
-require('dotenv').config();
 const mongoose = require('mongoose');
 const School = require('./models/School');
 const Staff = require('./models/Staff');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 async function testAllocation() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('Connected to MongoDB...\n');
+    console.log('Connected to MongoDB\n');
 
-    // Get first trainer and first school
+    // Use a real trainer from Staff
     const trainer = await Staff.findOne({ role: 'trainer' });
-    const school = await School.findOne();
-
-    if (!trainer || !school) {
-      console.log('❌ No trainer or school found for testing');
-      return;
+    if (!trainer) {
+      console.log('No trainer found in Staff collection');
+      process.exit(1);
     }
+    console.log('Using trainer:', trainer.name, trainer._id);
 
-    console.log('Testing allocation of trainer:', trainer.name, 'to school:', school.name);
-    console.log('Trainer ID:', trainer._id);
-    console.log('School ID:', school._id);
+    // Pick a school with no assigned trainers
+    const school = await School.findOne({ assignedStaff: { $exists: true, $size: 0 } });
+    if (!school) {
+      console.log('No school with empty assignedStaff, picking any school');
+      const any = await School.findOne();
+      school = any;
+    }
+    console.log('Target school:', school.name, school._id);
+    console.log('Current assignedStaff:', school.assignedStaff);
 
-    // Check initial state
-    const initialAssigned = school.assignedStaff || [];
-    console.log('Initial assignedStaff length:', initialAssigned.length);
-
-    // Allocate
+    // Simulate allocation: add trainer and save
     school.assignedStaff = school.assignedStaff || [];
     school.assignedStaff.push(trainer._id);
-    try {
-      await school.save();
-      console.log('✓ Allocation performed using push and save');
-    } catch (saveErr) {
-      console.log('❌ Save failed:', saveErr.message);
-    }
+    await school.save();
+    console.log('✓ Saved school with assignedStaff:', school.assignedStaff.map(String));
 
-    // Check after allocation
-    const updatedSchool = await School.findById(school._id);
-    const finalAssigned = updatedSchool.assignedStaff || [];
-    console.log('Final assignedStaff length:', finalAssigned.length);
+    // Now simulate what the schools page does: fetch staff for these IDs
+    const assignedIds = school.assignedStaff.map(String);
+    const trainers = await Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber').lean();
+    console.log('\nFound trainers from mapping:', trainers);
 
-    if (finalAssigned.length > initialAssigned.length) {
-      console.log('✅ Allocation persisted successfully!');
-    } else {
-      console.log('❌ Allocation did not persist');
-    }
+    const trainerMap = new Map(trainers.map(t => [t._id.toString(), t]));
+    const mapped = school.assignedStaff.map(id => trainerMap.get(id.toString())).filter(Boolean);
+    console.log('Mapped trainer objects:', mapped);
+    console.log('Trainer count after mapping:', mapped.length);
 
-    // Clean up - remove the allocation
-    await School.findByIdAndUpdate(school._id, { $pull: { assignedStaff: trainer._id } });
-    console.log('✓ Test allocation cleaned up');
+    // Clean up: revert the change to not pollute DB
+    school.assignedStaff = school.assignedStaff.filter(id => !id.equals(trainer._id));
+    await school.save();
+    console.log('\n✓ Reverted allocation for test');
 
-    await mongoose.connection.close();
+    process.exit(0);
   } catch (err) {
-    console.error('Error:', err.message);
+    console.error('Error:', err);
     process.exit(1);
   }
 }

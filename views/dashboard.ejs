@@ -541,72 +541,335 @@
                         </div>
                     </div>
                 <% } else if (page === 'schools') { %>
+                    <!-- Schools Stats Grid -->
                     <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-icon">🏫</div><div><div class="stat-number">32</div><div class="stat-label">Partner Schools</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">👧</div><div><div class="stat-number">930</div><div class="stat-label">Students Enrolled</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">📆</div><div><div class="stat-number">18</div><div class="stat-label">Active Programs</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">📍</div><div><div class="stat-number">10</div><div class="stat-label">Regions Covered</div></div></div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🏫</div>
+                            <div><div class="stat-number"><%= schoolList ? schoolList.length : 0 %></div><div class="stat-label">Partner Schools</div></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👧</div>
+                            <div><div class="stat-number"><%= schoolList ? (schoolList.reduce((sum, s) => sum + (s.studentCount || 0), 0)) : 0 %></div><div class="stat-label">Total Students</div></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div><div class="stat-number"><%= schoolList ? (schoolList.filter(s => s.serviceStatus === 'active').length) : 0 %></div><div class="stat-label">Active Service</div></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏸</div>
+                            <div><div class="stat-number"><%= schoolList ? (schoolList.filter(s => s.serviceStatus === 'on_hold').length) : 0 %></div><div class="stat-label">On Hold</div></div>
+                        </div>
                     </div>
+
+                    <!-- Filters Bar -->
                     <div class="content-card">
-<div class="card-header">
-                        <h3>School Participation</h3>
-                    </div>
+                        <div class="card-header">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                <h3>School Registry</h3>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="text" id="schoolSearch" placeholder="Search schools..." value="<%= filters.search || '' %>" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); width: 200px;">
+                                    <select id="statusFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                        <option value="">All Status</option>
+                                        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+                                        <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+                                        <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>Pending</option>
+                                    </select>
+                                    <select id="serviceStatusFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                        <option value="">All Service Status</option>
+                                        <option value="active" <%= filters.serviceStatus === 'active' ? 'selected' : '' %>>Active</option>
+                                        <option value="on_hold" <%= filters.serviceStatus === 'on_hold' ? 'selected' : '' %>>On Hold</option>
+                                        <option value="churned" <%= filters.serviceStatus === 'churned' ? 'selected' : '' %>>Churned</option>
+                                    </select>
+                                    <select id="zoneFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                        <option value="">All Zones</option>
+                                        <% (schoolList || []).filter(s => s.zone).map(z => { %><option value="<%= z.zone %>" <%= filters.zone === z.zone ? 'selected' : '' %>><%= z.zone %></option><% }) %></select>
+                                    <button class="btn btn-primary" onclick="window.DashboardUtils.openOnboardingModal()">+ Onboard New School</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="card-content">
                             <table class="data-table" id="schoolsTable">
-<thead><tr><th>School
-  <select id="schoolSortOrder" style="margin-left: 0.5rem; font-size: 0.875rem;">
-    <option value="asc">A-Z</option>
-    <option value="desc">Z-A</option>
-  </select>
-</th><th>County</th><th>Programs</th><th>Trainers</th><th>Students</th><th>Status</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>School
+                                            <select id="schoolSortOrder" style="margin-left: 0.5rem; font-size: 0.875rem;">
+                                                <option value="asc" <%= sortBy === 'name' && order === 'asc' ? 'selected' : '' %>>A-Z</option>
+                                                <option value="desc" <%= sortBy === 'name' && order === 'desc' ? 'selected' : '' %>>Z-A</option>
+                                            </select>
+                                        </th>
+                                        <th>Location</th>
+                                        <th>Zone</th>
+                                        <th>Trainers</th>
+                                        <th>Students</th>
+                                        <th>Events</th>
+                                        <th>Attendance</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     <% if (schoolList && schoolList.length > 0) { %>
                                         <% schoolList.forEach(school => { %>
-                                            <% const trainerCount = school.assignedStaff && school.assignedStaff.length ? school.assignedStaff.length : 0; %>
                                             <tr>
-                                                <td><%= school.name %></td>
-                                                <td><%= (school.address && school.address.city) || '—' %></td>
-                                                <td><%= (school.programsEnrolled && school.programsEnrolled.length > 0) ? school.programsEnrolled.length : '0' %></td>
+                                                <td><strong><a href="/dashboard/schools/<%= school._id %>" style="color: var(--primary); text-decoration: none;"><%= school.name %></a></strong></td>
+                                                <td><%= school.address && school.address.city ? school.address.city + (school.address.state ? ', ' + school.address.state : '') : '—' %></td>
+                                                <td><%= school.zone || '—' %></td>
                                                 <td>
-                                                    <% if (trainerCount > 0) { %>
-                                                        <span class="badge badge-info"><%= trainerCount %> trainer<%= trainerCount === 1 ? '' : 's' %></span>
-                                                        <div class="trainer-list">
+                                                    <% if (school.assignedStaff && school.assignedStaff.length > 0) { %>
+                                                        <div class="trainer-list" style="display: flex; flex-direction: column; gap: 0.25rem;">
                                                             <% school.assignedStaff.forEach(trainer => { %>
-                                                                <div><strong><%= trainer.name || trainer.email %></strong> (<%= trainer.idNumber || trainer._id.toString() %>)</div>
+                                                                <div style="font-size: 0.8rem;">
+                                                                    <strong><%= trainer.name || trainer.email %></strong>
+                                                                </div>
                                                             <% }) %>
                                                         </div>
                                                     <% } else { %>
-                                                        <span class="badge badge-warning">No trainers</span>
+                                                        <span class="badge badge-warning">Unassigned</span>
                                                     <% } %>
                                                 </td>
                                                 <td><%= school.studentCount || 0 %></td>
-                                                <td><%= school.status %></td>
+                                                <td>
+                                                    <span class="<%= school.participationMetrics && school.participationMetrics.totalEventsAttended > 5 ? 'badge badge-success' : 'badge badge-info' %>">
+                                                        <%= school.participationMetrics ? school.participationMetrics.totalEventsAttended : 0 %>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="<%= school.participationMetrics && school.participationMetrics.averageAttendanceRate >= 80 ? 'badge badge-success' : school.participationMetrics && school.participationMetrics.averageAttendanceRate >= 60 ? 'badge badge-warning' : 'badge badge-danger' %>">
+                                                        <%= school.participationMetrics ? school.participationMetrics.averageAttendanceRate : 0 %>%
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="<%= school.serviceStatus === 'active' ? 'badge badge-success' : school.serviceStatus === 'on_hold' ? 'badge badge-warning' : 'badge badge-secondary' %>">
+                                                        <%= school.serviceStatus ? school.serviceStatus.replace('_', ' ') : school.status %>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline" onclick="window.location.href='/dashboard/schools/<%= school._id %>'">View Profile</button>
+                                                    <button class="btn btn-sm btn-outline" onclick="window.location.href='/dashboard/schools/<%= school._id %>/edit'">Edit</button>
+                                                </td>
                                             </tr>
                                         <% }) %>
                                     <% } else { %>
-                                            <tr><td colspan="6" class="placeholder-text">No partner schools found yet.</td></tr>
+                                        <tr><td colspan="9" class="placeholder-text">No partner schools found. Try adjusting filters or <a href="/dashboard/schools/onboard">onboard a new school</a>.</td></tr>
                                     <% } %>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                    <div class="content-card">
-                        <div class="card-header"><h3>Add Partner School</h3></div>
-                        <div class="card-content">
-                            <form action="/dashboard/schools/add" method="POST" class="form-grid">
-                                <label>Name<input type="text" name="name" required></label>
-                                <label>Street<input type="text" name="street"></label>
-                                <label>City<input type="text" name="city"></label>
-                                <label>State<input type="text" name="state"></label>
-                                <label>Zip Code<input type="text" name="zipCode"></label>
-                                <label>Country<input type="text" name="country" value="Kenya"></label>
-                                <label>Contact Name<input type="text" name="contactName"></label>
-                                <label>Contact Email<input type="email" name="contactEmail"></label>
-                                <label>Contact Phone<input type="text" name="contactPhone"></label>
-                                <label>Student Count<input type="number" name="studentCount" min="0" value="0"></label>
-                                <label>Status<select name="status"><option value="active">Active</option><option value="pending">Pending</option><option value="inactive">Inactive</option></select></label>
-                                <button type="submit" class="btn btn-primary">Add School</button>
-                            </form>
+                <% } else if (page === 'school-profile') { %>
+                    <!-- Individual School Profile View -->
+                    <button class="btn btn-secondary" onclick="window.location.href='/dashboard/schools'" style="margin-bottom: 1rem;">← Back to Schools</button>
+                    
+                    <!-- School Header -->
+                    <div class="stats-grid">
+                        <div class="stat-card" style="grid-column: span 3; padding: 1.5rem;">
+                            <h2 style="margin: 0 0 0.5rem 0; color: var(--foreground);"><%= school.name %></h2>
+                            <div style="display: flex; gap: 1.5rem; color: var(--muted-foreground); font-size: 0.9rem; flex-wrap: wrap;">
+                                <span>📍 <%= school.address && school.address.city ? [school.address.city, school.address.state].filter(Boolean).join(', ') : 'Location not set' %></span>
+                                <span>🏫 <%= school.studentCount || 0 %> Students</span>
+                                <span>📅 Onboarded: <%= school.onboardingDate ? new Date(school.onboardingDate).toLocaleDateString() : '—' %></span>
+                                <span>📞 <%= school.contactPerson && school.contactPerson.phone ? school.contactPerson.phone : 'No contact' %></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number"><%= participationAnalytics.totalEvents %></div>
+                            <div class="stat-label">Events Attended</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number"><%= participationAnalytics.totalAttended %></div>
+                            <div class="stat-label">Show Ups</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number"><%= participationAnalytics.avgAttendance %>%</div>
+                            <div class="stat-label">Avg Attendance</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number"><%= scoutGroups.length %></div>
+                            <div class="stat-label">Scout Groups</div>
+                        </div>
+                    </div>
+
+                    <!-- Details Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                        <!-- Contact Information -->
+                        <div class="content-card">
+                            <div class="card-header"><h3>Contact Information</h3></div>
+                            <div class="card-content">
+                                <% if (school.contactPerson) { %>
+                                    <p><strong>Name:</strong> <%= school.contactPerson.name %></p>
+                                    <p><strong>Email:</strong> <%= school.contactPerson.email %></p>
+                                    <p><strong>Phone:</strong> <%= school.contactPerson.phone %></p>
+                                    <p><strong>Position:</strong> <%= school.contactPerson.position || 'Not specified' %></p>
+                                <% } else { %>
+                                    <p class="placeholder-text">No contact information recorded.</p>
+                                <% } %>
+                                <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">
+                                <p><strong>Zone:</strong> <%= school.zone || 'Not assigned' %></p>
+                                <p><strong>Region:</strong> <%= school.region || 'Not assigned' %></p>
+                                <p><strong>Service Package:</strong> <%= school.servicePackage || 'standard' %></p>
+                                <p><strong>Service Status:</strong> <span class="badge badge-<%= school.serviceStatus === 'active' ? 'success' : school.serviceStatus === 'on_hold' ? 'warning' : 'secondary' %>"><%= school.serviceStatus.replace('_', ' ') %></span></p>
+                            </div>
+                        </div>
+
+                        <!-- Assigned Trainers -->
+                        <div class="content-card">
+                            <div class="card-header"><h3>Assigned Trainers</h3></div>
+                            <div class="card-content">
+                                <% if (school.assignedStaff && school.assignedStaff.length > 0) { %>
+                                    <% school.assignedStaff.forEach(staff => { %>
+                                        <div style="padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem;">
+                                            <strong><%= staff.name || staff.email %></strong><br>
+                                            <small style="color: var(--muted-foreground);">
+                                                <%= staff.role || 'Trainer' %> 
+                                                (<%= staff.idNumber || 'No ID' %>)
+                                            </small>
+                                        </div>
+                                    <% }) %>
+                                <% } else { %>
+                                    <p class="placeholder-text">No trainers assigned yet.</p>
+                                    <% if (req.session.user.permissions && req.session.user.permissions.canAssignTrainers) { %>
+                                        <button class="btn btn-sm btn-primary" onclick="window.location.href='/trainer/allocation'">Assign Trainer</button>
+                                    <% } %>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <!-- Scout Groups -->
+                        <div class="content-card">
+                            <div class="card-header">
+                                <h3>Scout Groups</h3>
+                                <button class="btn btn-sm btn-primary" onclick="window.DashboardUtils.openAddScoutGroupModal('<%= school._id %>')">+ Add Group</button>
+                            </div>
+                            <div class="card-content">
+                                <% if (scoutGroups && scoutGroups.length > 0) { %>
+                                    <% scoutGroups.forEach(group => { %>
+                                        <div style="padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong><%= group.name %></strong> (<%= group.advancementLevel || 'unknown' %>)<br>
+                                                <small>👤 <%= group.memberCount || 0 %> members | 🎯 <%= group.patrol || 'No patrol' %></small>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline btn-danger" onclick="deleteScoutGroup('<%= group._id %>')">Delete</button>
+                                        </div>
+                                    <% }) %>
+                                <% } else { %>
+                                    <p class="placeholder-text">No scout groups registered.</p>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <!-- Recent Visit Logs -->
+                        <div class="content-card">
+                            <div class="card-header"><h3>Recent Visits</h3></div>
+                            <div class="card-content">
+                                <% if (visitLogs && visitLogs.length > 0) { %>
+                                    <% visitLogs.slice(0, 5).forEach(log => { %>
+                                        <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                                            <div style="font-weight: 500;"><%= log.purpose %></div>
+                                            <div style="font-size: 0.85rem; color: var(--muted-foreground);">
+                                                <%= log.date ? new Date(log.date).toLocaleDateString() : 'Date unknown' %> 
+                                                <span style="margin-left: auto;">
+                                                    <%= log.discussed ? ' - ' + log.discussed.substring(0, 50) + '...' : '' %>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    <% }) %>
+                                <% } else { %>
+                                    <p class="placeholder-text">No visit records found.</p>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <!-- Event Participation History -->
+                        <div class="content-card">
+                            <div class="card-header"><h3>Event History</h3></div>
+                            <div class="card-content">
+                                <table class="data-table">
+                                    <thead><tr><th>Event</th><th>Date</th><th>Attendance</th><th>Status</th></tr></thead>
+                                    <tbody>
+                                        <% if (schoolEvents && schoolEvents.length > 0) { %>
+                                            <% schoolEvents.slice(0, 10).forEach(se => { %>
+                                                <tr>
+                                                    <td><%= se.event && se.event.name ? se.event.name : 'Unknown Event' %></td>
+                                                    <td><%= se.event && se.event.date ? new Date(se.event.date).toLocaleDateString() : '—' %></td>
+                                                    <td><%= se.attendance ? se.attendance.attended + '/' + se.attendance.registered + ' (' + se.attendance.percentage + '%)' : '0/0 (0%)' %></td>
+                                                    <td><span class="badge badge-<%= se.status === 'attended' ? 'success' : se.status === 'cancelled' ? 'danger' : 'warning' %>"><%= se.status %></span></td>
+                                                </tr>
+                                            <% }) %>
+                                        <% } else { %>
+                                            <tr><td colspan="4" class="placeholder-text">No event participation recorded.</td></tr>
+                                        <% } %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Payment History -->
+                        <div class="content-card">
+                            <div class="card-header"><h3>Payment History</h3></div>
+                            <div class="card-content">
+                                <% if (payments && payments.length > 0) { %>
+                                    <table class="data-table">
+                                        <thead><tr><th>Date</th><th>Invoice</th><th>Amount</th><th>Status</th></tr></thead>
+                                        <tbody>
+                                            <% payments.slice(0, 5).forEach(payment => { %>
+                                                <tr>
+                                                    <td><%= payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString() : '—' %></td>
+                                                    <td><%= payment.invoiceNumber %></td>
+                                                    <td><%= payment.currency %> <%= payment.amount.toLocaleString() %></td>
+                                                    <td><span class="badge badge-<%= payment.status === 'paid' ? 'success' : payment.status === 'pending' ? 'warning' : 'danger' %>"><%= payment.status %></span></td>
+                                                </tr>
+                                            <% }) %>
+                                        </tbody>
+                                    </table>
+                                <% } else { %>
+                                    <p class="placeholder-text">No payment records.</p>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <!-- Documents -->
+                        <div class="content-card">
+                            <div class="card-header"><h3>Documents</h3></div>
+                            <div class="card-content">
+                                <% if (documents && documents.length > 0) { %>
+                                    <ul style="list-style: none; padding: 0;">
+                                        <% documents.forEach(doc => { %>
+                                            <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;">
+                                                <span>📄 <%= doc.name %> (<%= doc.documentType %>)</span>
+                                                <a href="<%= doc.url %>" target="_blank" class="btn btn-sm btn-outline">View</a>
+                                            </li>
+                                        <% }) %>
+                                    </ul>
+                                <% } else { %>
+                                    <p class="placeholder-text">No documents uploaded.</p>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <!-- Notes Section -->
+                        <div class="content-card">
+                            <div class="card-header"><h3>School Notes</h3></div>
+                            <div class="card-content">
+                                <% if (school.notes) { %>
+                                    <p><%= school.notes %></p>
+                                <% } else { %>
+                                    <p class="placeholder-text">No notes recorded.</p>
+                                <% } %>
+                                <% if (school.visitNotes && school.visitNotes.length > 0) { %>
+                                    <hr style="margin: 1rem 0;">
+                                    <h4>Visit Notes</h4>
+                                    <% school.visitNotes.forEach(note => { %>
+                                        <div style="font-size: 0.9rem;">
+                                            <strong><%= note.date ? new Date(note.date).toLocaleDateString() : 'Date unknown' %></strong><br>
+                                            <%= note.content %>
+                                        </div>
+                                    <% }) %>
+                                <% } %>
+                            </div>
                         </div>
                     </div>
                 <% } else if (page === 'events') { %>
@@ -1029,15 +1292,192 @@
                 <% } %>
             </div>
         </main>
-    </div>
+     </div>
 
-    <script src="/js/dashboard.js"></script>
-</body>
-</html>
+     <!-- School Onboarding Wizard Modal -->
+     <div id="onboardingModal" class="modal" style="display: none; z-index: 9999;">
+        <div class="modal-content large-modal" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3>Onboard New School</h3>
+                <button type="button" class="close-btn" onclick="closeOnboardingModal()">×</button>
             </div>
-        </main>
+            <div class="modal-body">
+                <form id="onboardingForm">
+                    <!-- Progress indicator -->
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; position: relative;">
+                        <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border); z-index: 0;"></div>
+                        <% ['Basic Info', 'Contact', 'Service', 'Trainer'].forEach((step, i) => { %>
+                            <div id="step-indicator-<%= i %>" style="position: relative; z-index: 1; background: white; padding: 0.5rem 1rem; border-radius: 1rem; font-size: 0.85rem; font-weight: <%= i === 0 ? 'bold' : 'normal' %>; color: <%= i === 0 ? 'var(--primary)' : 'var(--muted-foreground)' %>;">
+                                <%= step %>
+                            </div>
+                        <% }) %>
+                    </div>
+
+                    <div class="form-grid">
+                        <!-- Step 1: Basic Info -->
+                        <div id="step-0" class="onboarding-step" style="display: grid;">
+                            <h4>Basic Information</h4>
+                            <label>School Name* <input type="text" name="name" required placeholder="e.g., Greenwood Academy"></label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <label>Street <input type="text" name="street" placeholder="123 Main St"></label>
+                                <label>City <input type="text" name="city" placeholder="Nairobi"></label>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                                <label>State/County <input type="text" name="state" placeholder="e.g., Nairobi County"></label>
+                                <label>Zip Code <input type="text" name="zipCode" placeholder="00100"></label>
+                                <label>Country <input type="text" name="country" value="Kenya"></label>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <label>Zone <input type="text" name="zone" placeholder="e.g., Central Zone"></label>
+                                <label>Region <input type="text" name="region" placeholder="e.g., Nairobi Region"></label>
+                            </div>
+                            <label>Number of Students <input type="number" name="studentCount" min="0" value="0"></label>
+                        </div>
+
+                        <!-- Step 2: Contact Information -->
+                        <div id="step-1" class="onboarding-step" style="display: none; grid;">
+                            <h4>Contact Person</h4>
+                            <label>Contact Name* <input type="text" name="contactName" required placeholder="Full name of primary contact"></label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <label>Email* <input type="email" name="contactEmail" required placeholder="contact@school.edu"></label>
+                                <label>Phone* <input type="tel" name="contactPhone" required placeholder="+254700000000"></label>
+                            </div>
+                            <label>Position/Title <input type="text" name="contactPosition" placeholder="e.g., Principal, HOD"></label>
+                            <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">
+                            <h4>Additional Notes</h4>
+                            <label><textarea name="notes" rows="3" placeholder="Any special requirements, notes about the school, etc."></textarea></label>
+                        </div>
+
+                        <!-- Step 3: Service & Payment -->
+                        <div id="step-2" class="onboarding-step" style="display: none; grid;">
+                            <h4>Service Configuration</h4>
+                            <label>Service Package
+                                <select name="servicePackage">
+                                    <option value="basic">Basic - Essential programs</option>
+                                    <option value="standard" selected>Standard - Most common</option>
+                                    <option value="premium">Premium - Full suite</option>
+                                    <option value="custom">Custom - Tailored</option>
+                                </select>
+                            </label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                                <label>Payment Method
+                                    <select name="paymentMethod">
+                                        <option value="bank_transfer">Bank Transfer</option>
+                                        <option value="mpesa">M-Pesa</option>
+                                        <option value="cheque">Cheque</option>
+                                        <option value="cash">Cash</option>
+                                    </select>
+                                </label>
+                                <label>Billing Cycle
+                                    <select name="billingCycle">
+                                        <option value="per_event">Per Event</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="quarterly">Quarterly</option>
+                                        <option value="annual">Annual</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <label>Rate per Student (optional) <input type="number" name="ratePerStudent" min="0" step="0.01" placeholder="0.00"></label>
+                        </div>
+
+                        <!-- Step 4: Trainer Assignment -->
+                        <div id="step-3" class="onboarding-step" style="display: none; grid;">
+                            <h4>Assign Primary Trainer</h4>
+                            <p style="font-size: 0.9rem; color: var(--muted-foreground); margin-bottom: 1rem;">Select a trainer to be the primary contact for this school.</p>
+                            <label>
+                                <select name="primaryTrainerId">
+                                    <option value="">-- Select Trainer --</option>
+                                    <% 
+                                    let trainers = [];
+                                    if (typeof staffList !== 'undefined') { trainers = staffList.filter(s => s.role === 'trainer' || s.role === 'senior trainer' || s.role === 'supervisor'); }
+                                    %>
+                                    <% trainers.forEach(trainer => { %>
+                                        <option value="<%= trainer._id %>"><%= trainer.name %> (<%= trainer.email %>)</option>
+                                    <% }) %>
+                                </select>
+                            </label>
+                            <div style="grid-column: 1 / -1; margin-top: 1rem; padding: 1rem; background: var(--card); border-radius: var(--radius);">
+                                <strong>Summary</strong>
+                                <div id="onboardingSummary" style="font-size: 0.9rem; margin-top: 0.5rem;">
+                                    Please complete all required fields.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="onboardingMessage" class="message" style="display: none; margin-top: 1rem;"></div>
+
+                    <div class="modal-footer" style="justify-content: space-between;">
+                         <button type="button" class="btn btn-secondary" id="prevStepBtn" onclick="changeOnboardingStep(-1)" style="display: none;">Previous</button>
+                         <div>
+                             <button type="button" class="btn btn-secondary" onclick="closeOnboardingModal()">Cancel</button>
+                             <button type="button" class="btn btn-primary" id="nextStepBtn">Next Step</button>
+                         </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
-    <script src="/js/dashboard.js"></script>
-</body>
+    <!-- Add Scout Group Modal -->
+    <div id="addScoutGroupModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Scout Group</h3>
+                <button type="button" class="close-btn" onclick="closeAddScoutGroupModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="addScoutGroupForm" class="form-grid">
+                    <input type="hidden" name="schoolId" id="scoutGroupSchoolId">
+                    <label>Group Name* <input type="text" name="name" required placeholder="e.g., Leopards Patrol"></label>
+                    <label>Patrol Name <input type="text" name="patrol" placeholder="e.g., Red, Blue, Green"></label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <label>Group Leader <input type="text" name="leaderName" placeholder="Leader's full name"></label>
+                        <label>Leader Email <input type="email" name="leaderContactEmail" placeholder="leader@example.com"></label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <label>Member Count <input type="number" name="memberCount" min="0" value="0"></label>
+                        <label>Advancement Level
+                            <select name="advancementLevel">
+                                <option value="cubs">Cubs</option>
+                                <option value="scouts" selected>Scouts</option>
+                                <option value="seniors">Seniors</option>
+                                <option value="rovers">Rovers</option>
+                                <option value="mixed">Mixed</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <label>Meeting Day <input type="text" name="meetingDay" placeholder="e.g., Saturday"></label>
+                        <label>Meeting Time <input type="text" name="meetingTime" placeholder="e.g., 2:00 PM - 4:00 PM"></label>
+                    </div>
+                    <label>Notes <textarea name="notes" rows="2" placeholder="Any additional details..."></textarea></label>
+                    <div id="scoutGroupMessage" class="message" style="display: none; grid-column: 1 / -1; margin-top: 1rem;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAddScoutGroupModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveScoutGroup()">Add Group</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Modal (optional, for detailed analytics) -->
+    <div id="analyticsModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3>School Participation Analytics</h3>
+                <button type="button" class="close-btn" onclick="closeAnalyticsModal()">×</button>
+            </div>
+            <div class="modal-body" id="analyticsContent">
+                <!-- Analytics content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAnalyticsModal()">Close</button>
+            </div>
+         </div>
+      </div>
+
+      <script src="/js/dashboard.js"></script>
+  </body>
 </html>

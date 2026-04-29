@@ -85,6 +85,30 @@ document.addEventListener('DOMContentLoaded', function() {
     auditActionFilter?.addEventListener('change', updateAuditFilters);
     auditEntityFilter?.addEventListener('change', updateAuditFilters);
 
+    // ============ SCHOOLS PAGE FILTERS ============
+    const schoolSearch = document.getElementById('schoolSearch');
+    const statusFilter = document.getElementById('statusFilter');
+    const serviceStatusFilter = document.getElementById('serviceStatusFilter');
+    const zoneFilter = document.getElementById('zoneFilter');
+    const schoolSortOrder = document.getElementById('schoolSortOrder');
+
+    const updateSchoolFilters = () => {
+        const params = new URLSearchParams();
+        if (schoolSearch?.value.trim()) params.set('search', schoolSearch.value.trim());
+        if (statusFilter?.value) params.set('status', statusFilter.value);
+        if (serviceStatusFilter?.value) params.set('serviceStatus', serviceStatusFilter.value);
+        if (zoneFilter?.value) params.set('zone', zoneFilter.value);
+        if (schoolSortOrder?.value) {
+            const [sortBy, order] = schoolSortOrder.value.split('-');
+            params.set('sortBy', sortBy || 'name');
+            params.set('order', order || 'asc');
+        }
+        location.href = `/dashboard/schools?${params.toString()}`;
+    };
+
+    schoolSearch?.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), updateSchoolFilters()));
+    [statusFilter, serviceStatusFilter, zoneFilter, schoolSortOrder].forEach(el => el?.addEventListener('change', updateSchoolFilters));
+
     // Close sidebar when clicking outside on mobile
     document.addEventListener('click', function(e) {
         if (window.innerWidth <= 768) {
@@ -999,10 +1023,272 @@ function initializeCharts() {
 
 // School sorting functionality is now handled inside the main DOMContentLoaded listener above.
 
-// Export functions for potential use in other scripts
+// ============ SCHOOL ONBOARDING WIZARD ============
+
+let currentOnboardingStep = 0;
+let schoolFormData = {};
+
+function openOnboardingModal() {
+    currentOnboardingStep = 0;
+    schoolFormData = {};
+    document.getElementById('onboardingModal').style.display = 'flex';
+    showOnboardingStep(0);
+    updateOnboardingUI();
+
+    // Attach event listener to next button (ensure it's attached after modal is in DOM)
+    const nextBtn = document.getElementById('nextStepBtn');
+    if (nextBtn) {
+        nextBtn.onclick = function(e) {
+            if (currentOnboardingStep === 3) {
+                e.preventDefault();
+                submitOnboarding();
+            } else {
+                changeOnboardingStep(1);
+            }
+        };
+    }
+}
+
+function closeOnboardingModal() {
+    document.getElementById('onboardingModal').style.display = 'none';
+    document.getElementById('onboardingForm').reset();
+    currentOnboardingStep = 0;
+    schoolFormData = {};
+}
+
+function changeOnboardingStep(delta) {
+    const totalSteps = 4;
+    const newStep = currentOnboardingStep + delta;
+    if (newStep < 0 || newStep >= totalSteps) {
+        console.log('Step change out of bounds:', currentOnboardingStep, '->', newStep);
+        return;
+    }
+    
+    // Validate current step before moving forward
+    if (delta > 0 && !validateOnboardingStep(currentOnboardingStep)) {
+        console.log('Validation failed for step', currentOnboardingStep);
+        return;
+    }
+
+    console.log('Changing step from', currentOnboardingStep, 'to', newStep);
+    currentOnboardingStep = newStep;
+    showOnboardingStep(currentOnboardingStep);
+    updateOnboardingUI();
+}
+
+function showOnboardingStep(stepIndex) {
+    document.querySelectorAll('.onboarding-step').forEach((el, idx) => {
+        el.style.display = idx === stepIndex ? 'grid' : 'none';
+    });
+}
+
+function updateOnboardingUI() {
+    // Update step indicators
+    for (let i = 0; i < 4; i++) {
+        const indicator = document.getElementById(`step-indicator-${i}`);
+        if (indicator) {
+            indicator.style.fontWeight = i === currentOnboardingStep ? 'bold' : 'normal';
+            indicator.style.color = i <= currentOnboardingStep ? 'var(--primary)' : 'var(--muted-foreground)';
+        }
+    }
+
+    // Update buttons
+    const prevBtn = document.getElementById('prevStepBtn');
+    const nextBtn = document.getElementById('nextStepBtn');
+    if (prevBtn) prevBtn.style.display = currentOnboardingStep === 0 ? 'none' : 'inline-block';
+    if (nextBtn) {
+        nextBtn.textContent = currentOnboardingStep === 3 ? 'Complete Onboarding' : 'Next Step';
+    }
+
+    // Update summary on last step
+    if (currentOnboardingStep === 3) {
+        updateOnboardingSummary();
+    }
+}
+
+function validateOnboardingStep(step) {
+    const stepElement = document.querySelector(`#step-${step}`);
+    if (!stepElement) {
+        console.error('Step element not found for step', step);
+        return false;
+    }
+    const requiredInputs = stepElement.querySelectorAll('[required]');
+    
+    for (let input of requiredInputs) {
+        if (!input.value.trim()) {
+            showToast(`Please fill in all required fields`, 'error');
+            input.focus();
+            return false;
+        }
+    }
+    return true;
+}
+
+function updateOnboardingSummary() {
+    const form = document.getElementById('onboardingForm');
+    const summary = document.getElementById('onboardingSummary');
+    const name = form.name.value || 'School name';
+    const city = form.city.value || 'City';
+    const contact = form.contactName.value || 'Contact';
+    const trainerSelect = form.primaryTrainerId;
+    const trainerName = trainerSelect.options[trainerSelect.selectedIndex]?.text || 'Not assigned';
+    
+    summary.innerHTML = `
+        <strong>${name}</strong><br>
+        📍 ${city}<br>
+        👤 ${contact}<br>
+        📞 Trainer: ${trainerName}<br>
+        📦 Package: ${form.servicePackage.value}
+    `;
+}
+
+async function submitOnboarding() {
+    const form = document.getElementById('onboardingForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    const messageEl = document.getElementById('onboardingMessage');
+
+    try {
+        const response = await fetch('/dashboard/schools/onboard', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            messageEl.textContent = '✓ School onboarded successfully! Redirecting...';
+            messageEl.style.backgroundColor = '#d4edda';
+            messageEl.style.color = '#155724';
+            messageEl.style.borderLeft = '4px solid #28a745';
+            messageEl.style.display = 'block';
+
+            setTimeout(() => {
+                window.location.href = '/dashboard/schools';
+            }, 1500);
+        } else {
+            messageEl.textContent = '✗ ' + (result.error || 'Failed to onboard school');
+            messageEl.style.backgroundColor = '#f8d7da';
+            messageEl.style.color = '#721c24';
+            messageEl.style.borderLeft = '4px solid #f5c6cb';
+            messageEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error onboarding school:', error);
+        messageEl.textContent = '✗ Network error: ' + error.message;
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.borderLeft = '4px solid #f5c6cb';
+        messageEl.style.display = 'block';
+    }
+}
+
+// ============ SCOUT GROUP MANAGEMENT ============
+
+function openAddScoutGroupModal(schoolId) {
+    document.getElementById('scoutGroupSchoolId').value = schoolId;
+    document.getElementById('addScoutGroupForm').reset();
+    document.getElementById('scoutGroupMessage').style.display = 'none';
+    document.getElementById('addScoutGroupModal').style.display = 'flex';
+}
+
+function closeAddScoutGroupModal() {
+    document.getElementById('addScoutGroupModal').style.display = 'none';
+}
+
+async function saveScoutGroup() {
+    const form = document.getElementById('addScoutGroupForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    const messageEl = document.getElementById('scoutGroupMessage');
+
+    // Validate required fields
+    if (!data.name || !data.memberCount) {
+        messageEl.textContent = 'Please fill in group name and member count';
+        messageEl.className = 'message error';
+        messageEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/scout-groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            messageEl.textContent = '✓ Scout group added successfully';
+            messageEl.className = 'message success';
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                closeAddScoutGroupModal();
+                window.location.reload();
+            }, 1000);
+        } else {
+            messageEl.textContent = '✗ ' + (result.error || 'Failed to add scout group');
+            messageEl.className = 'message error';
+            messageEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error adding scout group:', error);
+        messageEl.textContent = '✗ Network error';
+        messageEl.className = 'message error';
+        messageEl.style.display = 'block';
+    }
+}
+
+async function deleteScoutGroup(groupId) {
+    if (!confirm('Delete this scout group? This cannot be undone.')) return;
+
+    try {
+        const response = await fetch(`/api/scout-groups/${groupId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('Scout group deleted successfully', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Error: ' + (result.error || 'Failed to delete group'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting scout group:', error);
+        showToast('Network error while deleting group', 'error');
+    }
+}
+
+// ============ UTILITY: CLOSE MODALS ON CLICK OUTSIDE ============
+
+document.addEventListener('click', function(event) {
+    const onboardingModal = document.getElementById('onboardingModal');
+    if (event.target === onboardingModal) {
+        closeOnboardingModal();
+    }
+    const scoutGroupModal = document.getElementById('addScoutGroupModal');
+    if (event.target === scoutGroupModal) {
+        closeAddScoutGroupModal();
+    }
+});
+
+// Export functions for inline handlers and other scripts
 window.DashboardUtils = {
+    ...(window.DashboardUtils || {}),
     loadDashboardData,
     updateStats,
     updateActivities,
-    initializeCharts
+    initializeCharts,
+    openOnboardingModal,
+    closeOnboardingModal,
+    changeOnboardingStep,
+    openAddScoutGroupModal,
+    closeAddScoutGroupModal,
+    saveScoutGroup,
+    deleteScoutGroup
 };

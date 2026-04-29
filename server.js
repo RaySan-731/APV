@@ -51,6 +51,10 @@ const VisitLog = require('./models/VisitLog');
 const Feedback = require('./models/Feedback');
 const AuditLog = require('./models/AuditLog');
 const Permission = require('./models/Permission');
+const ScoutGroup = require('./models/ScoutGroup');
+const SchoolEvent = require('./models/SchoolEvent');
+const Payment = require('./models/Payment');
+const SchoolDocument = require('./models/SchoolDocument');
 
 // MongoDB connection
 if (process.env.MONGODB_URI) {
@@ -2023,20 +2027,25 @@ app.get('/dashboard/trainer/:trainerId/schools', requireAuth, async (req, res) =
     }
 
     // Fetch all schools
-    const allSchools = await School.find().select('_id name address status').lean();
+    const allSchools = await School.find().select('_id name address status assignedStaff').lean();
     console.log('Total schools found:', allSchools.length);
 
-    // Fetch schools allocated to this trainer
-    const allocatedSchools = await School.find({ assignedStaff: trainerId }).select('_id').lean();
-    const allocatedSchoolIds = allocatedSchools.map(s => s._id.toString());
-    console.log('Schools allocated to trainer:', allocatedSchoolIds.length);
+    // Filter schools where trainer is assigned (support both ObjectId and {staffId} formats)
+    const trainerObjectId = trainerId.toString();
+    const allocatedSchools = allSchools.filter(s => 
+      s.assignedStaff && s.assignedStaff.some(a => 
+        (typeof a === 'string' && a === trainerObjectId) || 
+        (a.staffId && a.staffId.toString() === trainerObjectId)
+      )
+    );
 
+    console.log('Schools allocated to trainer:', allocatedSchools.length);
     console.log('=== END GET TRAINER SCHOOLS REQUEST ===\n');
 
     res.json({
       success: true,
       schools: allSchools,
-      allocatedSchools: allocatedSchools.map(s => ({ _id: s._id.toString() }))
+      allocatedSchools: allocatedSchools.map(s => s._id)
     });
   } catch (err) {
     console.error('✗ Error getting schools:', err.message);
@@ -2066,37 +2075,30 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
       return res.status(404).json({ success: false, error: 'Trainer not found' });
     }
 
-    // Validate requested schools against maximum capacity before mutating any data
-    const blockedSchools = [];
+    // Validate requested schools against maximum capacity
     const selectedSchoolIds = Array.isArray(schoolIds) ? schoolIds : [];
+    const blockedSchools = [];
 
     for (const schoolId of selectedSchoolIds) {
       const school = await School.findById(schoolId);
-      if (!school) {
-        continue;
-      }
+      if (!school) continue;
 
-      const assignedStaffIds = Array.isArray(school.assignedStaff) ? school.assignedStaff.map((id) => id.toString()) : [];
-      const hasTrainer = assignedStaffIds.includes(trainerId.toString());
-      const trainerCount = assignedStaffIds.length;
+      const assignedStaff = Array.isArray(school.assignedStaff) ? school.assignedStaff : [];
+      const hasTrainer = assignedStaff.some(a => a?.staffId?.toString() === trainerId);
+      const trainerCount = assignedStaff.length;
 
       if (!hasTrainer && trainerCount >= 2) {
-        const existingStaff = await Staff.find({ _id: { $in: assignedStaffIds } }).lean();
+        const validStaffIds = assignedStaff.map(a => a.staffId).filter(id => id);
+        const existingStaff = await Staff.find({ _id: { $in: validStaffIds } }).lean();
         blockedSchools.push({
           schoolId: school._id.toString(),
           schoolName: school.name,
-          existingTrainers: existingStaff.map(t => ({ id: t._id.toString(), name: t.name || t.email || 'Unknown', email: t.email || 'unknown' }))
+          existingTrainers: existingStaff.map(t => ({ id: t._id.toString(), name: t.name || t.email || 'Unknown' }))
         });
       }
     }
 
     if (blockedSchools.length > 0) {
-      console.log('⚠️ Trainer allocation blocked for', blockedSchools.length, 'school(s) due to maximum trainers reached');
-      blockedSchools.forEach(s => {
-        console.log(`  • ${s.schoolName} (${s.schoolId}) already has ${s.existingTrainers.length} trainers:`);
-        s.existingTrainers.forEach(t => console.log(`      - ${t.name} (${t.id})`));
-      });
-
       return res.status(400).json({
         success: false,
         error: 'One or more schools already have the maximum of 2 trainers.',
@@ -2108,10 +2110,19 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
       });
     }
 
-    // Remove trainer from all schools first
-    const schoolsWithTrainer = await School.find({ assignedStaff: trainerObjectId });
+    // Remove trainer from all schools first (both formats)
+    const schoolsWithTrainer = await School.find({
+      $or: [
+        { assignedStaff: trainerObjectId },
+        { assignedStaff: { $elemMatch: { staffId: trainerObjectId } } }
+      ]
+    });
+
     for (const sch of schoolsWithTrainer) {
-      sch.assignedStaff = sch.assignedStaff.filter(id => !id.equals(trainerObjectId));
+      sch.assignedStaff = sch.assignedStaff.filter(a => 
+        (typeof a === 'string' && a !== trainerObjectId.toString()) ||
+        (a.staffId && !a.staffId.equals(trainerObjectId))
+      );
       await sch.save();
     }
     console.log('✓ Removed trainer from all previously allocated schools');
@@ -2123,18 +2134,23 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
     );
     console.log('✓ Marked previous school assignments as transferred');
 
-    // Add trainer to selected schools where it is not already assigned
+    // Add trainer to selected schools
     const allocatedSchoolIds = [];
-
     for (const schoolId of selectedSchoolIds) {
       const school = await School.findById(schoolId);
-      if (!school) {
-        continue;
-      }
+      if (!school) continue;
 
       school.assignedStaff = school.assignedStaff || [];
-      if (!school.assignedStaff.some(id => id.equals(trainerObjectId))) {
-        school.assignedStaff.push(trainerObjectId);
+      const alreadyExists = school.assignedStaff.some(a => 
+        a.staffId && a.staffId.toString() === trainerId
+      );
+      if (!alreadyExists) {
+        school.assignedStaff.push({
+          staffId: trainerObjectId,
+          assignmentType: 'primary',
+          assignedDate: new Date(),
+          status: 'active'
+        });
         await school.save();
         allocatedSchoolIds.push(schoolId.toString());
         console.log('✓ Added trainer to school:', school.name);
@@ -2166,21 +2182,503 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
   }
 });
 
-app.post('/dashboard/schools/add', requireAuth, async (req, res) => {
+// ============ ENHANCED SCHOOL MANAGEMENT ROUTES ============
+
+// GET schools list with filters
+app.get('/dashboard/schools', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
   try {
-    const { name, street, city, state, zipCode, country, contactName, contactEmail, contactPhone, studentCount, status } = req.body;
-    const school = new School({
-      name,
-      address: { street, city, state, zipCode, country: country || 'Kenya' },
-      contactPerson: { name: contactName, email: contactEmail, phone: contactPhone },
-      studentCount: parseInt(studentCount, 10) || 0,
-      status: status || 'active'
+    const { status, serviceStatus, zone, region, search, sortBy = 'name', order = 'asc' } = req.query;
+
+    let query = {};
+    if (status) query.status = status;
+    if (serviceStatus) query.serviceStatus = serviceStatus;
+    if (zone) query.zone = { $regex: zone, $options: 'i' };
+    if (region) query.region = { $regex: region, $options: 'i' };
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { 'contactPerson.name': { $regex: search, $options: 'i' } },
+        { 'address.city': { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    let sortObj = {};
+    if (sortBy === 'name') sortObj.name = order === 'desc' ? -1 : 1;
+    else if (sortBy === 'students') sortObj.studentCount = order === 'desc' ? -1 : 1;
+    else if (sortBy === 'events') sortObj['participationMetrics.totalEventsAttended'] = order === 'desc' ? -1 : 1;
+    else if (sortBy === 'lastVisit') sortObj.lastVisitDate = order === 'desc' ? -1 : 1;
+    else sortObj.createdAt = order === 'desc' ? -1 : 1;
+
+    let schoolList = await School.find(query).sort(sortObj).lean();
+
+    // For trainers, filter to assigned schools
+    if (req.session.user.role === 'trainer') {
+      schoolList = schoolList.filter(s => s.assignedStaff && s.assignedStaff.some(a => a.staffId && a.staffId.toString() === req.session.user.id));
+    }
+
+    // Enrich with participation metrics
+    const schoolIds = schoolList.map(s => s._id);
+    const schoolEventAggregates = await SchoolEvent.aggregate([
+      { $match: { schoolId: { $in: schoolIds } } },
+      {
+        $group: {
+          _id: '$schoolId',
+          eventCount: { $sum: 1 },
+          totalAttended: { $sum: '$attendance.attended' },
+          avgAttendance: { $avg: '$attendance.percentage' }
+        }
+      }
+    ]);
+    const eventMap = new Map(schoolEventAggregates.map(a => [a._id.toString(), a]));
+
+    schoolList = schoolList.map(school => ({
+      ...school,
+      participationMetrics: {
+        ...(school.participationMetrics || {}),
+        totalEventsAttended: eventMap.get(school._id.toString())?.eventCount || 0,
+        averageAttendanceRate: Math.round(eventMap.get(school._id.toString())?.avgAttendance || 0),
+        engagementScore: Math.min(100, Math.round(((eventMap.get(school._id.toString())?.eventCount || 0) * 10) + (eventMap.get(school._id.toString())?.avgAttendance || 0)))
+      }
+    }));
+
+    // Resolve assigned staff names
+    const assignedIds = [...new Set(schoolList.flatMap(s => (s.assignedStaff || []).map(a => a?.staffId?.toString()).filter(Boolean)))];
+    let trainerMap = new Map();
+    if (assignedIds.length > 0) {
+      const staffListData = await Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber').lean();
+      staffListData.forEach(t => trainerMap.set(t._id.toString(), t));
+    }
+      schoolList.forEach(school => {
+        school.assignedStaff = (school.assignedStaff || []).map(a => {
+          const staffId = a?.staffId?.toString();
+          return staffId ? trainerMap.get(staffId) : null;
+        }).filter(Boolean);
+      });
+
+    // Fetch all trainers for onboarding modal
+    const staffList = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor', 'coordinator'] } }).select('name email idNumber status role').sort({ name: 1 }).lean();
+
+    res.render('dashboard', {
+      user: req.session.user,
+      page: 'schools',
+      schoolList,
+      staffList,
+      filters: { status, serviceStatus, zone, region, search },
+      sortBy, order
     });
-    await school.save();
-    res.redirect('/dashboard/schools');
   } catch (err) {
-    console.error('Error saving school:', err);
-    res.redirect('/dashboard/schools');
+    console.error('Error loading schools page:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
+// School onboarding wizard submission
+app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreateSchools'), async (req, res) => {
+  try {
+    const {
+      name, street, city, state, zipCode, country, zone, region,
+      contactName, contactEmail, contactPhone, contactPosition,
+      studentCount, servicePackage, paymentMethod, billingCycle,
+      primaryTrainerId, notes
+    } = req.body;
+
+    const trainerObjectId = primaryTrainerId ? new mongoose.Types.ObjectId(primaryTrainerId) : null;
+
+    // Create school with comprehensive onboarding data
+    const school = new School({
+      name: name.trim(),
+      address: {
+        street: street?.trim(),
+        city: city?.trim(),
+        state: state?.trim(),
+        zipCode: zipCode?.trim(),
+        country: country || 'Kenya'
+      },
+      zone: zone?.trim(),
+      region: region?.trim(),
+      contactPerson: {
+        name: contactName?.trim(),
+        email: contactEmail?.trim().toLowerCase(),
+        phone: contactPhone?.trim(),
+        position: contactPosition?.trim()
+      },
+      studentCount: parseInt(studentCount) || 0,
+      servicePackage: servicePackage || 'standard',
+      paymentTerms: {
+        method: paymentMethod || 'bank_transfer',
+        billingCycle: billingCycle || 'per_event'
+      },
+      assignedStaff: trainerObjectId ? [{
+        staffId: trainerObjectId,
+        assignmentType: 'primary',
+        assignedDate: new Date(),
+        status: 'active'
+      }] : [],
+      notes: notes?.trim(),
+      onboardingDate: new Date(),
+      partnershipDate: new Date(),
+      status: 'active',
+      serviceStatus: 'active'
+    });
+
+    await school.save();
+
+    // Create initial visit log for onboarding
+    if (req.session.user.id) {
+      const visitLog = new VisitLog({
+        schoolId: school._id,
+        trainerId: primaryTrainerId || req.session.user.id,
+        date: new Date(),
+        purpose: 'School onboarding - initial assessment',
+        discussed: 'Onboarding completed',
+        actionItems: 'Setup complete, first training scheduled'
+      });
+      await visitLog.save();
+    }
+
+    // Audit log
+    await logAudit('school_created', 'school', school._id, school.name, { schoolData: school }, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userRole: req.session.user.role,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, schoolId: school._id, message: 'School onboarded successfully' });
+  } catch (err) {
+    console.error('Error onboarding school:', err);
+    res.status(500).json({ success: false, error: 'Failed to onboard school: ' + err.message });
+  }
+});
+
+// Individual school profile page
+app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const school = await School.findById(schoolId).lean();
+    if (!school) {
+      return res.status(404).render('404', { user: req.session.user, error: 'School not found' });
+    }
+
+    // Populate assigned staff
+    if (school.assignedStaff) {
+      const staffIds = school.assignedStaff.map(a => a?.staffId?.toString()).filter(Boolean);
+      const staffList = await Staff.find({ _id: { $in: staffIds } }).select('name email idNumber role').lean();
+      const staffMap = new Map(staffList.map(s => [s._id.toString(), s]));
+      school.assignedStaff = school.assignedStaff.map(a => {
+        const staffId = a?.staffId?.toString();
+        if (!staffId) return null;
+        const staff = staffMap.get(staffId);
+        return staff ? { ...staff, assignmentType: a.assignmentType, assignedDate: a.assignedDate } : null;
+      }).filter(Boolean);
+    }
+
+    // Scout groups
+    const scoutGroups = await ScoutGroup.find({ schoolId: schoolId }).sort({ name: 1 }).lean();
+
+    // Event participation history
+    const schoolEvents = await SchoolEvent.find({ schoolId: schoolId })
+      .populate('eventId', 'name date location status')
+      .sort({ 'eventId.date': -1 })
+      .lean();
+
+    // Payment history
+    const payments = await Payment.find({ schoolId: schoolId }).sort({ paymentDate: -1 }).limit(10).lean();
+
+    // Documents
+    const documents = await SchoolDocument.find({ schoolId: schoolId, isActive: true }).sort({ uploadedAt: -1 }).lean();
+
+    // Visit logs
+    const visitLogs = await VisitLog.find({ schoolId: schoolId }).sort({ date: -1 }).limit(20).lean();
+
+    // Program enrollments
+    const programs = await Program.find({ _id: { $in: school.programsEnrolled || [] } }).lean();
+
+    // Calculate participation analytics
+    const totalEvents = schoolEvents.length;
+    const totalAttended = schoolEvents.filter(se => se.status === 'attended').length;
+    const avgAttendance = schoolEvents.length ? Math.round(schoolEvents.reduce((sum, se) => sum + (se.attendance?.percentage || 0), 0) / schoolEvents.length) : 0;
+
+    res.render('dashboard', {
+      user: req.session.user,
+      page: 'school-profile',
+      school,
+      scoutGroups,
+      schoolEvents: schoolEvents.map(se => ({ ...se, event: se.eventId })),
+      payments,
+      documents,
+      visitLogs,
+      programs,
+      participationAnalytics: {
+        totalEvents,
+        totalAttended,
+        avgAttendance,
+        lastEventDate: school.participationMetrics?.lastEventDate,
+        nextScheduledVisit: school.nextScheduledVisit
+      }
+    });
+  } catch (err) {
+    console.error('Error loading school profile:', err);
+    res.status(500).render('404', { user: req.session.user, error: 'Error loading school profile' });
+  }
+});
+
+// API: Record school event participation
+app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents'), async (req, res) => {
+  try {
+    const { schoolId, eventId, participantsCount, primaryContact, assignedStaff, notes } = req.body;
+
+    // Check if already exists
+    let schoolEvent = await SchoolEvent.findOne({ schoolId, eventId });
+    if (schoolEvent) {
+      // Update existing
+      schoolEvent.participantsCount = participantsCount;
+      schoolEvent.primaryContact = primaryContact;
+      schoolEvent.assignedStaff = assignedStaff || [];
+      schoolEvent.notes = notes;
+      await schoolEvent.save();
+    } else {
+      schoolEvent = new SchoolEvent({
+        schoolId,
+        eventId,
+        participantsCount,
+        primaryContact,
+        assignedStaff: assignedStaff || [],
+        notes,
+        status: 'registered',
+        attendance: { registered: participantsCount, attended: 0, percentage: 0 }
+      });
+      await schoolEvent.save();
+    }
+
+    // Update school metrics
+    await School.findByIdAndUpdate(schoolId, {
+      $inc: { 'participationMetrics.totalEventsAttended': 1 },
+      $set: { 'participationMetrics.lastEventDate': new Date() }
+    });
+
+    res.json({ success: true, schoolEvent });
+  } catch (err) {
+    console.error('Error recording school event:', err);
+    res.status(500).json({ success: false, error: 'Failed to record participation' });
+  }
+});
+
+// API: Update school event attendance
+app.post('/api/school-events/:id/attendance', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { attended } = req.body;
+
+    const schoolEvent = await SchoolEvent.findByIdAndUpdate(
+      id,
+      { $set: { 'attendance.attended': attended } },
+      { new: true }
+    );
+
+    if (!schoolEvent) return res.status(404).json({ success: false, error: 'Record not found' });
+
+    res.json({ success: true, schoolEvent });
+  } catch (err) {
+    console.error('Error updating attendance:', err);
+    res.status(500).json({ success: false, error: 'Failed to update attendance' });
+  }
+});
+
+// API: Get school payment history
+app.get('/api/schools/:schoolId/payments', requireAuth, async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { status, startDate, endDate } = req.query;
+
+    let query = { schoolId };
+    if (status) query.status = status;
+    if (startDate) query.paymentDate = { ...query.paymentDate, $gte: new Date(startDate) };
+    if (endDate) query.paymentDate = { ...query.paymentDate, $lte: new Date(endDate) };
+
+    const payments = await Payment.find(query).sort({ paymentDate: -1 }).lean();
+    const summary = await Payment.aggregate([
+      { $match: { schoolId: new mongoose.Types.ObjectId(schoolId) } },
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: '$amount' },
+          totalPaid: { $sum: '$amountPaid' },
+          totalOutstanding: { $sum: '$balance' },
+          overdueCount: { $sum: { $cond: [{ $and: [{ $eq: ['$status', 'pending'] }, { $lt: ['$dueDate', new Date()] }] }, 1, 0] } }
+        }
+      }
+    ]);
+
+    res.json({
+      payments,
+      summary: summary[0] || { totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueCount: 0 }
+    });
+  } catch (err) {
+    console.error('Error fetching payments:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch payments' });
+  }
+});
+
+// API: Create/update payment record
+app.post('/api/payments', requireAuth, requirePermission('canViewFinancials'), async (req, res) => {
+  try {
+    const {
+      schoolId, invoiceNumber, amount, currency, paymentDate, dueDate,
+      method, reference, programBooked, eventBooked, status, amountPaid, notes
+    } = req.body;
+
+    const payment = new Payment({
+      schoolId,
+      invoiceNumber,
+      amount: parseFloat(amount),
+      currency: currency || 'KES',
+      paymentDate: new Date(paymentDate),
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      method,
+      reference,
+      programBooked,
+      eventBooked,
+      status,
+      amountPaid: parseFloat(amountPaid) || 0,
+      recordedBy: req.session.user.id,
+      notes
+    });
+
+    await payment.save();
+    res.json({ success: true, payment });
+  } catch (err) {
+    console.error('Error saving payment:', err);
+    res.status(500).json({ success: false, error: 'Failed to save payment' });
+  }
+});
+
+// API: Upload document for school
+app.post('/api/documents', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId, documentType, name, description, url, fileSize, mimeType, expiryDate } = req.body;
+
+    const doc = new SchoolDocument({
+      schoolId,
+      documentType,
+      name,
+      description,
+      url,
+      fileSize,
+      mimeType,
+      expiryDate,
+      uploadedBy: req.session.user.id
+    });
+
+    await doc.save();
+    res.json({ success: true, document: doc });
+  } catch (err) {
+    console.error('Error uploading document:', err);
+    res.status(500).json({ success: false, error: 'Failed to upload document' });
+  }
+});
+
+// API: Get school documents
+app.get('/api/schools/:schoolId/documents', requireAuth, async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { documentType } = req.query;
+
+    const query = { schoolId, isActive: true };
+    if (documentType) query.documentType = documentType;
+
+    const documents = await SchoolDocument.find(query).sort({ uploadedAt: -1 }).lean();
+    res.json({ documents });
+  } catch (err) {
+    console.error('Error fetching documents:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch documents' });
+  }
+});
+
+// API: School analytics dashboard data
+app.get('/api/schools/analytics', requireAuth, requirePermission('canViewAnalytics'), async (req, res) => {
+  try {
+    const { timeRange = '6m' } = req.query;
+    let dateFilter = {};
+    if (timeRange === '3m') dateFilter.createdAt = { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) };
+    else if (timeRange === '6m') dateFilter.createdAt = { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) };
+    else if (timeRange === '1y') dateFilter.createdAt = { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) };
+
+    // Total schools count
+    const totalSchools = await School.countDocuments();
+
+    // Schools by status
+    const byStatus = await School.aggregate([
+      { $match: dateFilter.createdAt ? {} : {} },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    // Schools by service status
+    const byServiceStatus = await School.aggregate([
+      { $group: { _id: '$serviceStatus', count: { $sum: 1 } } }
+    ]);
+
+    // Top schools by engagement (most events)
+    const topEngaged = await SchoolEvent.aggregate([
+      { $group: { _id: '$schoolId', eventCount: { $sum: 1 } } },
+      { $sort: { eventCount: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'schools',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'schoolInfo'
+        }
+      },
+      { $unwind: '$schoolInfo' },
+      { $project: { schoolName: '$schoolInfo.name', eventCount: 1, _id: 0 } }
+    ]);
+
+    // Inactive schools (no visit in 90+ days)
+    const inactiveThreshold = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const inactiveSchools = await School.find({
+      $or: [
+        { lastVisitDate: { $lt: inactiveThreshold } },
+        { lastVisitDate: null }
+      ]
+    }).select('name lastVisitDate').lean();
+
+    // Region breakdown
+    const byRegion = await School.aggregate([
+      { $group: { _id: '$region', count: { $sum: 1 } } }
+    ]);
+
+    // Onboarding trends (last 6 months)
+    const onboardingTrends = await School.aggregate([
+      {
+        $group: {
+          _id: {
+            year: { $year: '$onboardingDate' },
+            month: { $month: '$onboardingDate' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': -1, '_id.month': -1 } },
+      { $limit: 6 }
+    ]);
+
+    res.json({
+      totalSchools,
+      byStatus,
+      byServiceStatus,
+      topEngaged,
+      inactiveSchools: inactiveSchools.length,
+      inactiveDetails: inactiveSchools.slice(0, 10),
+      byRegion,
+      onboardingTrends
+    });
+  } catch (err) {
+    console.error('Error fetching analytics:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch analytics' });
   }
 });
 
@@ -2221,56 +2719,6 @@ app.post('/dashboard/programs/add', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error saving program:', err);
     res.redirect('/dashboard/programs');
-  }
-});
-
-app.get('/dashboard/schools', requireAuth, async (req, res) => {
-  try {
-    let schoolList;
-    if (req.session.user && req.session.user.role === 'trainer') {
-      // For trainers, show only their assigned schools
-      schoolList = await School.find({ assignedStaff: req.session.user.id })
-        .sort({ createdAt: -1 })
-        .lean();
-    } else {
-    // For admins, show all schools
-    schoolList = await School.find()
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Resolve assignedStaff IDs to trainer objects from both Staff and User collections
-    const assignedIds = [...new Set((schoolList || []).flatMap(school => (school.assignedStaff || []).map(String)))];
-    let trainerMap = new Map();
-    if (assignedIds.length > 0) {
-      // Fetch from both Staff and User collections
-      const [staffList, userList] = await Promise.all([
-        Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber status').lean(),
-        User.find({ _id: { $in: assignedIds } }).select('name email role').lean()
-      ]);
-      staffList.forEach(t => trainerMap.set(t._id.toString(), { ...t, __entity: 'staff' }));
-      userList.forEach(u => trainerMap.set(u._id.toString(), { ...u, __entity: 'user' }));
-    }
-     schoolList.forEach(school => {
-       school.assignedStaff = (school.assignedStaff || []).map(id => trainerMap.get(id.toString())).filter(Boolean);
-     });
-   } // close else block for admin schools fetch
-
-   if (req.session.user && req.session.user.role === 'trainer') {
-      // Render trainer schools view
-      res.render('trainer_schools', {
-        user: req.session.user,
-        schoolList
-      });
-    } else {
-      res.render('dashboard', {
-        user: req.session.user,
-        page: 'schools',
-        schoolList
-      });
-    }
-  } catch (err) {
-    console.error('Error loading schools page:', err);
-    res.status(500).render('404', { user: req.session.user });
   }
 });
 
@@ -2414,22 +2862,27 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
       modelData.permissionsList = await Permission.find().sort({ role: 1 }).lean();
     }
 
-    if (page === 'schools') {
-      modelData.schoolList = await School.find().sort({ createdAt: -1 }).lean();
-      const assignedIds = [...new Set((modelData.schoolList || []).flatMap(school => (school.assignedStaff || []).map(String)))];
-      let trainerMap = new Map();
-      if (assignedIds.length > 0) {
-        const [staffList, userList] = await Promise.all([
-          Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber status').lean(),
-          User.find({ _id: { $in: assignedIds } }).select('name email role').lean()
-        ]);
-        staffList.forEach(t => trainerMap.set(t._id.toString(), { ...t, __entity: 'staff' }));
-        userList.forEach(u => trainerMap.set(u._id.toString(), { ...u, __entity: 'user' }));
-      }
-      modelData.schoolList.forEach(school => {
-        school.assignedStaff = (school.assignedStaff || []).map(id => trainerMap.get(id.toString())).filter(Boolean);
-      });
-    }
+     if (page === 'schools') {
+       modelData.schoolList = await School.find().sort({ createdAt: -1 }).lean();
+       const assignedIds = [...new Set((modelData.schoolList || []).flatMap(school => (school.assignedStaff || []).map(a => a?.staffId?.toString()).filter(Boolean)))];
+       let trainerMap = new Map();
+       if (assignedIds.length > 0) {
+         const [staffList, userList] = await Promise.all([
+           Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber status').lean(),
+           User.find({ _id: { $in: assignedIds } }).select('name email role').lean()
+         ]);
+         staffList.forEach(t => trainerMap.set(t._id.toString(), { ...t, __entity: 'staff' }));
+         userList.forEach(u => trainerMap.set(u._id.toString(), { ...u, __entity: 'user' }));
+       }
+       modelData.schoolList.forEach(school => {
+         school.assignedStaff = (school.assignedStaff || []).map(a => {
+           const staffId = a?.staffId?.toString();
+           return staffId ? trainerMap.get(staffId) : null;
+         }).filter(Boolean);
+       });
+       // Also fetch all active trainers for onboarding
+       modelData.staffList = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor', 'coordinator'] } }).select('name email idNumber status role').sort({ name: 1 }).lean();
+     }
 
     if (page === 'events') {
       modelData.eventList = await Event.find().sort({ date: 1 }).lean();

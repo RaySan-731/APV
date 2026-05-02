@@ -5,7 +5,7 @@ const User = require('./models/User');
 
 async function debugPermissions() {
   try {
-    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/scoutmate-hub';
+    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/apv-ventures';
     await mongoose.connect(uri);
     console.log('Connected to MongoDB:', uri);
 

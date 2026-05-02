@@ -4,7 +4,7 @@ const Staff = require('./models/Staff');
 
 async function checkAllocation() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/scoutmate-hub');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/apv-ventures');
     console.log('Connected to MongoDB\n');
 
     // Check all schools with assignedStaff

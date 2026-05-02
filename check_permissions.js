@@ -3,7 +3,7 @@ const Permission = require('./models/Permission');
 
 async function checkPermissions() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/scoutmate-hub');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/apv-ventures');
     console.log('Connected to MongoDB');
 
     const permissions = await Permission.find();

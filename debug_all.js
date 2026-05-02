@@ -5,7 +5,7 @@ const User = require('./models/User');
 
 async function fullDebug() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/scoutmate-hub');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/apv-ventures');
     console.log('Connected to MongoDB\n');
 
     console.log('=== SCHOOLS (all) ===');

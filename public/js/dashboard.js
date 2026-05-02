@@ -1021,7 +1021,1145 @@ function initializeCharts() {
     console.log('Charts initialization placeholder');
 }
 
-// School sorting functionality is now handled inside the main DOMContentLoaded listener above.
+ // School sorting functionality is now handled inside the main DOMContentLoaded listener above.
+
+// ============ EVENTS MANAGEMENT ============
+
+// Event management state
+let currentEvents = [];
+let currentEventView = 'table'; // 'table' or 'calendar'
+let calendarCurrentDate = new Date();
+let calendarViewType = 'month';
+
+// Initialize events page when loaded
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('eventsTableBody') || document.getElementById('calendarContainer')) {
+        applyURLToControls();  // Restore filters from URL
+        loadEvents();
+        populateTrainerDropdown();
+        populateSchoolDropdown();
+        initEventFilters();
+        initTableViewToggle();
+        initCalendarView();
+        initEventFormHandler();
+    }
+});
+
+// Load events from API
+async function loadEvents() {
+    try {
+        const params = new URLSearchParams();
+        const typeFilter = document.getElementById('typeFilter')?.value;
+        const statusFilter = document.getElementById('statusFilter')?.value;
+        const startDate = document.getElementById('startDateFilter')?.value;
+        const endDate = document.getElementById('endDateFilter')?.value;
+        const search = document.getElementById('eventSearch')?.value;
+
+        if (typeFilter) params.set('eventType', typeFilter);
+        if (statusFilter) params.set('status', statusFilter);
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+        if (search) params.set('search', search);
+
+        const response = await fetch(`/api/events?${params.toString()}`);
+        const data = await response.json();
+
+        if (data.success) {
+            currentEvents = data.events;
+            updateEventStats(data.events);
+            if (currentEventView === 'table') {
+                renderEventsTable(data.events);
+            } else {
+                renderCalendar(data.events);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading events:', error);
+        showToast('Failed to load events', 'error');
+    }
+    // Sync URL after loading
+    syncURLFromControls();
+}
+
+// Sync URL from current filter controls and view state
+function syncURLFromControls() {
+  const params = new URLSearchParams();
+  const typeFilter = document.getElementById('typeFilter')?.value;
+  const statusFilter = document.getElementById('statusFilter')?.value;
+  const startDate = document.getElementById('startDateFilter')?.value;
+  const endDate = document.getElementById('endDateFilter')?.value;
+  const search = document.getElementById('eventSearch')?.value;
+  if (typeFilter) params.set('eventType', typeFilter);
+  if (statusFilter) params.set('status', statusFilter);
+  if (startDate) params.set('startDate', startDate);
+  if (endDate) params.set('endDate', endDate);
+  if (search) params.set('search', search);
+  params.set('view', currentEventView);
+  const newURL = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+  window.history.replaceState(null, '', newURL);
+}
+
+// Apply URL query parameters to filter controls and view
+function applyURLToControls() {
+  const params = new URLSearchParams(window.location.search);
+  const getEl = (id) => document.getElementById(id);
+  if (params.get('eventType')) getEl('typeFilter').value = params.get('eventType');
+  if (params.get('status')) getEl('statusFilter').value = params.get('status');
+  if (params.get('startDate')) getEl('startDateFilter').value = params.get('startDate');
+  if (params.get('endDate')) getEl('endDateFilter').value = params.get('endDate');
+  if (params.get('search')) getEl('eventSearch').value = params.get('search');
+  const view = params.get('view');
+  if (view === 'table' || view === 'calendar') {
+    currentEventView = view;
+    const tableBtn = document.getElementById('tableViewBtn');
+    const calendarBtn = document.getElementById('calendarViewBtn');
+    if (view === 'table') {
+      tableBtn?.classList.add('btn-primary'); tableBtn?.classList.remove('btn-secondary');
+      calendarBtn?.classList.add('btn-secondary'); calendarBtn?.classList.remove('btn-primary');
+    } else {
+      calendarBtn?.classList.add('btn-primary'); calendarBtn?.classList.remove('btn-secondary');
+      tableBtn?.classList.add('btn-secondary'); tableBtn?.classList.remove('btn-primary');
+    }
+  }
+}
+
+// Update top stats
+function updateEventStats(events) {
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setHours(0,0,0,0);
+    const thisWeekEnd = new Date(thisWeekStart);
+    thisWeekEnd.setDate(thisWeekEnd.getDate() + 7);
+
+    const upcoming = events.filter(e => new Date(e.startDate) >= now).length;
+    const pending = events.reduce((acc, e) => {
+        return acc + (e.targetSchools?.filter(s => s.rsvpStatus === 'invited' || s.rsvpStatus === 'pending' || s.rsvpStatus === 'no_response').length || 0);
+    }, 0);
+    const confirmed = events.reduce((acc, e) => {
+        return acc + (e.targetSchools?.filter(s => s.rsvpStatus === 'confirmed').length || 0);
+    }, 0);
+    const thisWeek = events.filter(e => {
+        const d = new Date(e.startDate);
+        return d >= thisWeekStart && d < thisWeekEnd;
+    }).length;
+
+    const upcomingEl = document.getElementById('upcomingEventsCount');
+    const pendingEl = document.getElementById('pendingInvitationsCount');
+    const confirmedEl = document.getElementById('confirmedSchoolsCount');
+    const thisWeekEl = document.getElementById('eventsThisWeekCount');
+
+    if (upcomingEl) upcomingEl.textContent = upcoming;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (confirmedEl) confirmedEl.textContent = confirmed;
+    if (thisWeekEl) thisWeekEl.textContent = thisWeek;
+}
+
+// Render events table
+function renderEventsTable(events) {
+    const tbody = document.getElementById('eventsTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (!events || events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="placeholder-text">No events match your criteria.</td></tr>';
+        return;
+    }
+
+    events.forEach(event => {
+        const row = document.createElement('tr');
+
+        // Trainer count
+        const trainerCount = event.trainers?.length || 0;
+        // RSVP summary
+        const confirmedCount = event.targetSchools?.filter(s => s.rsvpStatus === 'confirmed').length || 0;
+        const invitedCount = event.targetSchools?.length || 0;
+
+        // Format dates
+        const start = event.startDate ? new Date(event.startDate) : null;
+        const end = event.endDate ? new Date(event.endDate) : null;
+        const dateStr = start && end
+            ? `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`
+            : start ? start.toLocaleDateString() : 'TBD';
+
+        // Badge color based on status
+        const statusClass = getStatusBadgeClass(event.status);
+
+        row.innerHTML = `
+            <td><strong>${escapeHtml(event.name)}</strong></td>
+            <td>${formatEventType(event.eventType)}</td>
+            <td>${dateStr}</td>
+            <td>${escapeHtml(event.location?.name || event.location || 'TBD')}</td>
+            <td><span class="badge ${statusClass}">${event.status.replace('_', ' ')}</span></td>
+            <td>${trainerCount} assigned</td>
+            <td>${confirmedCount}/${invitedCount} confirmed</td>
+            <td>
+                <button class="btn btn-sm btn-outline" onclick="openManageEventModal('${event._id}')">Manage</button>
+                <button class="btn btn-sm btn-outline" onclick="openEditEventModal('${event._id}')">Edit</button>
+                <button class="btn btn-sm btn-outline" onclick="deleteEvent('${event._id}')">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Get badge class for status
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'draft': return 'badge-warning';
+        case 'scheduled': return 'badge-primary';
+        case 'confirmed': return 'badge-success';
+        case 'in_progress': return 'badge-primary';
+        case 'completed': return 'badge-secondary';
+        case 'reviewed': return 'badge-success';
+        case 'cancelled': return 'badge-danger';
+        case 'archived': return 'badge-muted';
+        case 'published': return 'badge-info'; // legacy
+        default: return 'badge-info';
+    }
+}
+
+// Format event type display
+function formatEventType(type) {
+    const types = {
+        'camp': '🏕️ Camp',
+        'hike': '🥾 Hike',
+        'team_building': '🤝 Team Building',
+        'training_session': '📚 Training',
+        'inter_school_competition': '🏆 Competition',
+        'other': '📌 Other'
+    };
+    return types[type] || type;
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Initialize filter event listeners
+function initEventFilters() {
+    const filterInputs = ['eventSearch', 'typeFilter', 'statusFilter', 'startDateFilter', 'endDateFilter'];
+    filterInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            // Use change for selects, keydown+Enter for search, change for dates
+            if (el.tagName === 'INPUT' && el.type === 'text') {
+                el.addEventListener('keydown', e => e.key === 'Enter' && loadEvents());
+            } else {
+                el.addEventListener('change', loadEvents);
+            }
+        }
+    });
+}
+
+// Table/Calendar view toggle
+function initTableViewToggle() {
+    const tableBtn = document.getElementById('tableViewBtn');
+    const calendarBtn = document.getElementById('calendarViewBtn');
+
+    if (tableBtn) {
+        tableBtn.addEventListener('click', () => {
+            currentEventView = 'table';
+            document.getElementById('tableView').style.display = 'block';
+            document.getElementById('calendarView').style.display = 'none';
+            tableBtn.classList.add('btn-primary');
+            tableBtn.classList.remove('btn-secondary');
+            calendarBtn.classList.add('btn-secondary');
+            calendarBtn.classList.remove('btn-primary');
+            renderEventsTable(currentEvents);
+        });
+    }
+
+
+
+     if (calendarBtn) {
+         calendarBtn.addEventListener('click', () => {
+             currentEventView = 'calendar';
+             document.getElementById('tableView').style.display = 'none';
+             document.getElementById('calendarView').style.display = 'block';
+             calendarBtn.classList.add('btn-primary');
+             calendarBtn.classList.remove('btn-secondary');
+             tableBtn.classList.add('btn-secondary');
+             tableBtn.classList.remove('btn-primary');
+             renderCalendar(currentEvents);
+             syncURLFromControls();
+         });
+     }
+}
+
+// ============ MODAL FUNCTIONS ============
+
+// Open Create Event Modal
+function openCreateEventModal() {
+    document.getElementById('eventModal').style.display = 'flex';
+    document.getElementById('eventModalTitle').textContent = 'Create New Event';
+    document.getElementById('eventForm').reset();
+    document.getElementById('eventId').value = '';
+    document.getElementById('equipmentList').innerHTML = '';
+    document.getElementById('prerequisitesList').innerHTML = '';
+    addEquipmentItem(); // add one empty row
+    addPrerequisiteItem();
+}
+
+// Open Edit Event Modal
+async function openEditEventModal(eventId) {
+    try {
+        const response = await fetch(`/api/events/${eventId}`);
+        const data = await response.json();
+
+        if (!data.success) throw new Error(data.error);
+
+        const event = data.event;
+
+        document.getElementById('eventModal').style.display = 'flex';
+        document.getElementById('eventModalTitle').textContent = 'Edit Event';
+        document.getElementById('eventId').value = event._id;
+
+        // Basic
+        document.getElementById('eventName').value = event.name || '';
+        document.getElementById('eventType').value = event.eventType || 'other';
+        document.getElementById('eventDescription').value = event.description || '';
+        document.getElementById('eventAgenda').value = event.agenda || '';
+
+        // Schedule
+        const formatDT = (date) => date ? new Date(date).toISOString().slice(0,16) : '';
+        document.getElementById('eventStartDate').value = formatDT(event.startDate);
+        document.getElementById('eventEndDate').value = formatDT(event.endDate);
+        document.getElementById('eventRegistrationDeadline').value = formatDT(event.registrationDeadline);
+        document.getElementById('eventDefaultRsvpDeadline').value = formatDT(event.defaultInvitationDeadline);
+
+        // Location
+        document.getElementById('locationName').value = event.location?.name || '';
+        document.getElementById('locationAddress').value = event.location?.address || '';
+        document.getElementById('locationCity').value = event.location?.city || '';
+        document.getElementById('locationRegion').value = event.location?.region || '';
+        document.getElementById('locationCountry').value = event.location?.country || 'Kenya';
+        if (event.location?.coordinates) {
+            document.getElementById('coordinates').value = `${event.location.coordinates.latitude}, ${event.location.coordinates.longitude}`;
+        }
+
+        // Capacity
+        document.getElementById('maxParticipants').value = event.maxParticipants || '';
+        document.getElementById('estimatedScoutCount').value = event.estimatedScoutCount || '';
+        document.getElementById('waitlistEnabled').checked = event.waitlistEnabled || false;
+
+        // Equipment
+        const equipmentList = document.getElementById('equipmentList');
+        equipmentList.innerHTML = '';
+        (event.requiredEquipment || []).forEach(eq => {
+            addEquipmentItem(eq.item, eq.quantity, eq.providedBy, eq.notes);
+        });
+        if ((event.requiredEquipment || []).length === 0) addEquipmentItem();
+
+        // Prerequisites
+        const prereqList = document.getElementById('prerequisitesList');
+        prereqList.innerHTML = '';
+        (event.prerequisites || []).forEach(pr => {
+            addPrerequisiteItem(pr.description, pr.mandatory);
+        });
+        if ((event.prerequisites || []).length === 0) addPrerequisiteItem();
+
+        // Budget
+        document.getElementById('budgetTotal').value = event.budget?.total || '';
+        document.getElementById('costPerParticipant').value = event.costPerParticipant || '';
+
+        // Publishing
+        document.getElementById('eventStatus').value = event.status || 'draft';
+        document.getElementById('eventVisibility').value = event.visibility || 'private';
+
+    } catch (error) {
+        console.error('Error loading event:', error);
+        showToast('Failed to load event details', 'error');
+    }
+}
+
+// Close event modal
+function closeEventModal() {
+    document.getElementById('eventModal').style.display = 'none';
+}
+
+// Close manage event modal
+function closeManageEventModal() {
+    document.getElementById('manageEventModal').style.display = 'none';
+}
+
+// ============ EVENT FORM HANDLING ============
+
+// Add equipment item row
+function addEquipmentItem(item = '', quantity = 1, providedBy = 'APV', notes = '') {
+    const container = document.getElementById('equipmentList');
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '0.5rem';
+    row.style.marginBottom = '0.5rem';
+    row.innerHTML = `
+        <input type="text" placeholder="Item name" value="${escapeHtml(item)}" style="flex: 2;" required>
+        <input type="number" placeholder="Qty" value="${quantity}" min="1" style="width: 60px;">
+        <select style="width: 130px;">
+            <option value="APV" ${providedBy === 'APV' ? 'selected' : ''}>Provided by APV</option>
+            <option value="School" ${providedBy === 'School' ? 'selected' : ''}>Provided by School</option>
+            <option value="Participant" ${providedBy === 'Participant' ? 'selected' : ''}>Provided by Participant</option>
+        </select>
+        <input type="text" placeholder="Notes" value="${escapeHtml(notes)}" style="flex: 1;">
+        <button type="button" class="btn btn-sm btn-outline" onclick="this.parentElement.remove()">✕</button>
+    `;
+    container.appendChild(row);
+}
+
+// Add prerequisite row
+function addPrerequisiteItem(description = '', mandatory = true) {
+    const container = document.getElementById('prerequisitesList');
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '0.5rem';
+    row.style.marginBottom = '0.5rem';
+    row.innerHTML = `
+        <input type="text" placeholder="Prerequisite description" value="${escapeHtml(description)}" style="flex: 2;" required>
+        <label style="display: flex; align-items: center; gap: 0.25rem; width: 100px;">
+            <input type="checkbox" ${mandatory ? 'checked' : ''}> Mandatory
+        </label>
+        <button type="button" class="btn btn-sm btn-outline" onclick="this.parentElement.remove()">✕</button>
+    `;
+    container.appendChild(row);
+}
+
+// Collect equipment data from DOM
+function collectEquipmentData() {
+    const rows = document.querySelectorAll('#equipmentList > div');
+    return Array.from(rows).map(row => {
+        const inputs = row.querySelectorAll('input, select');
+        return {
+            item: inputs[0]?.value || '',
+            quantity: parseInt(inputs[1]?.value) || 1,
+            providedBy: inputs[2]?.value || 'APV',
+            notes: inputs[3]?.value || ''
+        };
+    }).filter(eq => eq.item);
+}
+
+// Collect prerequisites data from DOM
+function collectPrerequisitesData() {
+    const rows = document.querySelectorAll('#prerequisitesList > div');
+    return Array.from(rows).map(row => {
+        const inputs = row.querySelectorAll('input, select');
+        return {
+            description: inputs[0]?.value || '',
+            mandatory: inputs[1]?.checked || false
+        };
+    }).filter(pr => pr.description);
+}
+
+// Submit event form
+function initEventFormHandler() {
+    const form = document.getElementById('eventForm');
+    if (!form) return;
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const eventId = document.getElementById('eventId').value;
+        const isEdit = !!eventId;
+
+        const formData = {
+            name: document.getElementById('eventName').value,
+            description: document.getElementById('eventDescription').value,
+            eventType: document.getElementById('eventType').value,
+            agenda: document.getElementById('eventAgenda').value,
+            startDate: document.getElementById('eventStartDate').value,
+            endDate: document.getElementById('eventEndDate').value,
+            registrationDeadline: document.getElementById('eventRegistrationDeadline').value,
+            defaultInvitationDeadline: document.getElementById('eventDefaultRsvpDeadline').value,
+            locationName: document.getElementById('locationName').value,
+            locationAddress: document.getElementById('locationAddress').value,
+            locationCity: document.getElementById('locationCity').value,
+            locationRegion: document.getElementById('locationRegion').value,
+            locationCountry: document.getElementById('locationCountry').value,
+            region: document.getElementById('locationRegion').value,
+            maxParticipants: document.getElementById('maxParticipants').value,
+            estimatedScoutCount: document.getElementById('estimatedScoutCount').value,
+            waitlistEnabled: document.getElementById('waitlistEnabled').checked,
+            requiredEquipment: JSON.stringify(collectEquipmentData()),
+            prerequisites: JSON.stringify(collectPrerequisitesData()),
+            budgetTotal: document.getElementById('budgetTotal').value,
+            costPerParticipant: document.getElementById('costPerParticipant').value,
+            status: document.getElementById('eventStatus').value,
+            visibility: document.getElementById('eventVisibility').value
+        };
+
+        // Handle coordinates
+        const coords = document.getElementById('coordinates').value;
+        if (coords && coords.includes(',')) {
+            const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()));
+            if (!isNaN(lat) && !isNaN(lng)) {
+                formData.locationLatitude = lat;
+                formData.locationLongitude = lng;
+            }
+        }
+
+        try {
+            const url = isEdit ? `/dashboard/events/update/${eventId}` : '/dashboard/events/create';
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            let result;
+            try {
+                result = await response.json();
+            } catch (parseError) {
+                console.error('Failed to parse response as JSON:', parseError);
+                showToast(`Server error: ${response.status} ${response.statusText}`, 'error');
+                return;
+            }
+
+            if (result.success) {
+                showToast(isEdit ? 'Event updated successfully' : 'Event created successfully', 'success');
+                closeEventModal();
+                loadEvents();
+            } else {
+                showToast('Error: ' + (result.error || 'Failed to save event'), 'error');
+            }
+        } catch (error) {
+            console.error('Error saving event:', error);
+            showToast('Network error while saving event', 'error');
+        }
+    });
+}
+
+// Delete event
+async function deleteEvent(eventId) {
+    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) return;
+
+    try {
+        const response = await fetch(`/dashboard/events/delete/${eventId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('Event deleted successfully', 'success');
+            loadEvents();
+        } else {
+            showToast('Error: ' + (result.error || 'Failed to delete event'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting event:', error);
+        showToast('Network error while deleting event', 'error');
+    }
+}
+
+// ============ TRAINER ASSIGNMENT ============
+
+// Populate trainer dropdown
+async function populateTrainerDropdown() {
+    try {
+        const response = await fetch('/api/trainers/list');
+        const data = await response.json();
+
+        if (data.success) {
+            const select = document.getElementById('trainerSelect');
+            select.innerHTML = '<option value="">Select a trainer...</option>';
+            data.trainers.forEach(trainer => {
+                const option = document.createElement('option');
+                option.value = trainer._id;
+                option.textContent = `${trainer.name} (${trainer.role})`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching trainers:', error);
+    }
+}
+
+// Assign trainer to event
+async function assignTrainer() {
+    const eventId = document.getElementById('manageEventId').value;
+    const trainerId = document.getElementById('trainerSelect').value;
+    const role = document.getElementById('trainerRoleSelect').value;
+
+    if (!trainerId) {
+        showToast('Please select a trainer', 'warning');
+        return;
+    }
+
+    // Check for conflicts
+    const conflictResponse = await fetch(`/api/trainers/${trainerId}/availability?startDate=${encodeURIComponent(document.getElementById('eventStartDate').value)}&endDate=${encodeURIComponent(document.getElementById('eventEndDate').value)}&excludeEventId=${eventId}`);
+    const conflictData = await conflictResponse.json();
+
+    if (!conflictData.available) {
+        const conflictEl = document.getElementById('trainerConflictError');
+        conflictEl.style.display = 'block';
+        conflictEl.className = 'message error';
+        conflictEl.innerHTML = `<strong>Conflict detected:</strong><br>${conflictData.conflicts.map(c => `${c.name}: ${c.dates}`).join('<br>')}`;
+        return;
+    } else {
+        document.getElementById('trainerConflictError').style.display = 'none';
+    }
+
+    try {
+        const response = await fetch(`/api/events/${eventId}/assign-trainer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trainerId, role })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('Trainer assigned successfully', 'success');
+            openManageEventModal(eventId); // Refresh modal
+            loadEvents();
+        } else {
+            showToast('Error: ' + (result.error || 'Assignment failed'), 'error');
+        }
+    } catch (error) {
+        console.error('Error assigning trainer:', error);
+        showToast('Network error', 'error');
+    }
+}
+
+// Populate school dropdown
+async function populateSchoolDropdown() {
+    try {
+        const response = await fetch('/api/schools/list');
+        const data = await response.json();
+
+        if (data.success) {
+            const select = document.getElementById('schoolSelect');
+            select.innerHTML = '<option value="">Select a school...</option>';
+            data.schools.forEach(school => {
+                const option = document.createElement('option');
+                option.value = school._id;
+                option.textContent = `${school.name} - ${school.address?.city || 'No city'}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching schools:', error);
+    }
+}
+
+// Invite school to event
+async function inviteSchool() {
+    const eventId = document.getElementById('manageEventId').value;
+    const schoolId = document.getElementById('schoolSelect').value;
+    const rsvpDeadline = document.getElementById('inviteRsvpDeadline').value;
+
+    if (!schoolId) {
+        showToast('Please select a school', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/events/${eventId}/invite-school`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schoolId, rsvpDeadline })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('Invitation sent successfully', 'success');
+            openManageEventModal(eventId);
+            loadEvents();
+        } else {
+            showToast('Error: ' + (result.error || 'Invitation failed'), 'error');
+        }
+    } catch (error) {
+        console.error('Error inviting school:', error);
+        showToast('Network error', 'error');
+    }
+}
+
+// Open Manage Event Modal
+async function openManageEventModal(eventId) {
+    try {
+        const response = await fetch(`/api/events/${eventId}`);
+        const data = await response.json();
+
+        if (!data.success) throw new Error(data.error);
+
+        const event = data.event;
+        document.getElementById('manageEventModal').style.display = 'flex';
+        document.getElementById('manageEventTitle').textContent = `Manage: ${event.name}`;
+
+        // Store eventId in hidden field
+        document.getElementById('manageEventId').value = eventId;
+        // Also store dates in the hidden fields used by conflict checking (located in create/edit modal)
+        const formatDT = (date) => date ? new Date(date).toISOString().slice(0,16) : '';
+        document.getElementById('eventStartDate').value = formatDT(event.startDate);
+        document.getElementById('eventEndDate').value = formatDT(event.endDate);
+
+        // Render assigned trainers
+        const trainersList = document.getElementById('assignedTrainersList');
+        trainersList.innerHTML = '';
+        if (event.trainers && event.trainers.length > 0) {
+            event.trainers.forEach(assignment => {
+                const trainer = assignment.trainerId;
+                const badgeClass = assignment.status === 'confirmed' ? 'badge-success' : assignment.status === 'declined' ? 'badge-danger' : 'badge-info';
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;';
+                item.innerHTML = `
+                    <div>
+                        <strong>${trainer?.name || 'Unknown'}</strong> (${trainer?.role || 'N/A'}) — <span class="badge ${badgeClass}">${assignment.status.replace('_', ' ')}</span>
+                        <br><small>Role: ${assignment.role.replace('_', ' ')}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="removeTrainer('${eventId}', '${trainer._id}')">Remove</button>
+                `;
+                trainersList.appendChild(item);
+            });
+        } else {
+            trainersList.innerHTML = '<p class="placeholder-text">No trainers assigned yet.</p>';
+        }
+
+        // Render invited schools with RSVP status
+        const schoolsList = document.getElementById('invitedSchoolsList');
+        schoolsList.innerHTML = '';
+        if (event.targetSchools && event.targetSchools.length > 0) {
+            event.targetSchools.forEach(inv => {
+                const school = inv.schoolId;
+                let badgeClass = 'badge-info';
+                if (inv.rsvpStatus === 'confirmed') badgeClass = 'badge-success';
+                else if (inv.rsvpStatus === 'declined') badgeClass = 'badge-danger';
+                else if (inv.rsvpStatus === 'pending' || inv.rsvpStatus === 'invited') badgeClass = 'badge-warning';
+
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;';
+                item.innerHTML = `
+                    <div>
+                        <strong>${school?.name || 'Unknown School'}</strong>
+                        <br><small>${school?.address?.city || 'No city'} | RSVP: <span class="badge ${badgeClass}">${inv.rsvpStatus.replace('_', ' ')}</span> | Deadline: ${inv.rsvpDeadline ? new Date(inv.rsvpDeadline).toLocaleDateString() : 'None'}</small>
+                        ${inv.numberOfParticipants ? `<br><small>Participants: ${inv.numberOfParticipants}</small>` : ''}
+                    </div>
+                `;
+                schoolsList.appendChild(item);
+            });
+        } else {
+            schoolsList.innerHTML = '<p class="placeholder-text">No schools invited yet.</p>';
+        }
+
+        // ===== POST-EVENT REVIEW HANDLING =====
+        // Handle review section in manage modal
+        (function populateReviewSection() {
+            const reviewSection = document.getElementById('reviewSection');
+            const reviewContent = document.getElementById('reviewContent');
+            const trainerReportForm = document.getElementById('trainerReportForm');
+            const adminReviewActions = document.getElementById('adminReviewActions');
+
+            // Hide all first
+            reviewSection.style.display = 'none';
+            reviewContent.innerHTML = '';
+            trainerReportForm.style.display = 'none';
+            adminReviewActions.style.display = 'none';
+
+            const eventStatus = event.status;
+            if (!['completed', 'reviewed'].includes(eventStatus)) {
+                return; // Hide if not yet completed
+            }
+
+            reviewSection.style.display = 'block';
+            const isAssignedTrainer = event.trainers && event.trainers.some(t => t.trainerId && t.trainerId._id.toString() === window.currentUser.id);
+            const canApprove = ['admin', 'supervisor', 'coordinator'].includes(window.currentUser.role);
+            const review = event.review || {};
+
+            if (!review.trainerReport) {
+                // No report submitted yet
+                if (isAssignedTrainer) {
+                    trainerReportForm.style.display = 'block';
+                    reviewContent.innerHTML = '<p>Please submit your post-event report below.</p>';
+                } else {
+                    reviewContent.innerHTML = '<p>No report submitted yet.</p>';
+                }
+            } else {
+                // Report exists
+                trainerReportForm.style.display = 'none';
+                let html = '<div style="background: var(--muted); padding: 1rem; border-radius: var(--radius);">';
+                html += `<p><strong>Trainer Report:</strong><br>${review.trainerReport.replace(/\n/g, '<br>')}</p>`;
+                if (review.actualAttendeeCount !== undefined) {
+                    html += `<p><strong>Actual Attendee Count:</strong> ${review.actualAttendeeCount}</p>`;
+                }
+                if (review.reportSubmittedAt) {
+                    html += `<p><small>Submitted: ${new Date(review.reportSubmittedAt).toLocaleString()}</small></p>`;
+                }
+                html += '</div>';
+
+                const status = review.reviewStatus || 'pending';
+                if (status === 'pending') {
+                    if (canApprove) {
+                        adminReviewActions.style.display = 'block';
+                        document.getElementById('adminReviewStatus').textContent = 'Report is pending review.';
+                    }
+                } else if (status === 'approved') {
+                    html += `<p><strong>Review Status:</strong> <span class="badge badge-success">Approved</span></p>`;
+                    if (review.reviewNotes) {
+                        html += `<p><strong>Reviewer Notes:</strong> ${review.reviewNotes}</p>`;
+                    }
+                    if (review.closedAt) {
+                        html += `<p><small>Closed: ${new Date(review.closedAt).toLocaleString()}</small></p>`;
+                    }
+                } else if (status === 'needs_revision') {
+                    if (isAssignedTrainer) {
+                        trainerReportForm.style.display = 'block';
+                        html += `<p><strong>Review Status:</strong> <span class="badge badge-warning">Needs Revision</span></p>`;
+                        if (review.reviewNotes) {
+                            html += `<p><strong>Reviewer Notes:</strong> ${review.reviewNotes}</p>`;
+                        }
+                    } else {
+                        html += `<p><strong>Review Status:</strong> <span class="badge badge-warning">Needs Revision</span></p>`;
+                        if (review.reviewNotes) {
+                            html += `<p><strong>Reviewer Notes:</strong> ${review.reviewNotes}</p>`;
+                        }
+                    }
+                }
+
+                reviewContent.innerHTML = html;
+            }
+        })();
+
+    } catch (error) {
+        console.error('Error loading event for management:', error);
+        showToast('Failed to load event details', 'error');
+    }
+}
+
+// Remove trainer from event
+async function removeTrainer(eventId, trainerId) {
+    try {
+        const response = await fetch(`/api/events/${eventId}/remove-trainer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trainerId })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('Trainer removed', 'success');
+            openManageEventModal(eventId);
+            loadEvents();
+        } else {
+            showToast('Error: ' + (result.error || 'Failed to remove'), 'error');
+        }
+    } catch (err) {
+        console.error('Error removing trainer:', err);
+        showToast('Network error', 'error');
+    }
+}
+
+// Send reminders
+async function sendReminders(type) {
+    const eventId = document.getElementById('manageEventId').value;
+    // In a real implementation, you'd call an endpoint that queues emails.
+    showToast(`Reminder scheduled for ${type}`, 'success');
+}
+
+// ===== POST-EVENT REVIEW HANDLERS =====
+
+// Submit trainer report
+async function submitTrainerReport() {
+  const eventId = document.getElementById('manageEventId').value;
+  const report = document.getElementById('trainerReport').value.trim();
+  const actualAttendeeCount = document.getElementById('actualAttendeeCount').value;
+
+  if (!report) {
+    showToast('Please enter a report', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/events/${eventId}/submit-report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trainerReport: report, actualAttendeeCount })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Report submitted successfully', 'success');
+      openManageEventModal(eventId); // refresh modal
+      loadEvents();
+    } else {
+      showToast('Error: ' + (data.error || 'Failed to submit report'), 'error');
+    }
+  } catch (err) {
+    console.error('Error submitting report:', err);
+    showToast('Network error', 'error');
+  }
+}
+
+// Admin approve event review
+async function approveEventReview() {
+  const eventId = document.getElementById('manageEventId').value;
+  const notes = prompt('Enter review notes (optional):') || '';
+  try {
+    const res = await fetch(`/api/events/${eventId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve', reviewNotes: notes })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Event approved successfully', 'success');
+      openManageEventModal(eventId);
+      loadEvents();
+    } else {
+      showToast('Error: ' + (data.error || 'Failed to approve'), 'error');
+    }
+  } catch (err) {
+    console.error('Error approving event:', err);
+    showToast('Network error', 'error');
+  }
+}
+
+// Admin request revision
+async function requestRevision() {
+  const eventId = document.getElementById('manageEventId').value;
+  const notes = prompt('Enter revision notes (required):');
+  if (!notes) {
+    showToast('Revision notes are required', 'error');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/events/${eventId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'request_revision', reviewNotes: notes })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Revision requested', 'success');
+      openManageEventModal(eventId);
+      loadEvents();
+    } else {
+      showToast('Error: ' + (data.error || 'Failed to request revision'), 'error');
+    }
+  } catch (err) {
+    console.error('Error requesting revision:', err);
+    showToast('Network error', 'error');
+  }
+}
+
+// ============ CALENDAR VIEW ============
+
+function initCalendarView() {
+    document.getElementById('calendarViewType')?.addEventListener('change', (e) => {
+        calendarViewType = e.target.value;
+        renderCalendar(currentEvents);
+    });
+
+    document.getElementById('prevPeriodBtn')?.addEventListener('click', () => {
+        changeCalendarPeriod(-1);
+    });
+
+    document.getElementById('nextPeriodBtn')?.addEventListener('click', () => {
+        changeCalendarPeriod(1);
+    });
+}
+
+function changeCalendarPeriod(delta) {
+    if (calendarViewType === 'month') {
+        calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + delta);
+    } else if (calendarViewType === 'week') {
+        calendarCurrentDate.setDate(calendarCurrentDate.getDate() + (delta * 7));
+    } else {
+        // list view - change by month anyway
+        calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + delta);
+    }
+    renderCalendar(currentEvents);
+}
+
+function renderCalendar(events) {
+    const container = document.getElementById('calendarContainer');
+    if (!container) return;
+
+    if (calendarViewType === 'list') {
+        renderCalendarList(events);
+    } else if (calendarViewType === 'week') {
+        renderCalendarWeek(events);
+    } else {
+        renderCalendarMonth(events);
+    }
+}
+
+function renderCalendarMonth(events) {
+    const year = calendarCurrentDate.getFullYear();
+    const month = calendarCurrentDate.getMonth();
+    const title = calendarCurrentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    document.getElementById('calendarTitle').textContent = title;
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startPadding = firstDay.getDay(); // Sunday = 0
+    const daysInMonth = lastDay.getDate();
+
+    let html = '<div class="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.25rem;">';
+
+    // Day headers
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    dayNames.forEach(day => {
+        html += `<div style="font-weight: bold; text-align: center; padding: 0.5rem; background: var(--muted); border-radius: var(--radius);">${day}</div>`;
+    });
+
+    // Empty cells before first day
+    for (let i = 0; i < startPadding; i++) {
+        html += '<div style="min-height: 80px; background: var(--card); padding: 0.25rem; border-radius: var(--radius);"></div>';
+    }
+
+    // Days
+    for (let day = 1; day <= daysInMonth; day++) {
+        const currentDate = new Date(year, month, day);
+        const dayEvents = events.filter(e => {
+            const d = new Date(e.startDate);
+            return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
+        });
+
+        html += `<div style="min-height: 80px; background: var(--card); padding: 0.25rem; border-radius: var(--radius); border: 1px solid var(--border);">`;
+        html += `<div style="font-weight: 600; font-size: 0.875rem;">${day}</div>`;
+
+        dayEvents.forEach(ev => {
+            const colorClass = getEventColorClass(ev.eventType);
+            html += `
+                <div class="event-marker ${colorClass}" style="font-size: 0.75rem; padding: 0.25rem; margin-top: 0.25rem; border-radius: 4px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(ev.name)}">
+                    ${escapeHtml(ev.name)}
+                </div>
+            `;
+        });
+
+        html += '</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderCalendarWeek(events) {
+    const weekStart = new Date(calendarCurrentDate);
+    weekStart.setDate(calendarCurrentDate.getDate() - calendarCurrentDate.getDay());
+    const title = `${weekStart.toLocaleDateString()} - ${new Date(weekStart.getTime() + 6*24*60*60*1000).toLocaleDateString()}`;
+    document.getElementById('calendarTitle').textContent = title;
+
+    let html = '<div class="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.25rem;">';
+
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    dayNames.forEach(day => {
+        html += `<div style="font-weight: bold; text-align: center; padding: 0.5rem; background: var(--muted); border-radius: var(--radius);">${day}</div>`;
+    });
+
+    for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(weekStart);
+        currentDate.setDate(weekStart.getDate() + i);
+        const dayEvents = events.filter(e => {
+            const d = new Date(e.startDate);
+            return d.toDateString() === currentDate.toDateString();
+        });
+
+        html += `<div style="min-height: 100px; background: var(--card); padding: 0.25rem; border-radius: var(--radius); border: 1px solid var(--border);">`;
+        html += `<div style="font-weight: 600; font-size: 0.875rem;">${currentDate.getDate()}</div>`;
+
+        dayEvents.forEach(ev => {
+            const colorClass = getEventColorClass(ev.eventType);
+            html += `
+                <div class="event-marker ${colorClass}" style="font-size: 0.75rem; padding: 0.25rem; margin-top: 0.25rem; border-radius: 4px; cursor: pointer;" title="${escapeHtml(ev.name)}">
+                    ${escapeHtml(ev.name)}
+                </div>
+            `;
+        });
+
+        html += '</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderCalendarList(events) {
+    const year = calendarCurrentDate.getFullYear();
+    const month = calendarCurrentDate.getMonth();
+    const title = calendarCurrentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    document.getElementById('calendarTitle').textContent = `${title} (List View)`;
+
+    const monthEvents = events.filter(e => {
+        const d = new Date(e.startDate);
+        return d.getMonth() === month && d.getFullYear() === year;
+    }).sort((a,b) => new Date(a.startDate) - new Date(b.startDate));
+
+    let html = '<div class="events-list">';
+    if (monthEvents.length === 0) {
+        html = '<p class="placeholder-text">No events this month.</p>';
+    } else {
+        monthEvents.forEach(ev => {
+            const colorClass = getEventColorClass(ev.eventType);
+            html += `
+                <div style="padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.75rem; border-left: 4px solid var(--${colorClass === 'badge-success' ? 'primary' : colorClass === 'badge-warning' ? 'accent' : 'secondary'});">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h4 style="margin: 0 0 0.5rem 0;">${escapeHtml(ev.name)}</h4>
+                            <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.875rem; color: var(--muted-foreground);">
+                                <span>📅 ${new Date(ev.startDate).toLocaleDateString()} - ${new Date(ev.endDate).toLocaleDateString()}</span>
+                                <span>📍 ${ev.location?.name || ev.location}</span>
+                                <span>🏷️ ${formatEventType(ev.eventType)}</span>
+                            </div>
+                        </div>
+                        <span class="badge ${getStatusBadgeClass(ev.status)}">${ev.status.replace('_',' ')}</span>
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.875rem;">
+                        Trainers: ${ev.trainers?.map(t => t.trainerId?.name || 'Unassigned').join(', ') || 'None assigned'} |
+                        RSVP: ${ev.targetSchools?.filter(s => s.rsvpStatus === 'confirmed').length || 0} confirmed
+                    </div>
+                </div>
+            `;
+        });
+    }
+    container.innerHTML = html;
+}
+
+function getEventColorClass(eventType) {
+    // Returns color for event type for calendar markers
+    const colors = {
+        'camp': 'primary',
+        'hike': 'success',
+        'team_building': 'accent',
+        'training_session': 'warning',
+        'inter_school_competition': 'danger',
+        'other': 'secondary'
+    };
+    return colors[eventType] || 'secondary';
+}
+
+// ============ API ENDPOINTS FOR DROPDOWNS ============
+
+// Add a catch-all route for fetching trainers list (assuming we add an endpoint)
+// We'll add this endpoint in server.js: get('/api/trainers/list')
+
+// And for schools list: get('/api/schools/list')
+
+// ============ FORM HELPERS ============
+
+// For create/edit modal equipment and prerequisites are dynamic
+// Already handled above.
+
+// ============ FILTERing ============
+
+
+// Initialize filters
+function initFilters() {
+    const filterElements = ['eventSearch', 'typeFilter', 'statusFilter', 'startDateFilter', 'endDateFilter'];
+    filterElements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (el.tagName === 'INPUT' && el.type === 'text') {
+                el.addEventListener('keydown', e => e.key === 'Enter' && loadEvents());
+            } else {
+                el.addEventListener('change', loadEvents);
+            }
+        }
+    });
+}
 
 // ============ SCHOOL ONBOARDING WIZARD ============
 

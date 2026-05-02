@@ -9,15 +9,16 @@
     "migrate": "node scripts/migrate_to_mongodb.js",
     "normalize-db": "node scripts/normalize_db_records.js"
   },
-  "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^8.0.3",
-    "express-session": "^1.17.3",
-    "bcryptjs": "^2.4.3",
-    "dotenv": "^16.3.1",
-    "ejs": "^3.1.9",
-    "nodemailer": "^6.9.7"
-  },
+   "dependencies": {
+     "express": "^4.18.2",
+     "mongoose": "^8.0.3",
+     "express-session": "^1.17.3",
+     "bcryptjs": "^2.4.3",
+     "dotenv": "^16.3.1",
+     "ejs": "^3.1.9",
+     "nodemailer": "^6.9.7",
+     "pdfkit": "^0.14.0"
+   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },

@@ -872,51 +872,287 @@
                             </div>
                         </div>
                     </div>
-                <% } else if (page === 'events') { %>
+                 <% } else if (page === 'events') { %>
+                    <!-- Events Management Page -->
                     <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-icon">📅</div><div><div class="stat-number">14</div><div class="stat-label">Upcoming Events</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">🚩</div><div><div class="stat-number">4</div><div class="stat-label">Pending Approvals</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">🎓</div><div><div class="stat-number">520</div><div class="stat-label">Registered Scouts</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">⏳</div><div><div class="stat-number">3</div><div class="stat-label">Events this Week</div></div></div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📅</div>
+                            <div><div class="stat-number" id="upcomingEventsCount">0</div><div class="stat-label">Upcoming Events</div></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📨</div>
+                            <div><div class="stat-number" id="pendingInvitationsCount">0</div><div class="stat-label">Pending Invitations</div></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div><div class="stat-number" id="confirmedSchoolsCount">0</div><div class="stat-label">Confirmed Schools</div></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🚩</div>
+                            <div><div class="stat-number" id="eventsThisWeekCount">0</div><div class="stat-label">Events This Week</div></div>
+                        </div>
                     </div>
-                    <div class="content-card">
-                        <div class="card-header"><h3>Event Schedule</h3></div>
+
+                    <!-- Filters & Controls -->
+                    <div class="content-card" style="margin-bottom: 1.5rem;">
+                        <div class="card-header">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                                    <h3>Events Management</h3>
+                                    <input type="text" id="eventSearch" placeholder="Search events..." style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); width: 200px;">
+                                    <select id="typeFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                        <option value="">All Types</option>
+                                        <option value="camp">Camp</option>
+                                        <option value="hike">Hike</option>
+                                        <option value="team_building">Team Building</option>
+                                        <option value="training_session">Training Session</option>
+                                        <option value="inter_school_competition">Inter-School Competition</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                     <select id="statusFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                         <option value="">All Statuses</option>
+                                         <option value="draft">Draft</option>
+                                         <option value="scheduled">Scheduled</option>
+                                         <option value="confirmed">Confirmed</option>
+                                         <option value="in_progress">In Progress</option>
+                                         <option value="completed">Completed</option>
+                                         <option value="reviewed">Reviewed</option>
+                                         <option value="cancelled">Cancelled</option>
+                                         <option value="archived">Archived</option>
+                                     </select>
+                                    <input type="date" id="startDateFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                    <input type="date" id="endDateFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                </div>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button class="btn btn-secondary" id="tableViewBtn">Table</button>
+                                    <button class="btn btn-secondary" id="calendarViewBtn">Calendar</button>
+                                    <button class="btn btn-primary" onclick="openCreateEventModal()">+ Create Event</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table View -->
+                    <div id="tableView" class="content-card">
                         <div class="card-content">
-                            <table class="data-table" id="eventTable">
-<thead><tr><th>Event\n  <select id="eventSortOrder" style="margin-left: 0.5rem; font-size: 0.875rem;">\n    <option value="asc">A-Z</option>\n    <option value="desc">Z-A</option>\n  </select>\n</th><th>Date</th><th>Location</th><th>Team</th><th>Status</th></tr></thead>
-                                <tbody>
-                                    <% if (eventList && eventList.length > 0) { %>
-                                        <% eventList.forEach(event => { %>
-                                            <tr>
-                                                <td><%= event.name %></td>
-                                                <td><%= event.date ? new Date(event.date).toLocaleDateString() : 'TBD' %></td>
-                                                <td><%= event.location %></td>
-                                                <td><%= event.team || 'TBD' %></td>
-                                                <td><%= event.status %></td>
-                                            </tr>
-                                        <% }) %>
-                                    <% } else { %>
-                                        <tr><td colspan="5" class="placeholder-text">No events scheduled yet.</td></tr>
-                                    <% } %>
+                            <table class="data-table" id="eventsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Event Name</th>
+                                        <th>Type</th>
+                                        <th>Dates</th>
+                                        <th>Location</th>
+                                        <th>Status</th>
+                                        <th>Trainers</th>
+                                        <th>RSVP</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="eventsTableBody">
+                                    <!-- Events loaded via JS -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                    <div class="content-card">
-                        <div class="card-header"><h3>Add Event</h3></div>
-                        <div class="card-content">
-                            <form action="/dashboard/events/add" method="POST" class="form-grid">
-                                <label>Event Name<input type="text" name="name" required></label>
-                                <label>Date<input type="date" name="date" required></label>
-                                <label>Location<input type="text" name="location" required></label>
-                                <label>Team<input type="text" name="team"></label>
-                                <label>Registered Count<input type="number" min="0" name="registeredCount" value="0"></label>
-                                <label>Status<select name="status"><option>Planning</option><option>Confirmed</option><option>Completed</option><option>Cancelled</option></select></label>
-                                <button type="submit" class="btn btn-primary">Add Event</button>
-                            </form>
+
+                    <!-- Calendar View (Month/Week/List) -->
+                    <div id="calendarView" class="content-card" style="display: none;">
+                        <div class="card-header">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <button class="btn btn-secondary" id="prevPeriodBtn">&lt; Previous</button>
+                                    <h3 id="calendarTitle">Calendar View</h3>
+                                    <button class="btn btn-secondary" id="nextPeriodBtn">Next &gt;</button>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <select id="calendarViewType" class="btn btn-secondary">
+                                        <option value="month">Month</option>
+                                        <option value="week">Week</option>
+                                        <option value="list">List</option>
+                                    </select>
+                                    <a href="/api/calendar/export?startDate=<%= new Date().toISOString().split('T')[0] %>&endDate=<%= new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0] %>" class="btn btn-outline" target="_blank">Export CSV</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-content" id="calendarContainer">
+                            <!-- Calendar rendered via JS -->
                         </div>
                     </div>
-                <% } else if (page === 'programs') { %>
+
+                    <!-- Create/Edit Event Modal -->
+                    <div id="eventModal" class="modal" style="display: none;">
+                        <div class="modal-content large-modal">
+                            <div class="modal-header">
+                                <h3 id="eventModalTitle">Create New Event</h3>
+                                <button type="button" class="close-btn" onclick="closeEventModal()">×</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="eventForm" class="form-grid">
+                                    <input type="hidden" id="eventId" name="eventId">
+
+                                    <!-- Basic Info -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Basic Information</h4>
+                                    </div>
+                                    <label>Event Name*<input type="text" name="name" id="eventName" required></label>
+                                    <label>Event Type*<select name="eventType" id="eventType" required>
+                                        <option value="camp">Camp</option>
+                                        <option value="hike">Hike</option>
+                                        <option value="team_building">Team Building</option>
+                                        <option value="training_session">Training Session</option>
+                                        <option value="inter_school_competition">Inter-School Competition</option>
+                                        <option value="other">Other</option>
+                                    </select></label>
+                                    <label style="grid-column: 1 / -1;">Description<textarea name="description" id="eventDescription" rows="3"></textarea></label>
+                                    <label style="grid-column: 1 / -1;">Agenda<textarea name="agenda" id="eventAgenda" rows="3"></textarea></label>
+
+                                    <!-- Schedule -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Schedule</h4>
+                                    </div>
+                                    <label>Start Date*<input type="datetime-local" name="startDate" id="eventStartDate" required></label>
+                                    <label>End Date*<input type="datetime-local" name="endDate" id="eventEndDate" required></label>
+                                    <label>Registration Deadline<input type="datetime-local" name="registrationDeadline" id="eventRegistrationDeadline"></label>
+                                    <label>Default RSVP Deadline for Invitations<input type="datetime-local" name="defaultInvitationDeadline" id="eventDefaultRsvpDeadline"></label>
+
+                                    <!-- Location -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Location</h4>
+                                    </div>
+                                    <label>Location Name*<input type="text" name="locationName" id="locationName" required></label>
+                                    <label>Address<input type="text" name="locationAddress" id="locationAddress"></label>
+                                    <label>City<input type="text" name="locationCity" id="locationCity"></label>
+                                    <label>Region<input type="text" name="locationRegion" id="locationRegion" placeholder="e.g., Nairobi, Coast"></label>
+                                    <label>Country<input type="text" name="locationCountry" id="locationCountry" value="Kenya"></label>
+                                    <label style="grid-column: 1 / -1;">Coordinates (lat, lng)<input type="text" name="coordinates" id="coordinates" placeholder="e.g., -1.2921, 36.8219"></label>
+
+                                    <!-- Capacity & Participants -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Capacity</h4>
+                                    </div>
+                                    <label>Max Participants*<input type="number" name="maxParticipants" id="maxParticipants" min="1" required></label>
+                                    <label>Estimated Scout Count<input type="number" name="estimatedScoutCount" id="estimatedScoutCount" min="0"></label>
+                                    <label>
+                                        <input type="checkbox" name="waitlistEnabled" id="waitlistEnabled">
+                                        Enable Waitlist
+                                    </label>
+
+                                    <!-- Equipment -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Required Equipment</h4>
+                                    </div>
+                                    <label style="grid-column: 1 / -1;">
+                                        <div id="equipmentList">
+                                            <!-- Dynamic equipment list -->
+                                        </div>
+                                        <button type="button" class="btn btn-secondary" onclick="addEquipmentItem()">+ Add Equipment</button>
+                                    </label>
+
+                                    <!-- Prerequisites -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Prerequisites (optional)</h4>
+                                    </div>
+                                    <label style="grid-column: 1 / -1;">
+                                        <div id="prerequisitesList">
+                                            <!-- Dynamic prerequisites -->
+                                        </div>
+                                        <button type="button" class="btn btn-secondary" onclick="addPrerequisite()">+ Add Prerequisite</button>
+                                    </label>
+
+                                    <!-- Budget -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Budget</h4>
+                                    </div>
+                                    <label>Total Budget (KES)<input type="number" name="budgetTotal" id="budgetTotal" min="0" step="0.01"></label>
+                                    <label>Cost Per Participant (KES)<input type="number" name="costPerParticipant" id="costPerParticipant" min="0" step="0.01"></label>
+
+                                    <!-- Publishing -->
+                                    <div style="grid-column: 1 / -1; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                                        <h4 style="margin:0;">Publishing</h4>
+                                    </div>
+                                    <label>Status<select name="status" id="eventStatus">
+                                        <option value="draft">Draft</option>
+                                        <option value="scheduled">Scheduled</option>
+                                        <option value="confirmed">Confirmed</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="reviewed">Reviewed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                        <option value="archived">Archived</option>
+                                    </select></label>
+                                    <label>Visibility<select name="visibility" id="eventVisibility">
+                                        <option value="private">Private</option>
+                                        <option value="public">Public</option>
+                                        <option value="invited_only">Invited Only</option>
+                                    </select></label>
+
+                                    <div class="form-actions" style="grid-column: 1 / -1;">
+                                        <button type="button" class="btn btn-secondary" onclick="closeEventModal()">Cancel</button>
+                                        <button type="submit" class="btn btn-primary" id="saveEventBtn">Create Event</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manage Event Details Modal (assign trainers, invite schools, view RSVPs) -->
+<div id="manageEventModal" class="modal" style="display: none;">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <h3 id="manageEventTitle">Manage Event</h3>
+            <button type="button" class="close-btn" onclick="closeManageEventModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="manageEventId">
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                                    <!-- Trainer Assignment Section -->
+                                    <div class="manage-section">
+                                        <h4>Trainer Assignments</h4>
+                                        <div id="assignedTrainersList" style="margin-bottom: 1rem;"></div>
+                                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                                            <select id="trainerSelect" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); min-width: 200px;">
+                                                <option value="">Select a trainer...</option>
+                                            </select>
+                                            <select id="trainerRoleSelect" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                                <option value="lead_trainer">Lead Trainer</option>
+                                                <option value="assistant_trainer">Assistant Trainer</option>
+                                                <option value="coordinator">Coordinator</option>
+                                                <option value="volunteer">Volunteer</option>
+                                            </select>
+                                            <button class="btn btn-primary" onclick="assignTrainer()">Assign Trainer</button>
+                                        </div>
+                                        <div id="trainerConflictError" class="message" style="display: none; margin-top: 0.5rem;"></div>
+                                    </div>
+
+                                    <!-- School Invitations Section -->
+                                    <div class="manage-section">
+                                        <h4>School Invitations</h4>
+                                        <div id="invitedSchoolsList" style="margin-bottom: 1rem; max-height: 200px; overflow-y: auto;"></div>
+                                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                                            <select id="schoolSelect" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); min-width: 200px;">
+                                                <option value="">Select a school...</option>
+                                            </select>
+                                            <label style="display: flex; align-items: center; gap: 0.5rem;">RSVP Deadline<input type="date" id="inviteRsvpDeadline"></label>
+                                            <button class="btn btn-primary" onclick="inviteSchool()">Send Invitation</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Invitation Reminders -->
+                                    <div class="manage-section">
+                                        <h4>Send Reminders</h4>
+                                        <p style="font-size: 0.875rem; color: var(--muted-foreground);">Send automated reminders to schools that haven't responded.</p>
+                                        <div style="display: flex; gap: 0.5rem;">
+                                            <button class="btn btn-secondary" onclick="sendReminders('3d')">Remind in 3 days</button>
+                                            <button class="btn btn-secondary" onclick="sendReminders('1w')">Remind in 1 week</button>
+                                            <button class="btn btn-secondary" onclick="sendReminders('overdue')">Remind Overdue</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                 <% } else if (page === 'programs') { %>
                     <div class="stats-grid">
                         <div class="stat-card"><div class="stat-icon">📚</div><div><div class="stat-number">28</div><div class="stat-label">Program Offerings</div></div></div>
                         <div class="stat-card"><div class="stat-icon">🏕</div><div><div class="stat-number">9</div><div class="stat-label">Live Programs</div></div></div>
@@ -1474,10 +1710,39 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeAnalyticsModal()">Close</button>
-            </div>
-         </div>
-      </div>
+                                         </div>
+                                     </div>
 
+                                     <!-- Post-Event Review Section -->
+                                     <div class="manage-section" id="reviewSection">
+                                         <h4>Post-Event Review</h4>
+                                         <div id="reviewContent">
+                                             <!-- Review status populated by JS -->
+                                         </div>
+                                         <div id="trainerReportForm" style="display:none; margin-top: 0.5rem; padding: 0.5rem; background: var(--muted); border-radius: var(--radius);">
+                                             <label>Trainer Report</label>
+                                             <textarea id="trainerReport" style="width:100%; height:100px; padding:0.5rem; border:1px solid var(--border); border-radius: var(--radius);" placeholder="Enter your post-event report..."></textarea>
+                                             <label style="display:block; margin-top:0.5rem;">Actual Attendee Count</label>
+                                             <input type="number" id="actualAttendeeCount" min="0" style="padding:0.5rem; width:120px; border:1px solid var(--border); border-radius: var(--radius);">
+                                             <button class="btn btn-primary" style="margin-top:0.5rem;" onclick="submitTrainerReport()">Submit Report</button>
+                                         </div>
+                                         <div id="adminReviewActions" style="display:none; margin-top:0.5rem; padding:0.5rem; background: var(--muted); border-radius: var(--radius);">
+                                             <p id="adminReviewStatus" style="margin-bottom:0.5rem;"></p>
+                                             <button class="btn btn-success" onclick="approveEventReview()">Approve Report</button>
+                                             <button class="btn btn-warning" onclick="requestRevision()">Request Revision</button>
+                                         </div>
+                                     </div>
+                                  </div>
+
+      <script>
+        // Expose current user to client-side scripts
+        window.currentUser = {
+          id: '<%= user.id %>',
+          role: '<%= user.role %>',
+          name: '<%= user.name %>',
+          email: '<%= user.email %>'
+        };
+      </script>
       <script src="/js/dashboard.js"></script>
   </body>
 </html>

@@ -90,10 +90,10 @@ paymentSchema.pre('save', function(next) {
   next();
 });
 
-// Indexes for querying
-paymentSchema.index({ schoolId: 1, paymentDate: -1 });
-paymentSchema.index({ status: 1 });
-paymentSchema.index({ dueDate: 1 });
-paymentSchema.index({ invoiceNumber: 1 });
+  // Indexes for querying
+  paymentSchema.index({ schoolId: 1, paymentDate: -1 });
+  paymentSchema.index({ status: 1 });
+  paymentSchema.index({ dueDate: 1 });
+  // Note: invoiceNumber already indexed by unique:true constraint (line 18)
 
-module.exports = mongoose.model('Payment', paymentSchema);
+  module.exports = mongoose.model('Payment', paymentSchema);

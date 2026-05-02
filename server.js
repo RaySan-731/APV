@@ -52,7 +52,6 @@ const Feedback = require('./models/Feedback');
 const AuditLog = require('./models/AuditLog');
 const Permission = require('./models/Permission');
 const ScoutGroup = require('./models/ScoutGroup');
-const SchoolEvent = require('./models/SchoolEvent');
 const Payment = require('./models/Payment');
 const SchoolDocument = require('./models/SchoolDocument');
 
@@ -108,10 +107,8 @@ const requirePermission = (permission) => {
                              req.headers.accept?.includes('application/json') ||
                              req.headers['content-type']?.includes('application/json') ||
                              req.path.startsWith('/api/') ||
-                             (req.path.startsWith('/dashboard/') && (
-                               req.method === 'POST' || 
-                               req.headers['content-type']?.includes('application/json')
-                             ));
+                             req.path.startsWith('/dashboard/') ||
+                             (req.method === 'POST' && req.headers['content-type']?.includes('application/json'));
         if (isApiRequest) {
           return res.status(403).json({ success: false, error: 'Access denied. Insufficient permissions.' });
         }
@@ -199,456 +196,26 @@ const sendEmail = async (to, subject, html) => {
   }
 };
 
-// Initialize default permissions
-const initializePermissions = async () => {
-  try {
-    const defaultPermissions = [
-      // Legacy user roles (from User model)
-      {
-        role: 'founder',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: true,
-          canEditStaff: true,
-          canDeleteStaff: true,
-          canInviteStaff: true,
-          canResetPasswords: true,
-          canViewSchools: true,
-          canCreateSchools: true,
-          canEditSchools: true,
-          canDeleteSchools: true,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: true,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: true,
-          canEditPrograms: true,
-          canDeletePrograms: true,
-          canViewBookings: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: true,
-          canApproveBookings: true,
-          canViewFinancials: true,
-          canManageBudgets: true,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: true,
-          canManageSystem: true,
-          canViewAuditLogs: true,
-          canManagePermissions: true
-        },
-        description: 'Organization founder with full access'
-      },
-      {
-        role: 'commissioner',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: true,
-          canEditStaff: true,
-          canDeleteStaff: false,
-          canInviteStaff: true,
-          canResetPasswords: true,
-          canViewSchools: true,
-          canCreateSchools: true,
-          canEditSchools: true,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: false,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: true,
-          canEditPrograms: true,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: false,
-          canApproveBookings: true,
-          canViewFinancials: true,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: true,
-          canManagePermissions: false
-        },
-        description: 'Commissioner with broad management access'
-      },
-      {
-        role: 'training_officer',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: false,
-          canEditEvents: false,
-          canDeleteEvents: false,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: false,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: true,
-          canManagePermissions: false
-        },
-        description: 'Training officer with scheduling and oversight'
-      },
-      {
-        role: 'medical',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: false,
-          canViewEvents: true,
-          canCreateEvents: false,
-          canEditEvents: false,
-          canDeleteEvents: false,
-          canScheduleEvents: false,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: false,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: false,
-          canGenerateReports: true,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Medical staff with limited viewing access'
-      },
-      {
-        role: 'rover',
-        permissions: {
-          canViewStaff: false,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: false,
-          canViewEvents: true,
-          canCreateEvents: false,
-          canEditEvents: false,
-          canDeleteEvents: false,
-          canScheduleEvents: false,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: false,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: false,
-          canGenerateReports: false,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Basic member with minimal access'
-      },
-      {
-        role: 'staff',
-        permissions: {
-          canViewStaff: false,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: false,
-          canViewEvents: true,
-          canCreateEvents: false,
-          canEditEvents: false,
-          canDeleteEvents: false,
-          canScheduleEvents: false,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: false,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: false,
-          canGenerateReports: false,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Staff with basic viewing permissions'
-      },
-      // Staff roles (from Staff model)
-      {
-        role: 'trainer',
-        permissions: {
-          canViewStaff: false,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: false,
-          canViewEvents: true,
-          canCreateEvents: false,
-          canEditEvents: false,
-          canDeleteEvents: false,
-          canScheduleEvents: false,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: false,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: false,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: false,
-          canGenerateReports: false,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Basic trainer permissions'
-      },
-      {
-        role: 'senior trainer',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: true,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: false,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: false,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Senior trainer with additional responsibilities'
-      },
-      {
-        role: 'supervisor',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: true,
-          canEditStaff: true,
-          canDeleteStaff: false,
-          canInviteStaff: true,
-          canResetPasswords: true,
-          canViewSchools: true,
-          canCreateSchools: true,
-          canEditSchools: true,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: true,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: true,
-          canEditPrograms: true,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: true,
-          canApproveBookings: true,
-          canViewFinancials: true,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: true,
-          canManageSystem: false,
-          canViewAuditLogs: true,
-          canManagePermissions: false
-        },
-        description: 'Supervisor with management capabilities'
-      },
-      {
-        role: 'admin',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: true,
-          canEditStaff: true,
-          canDeleteStaff: true,
-          canInviteStaff: true,
-          canResetPasswords: true,
-          canViewSchools: true,
-          canCreateSchools: true,
-          canEditSchools: true,
-          canDeleteSchools: true,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: true,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: true,
-          canEditPrograms: true,
-          canDeletePrograms: true,
-          canViewBookings: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: true,
-          canApproveBookings: true,
-          canViewFinancials: true,
-          canManageBudgets: true,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: true,
-          canManageSystem: true,
-          canViewAuditLogs: true,
-          canManagePermissions: true
-        },
-        description: 'Full administrative access'
-      },
-      {
-        role: 'coordinator',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: false,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: true,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Coordinator for scheduling and assignments'
-      }
-    ];
-
-    for (const perm of defaultPermissions) {
-      await Permission.findOneAndUpdate(
-        { role: perm.role },
-        perm,
-        { upsert: true, new: true }
-      );
-    }
-
-    console.log('✓ Default permissions initialized');
-  } catch (err) {
-    console.error('✗ Error initializing permissions:', err);
-  }
+// Event status lifecycle validation
+const validStatusTransitions = {
+  'draft': ['scheduled', 'confirmed', 'cancelled', 'archived'],
+  'scheduled': ['confirmed', 'in_progress', 'cancelled', 'archived'],
+  'confirmed': ['in_progress', 'cancelled', 'archived'],
+  'in_progress': ['completed', 'cancelled', 'archived'],
+  'completed': ['reviewed', 'archived'],
+  'reviewed': ['archived'],
+  'cancelled': ['draft', 'scheduled'], // allow recovery
+  'archived': [] // terminal state
 };
+
+function validateEventStatusTransition(oldStatus, newStatus) {
+  if (!oldStatus || !newStatus) return null; // Skip validation if we don't have both
+  const allowed = validStatusTransitions[oldStatus] || [];
+  if (!allowed.includes(newStatus)) {
+    return `Invalid status transition: ${oldStatus} → ${newStatus}. Allowed: ${allowed.join(', ')}`;
+  }
+  return null;
+}
 
 // Routes
 app.get('/', (req, res) => {
@@ -697,11 +264,12 @@ app.post('/login', async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    req.session.user = {
-      email: user.email,
-      role: user.role || 'rover',
-      name: user.name || 'Member'
-    };
+     req.session.user = {
+       id: user._id.toString(),
+       email: user.email,
+       role: user.role || 'rover',
+       name: user.name || 'Member'
+     };
 
     // redirect to requested page if present
     const nextUrl = req.body.next || req.query.next || (req.session.user.role === 'trainer' ? '/trainer/dashboard' : '/dashboard');
@@ -1461,7 +1029,7 @@ app.post('/api/leave/request', requireAuth, async (req, res) => {
 });
 
 // Approve/Reject leave
-app.post('/api/leave/approve', requireAuth, requirePermission('canManageStaff'), async (req, res) => {
+app.post('/api/leave/approve', requireAuth, requirePermission('canEditStaff'), async (req, res) => {
   try {
     const { staffId, leaveId, action, notes } = req.body;
 
@@ -1616,7 +1184,7 @@ app.get('/dashboard/audit-logs', requireAuth, requirePermission('canViewAuditLog
 // ============ PERFORMANCE MANAGEMENT ROUTES ============
 
 // Update performance metrics
-app.post('/api/performance/update', requireAuth, requirePermission('canManageStaff'), async (req, res) => {
+app.post('/api/performance/update', requireAuth, requirePermission('canEditStaff'), async (req, res) => {
   try {
     const { staffId, eventsCompleted, reportsSubmitted, schoolsVisited, averageAttendanceRate, averageFeedbackRating } = req.body;
 
@@ -2218,14 +1786,13 @@ app.get('/dashboard/schools', requireAuth, requirePermission('canViewSchools'), 
 
     // Enrich with participation metrics
     const schoolIds = schoolList.map(s => s._id);
-    const schoolEventAggregates = await SchoolEvent.aggregate([
-      { $match: { schoolId: { $in: schoolIds } } },
+    const schoolEventAggregates = await Event.aggregate([
+      { $match: { 'targetSchools.schoolId': { $in: schoolIds } } },
       {
         $group: {
-          _id: '$schoolId',
+          _id: '$targetSchools.schoolId',
           eventCount: { $sum: 1 },
-          totalAttended: { $sum: '$attendance.attended' },
-          avgAttendance: { $avg: '$attendance.percentage' }
+          avgAttendance: { $avg: '$participationMetrics.averageAttendanceRate' }
         }
       }
     ]);
@@ -2379,9 +1946,12 @@ app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewS
     const scoutGroups = await ScoutGroup.find({ schoolId: schoolId }).sort({ name: 1 }).lean();
 
     // Event participation history
-    const schoolEvents = await SchoolEvent.find({ schoolId: schoolId })
-      .populate('eventId', 'name date location status')
-      .sort({ 'eventId.date': -1 })
+    // Using Event model with targetSchools array to find events this school is invited to
+    const schoolEvents = await Event.find(
+      { 'targetSchools.schoolId': schoolId },
+      { name: 1, startDate: 1, location: 1, eventType: 1, 'targetSchools.$': 1 }
+    )
+      .sort({ startDate: -1 })
       .lean();
 
     // Payment history
@@ -2398,15 +1968,22 @@ app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewS
 
     // Calculate participation analytics
     const totalEvents = schoolEvents.length;
-    const totalAttended = schoolEvents.filter(se => se.status === 'attended').length;
-    const avgAttendance = schoolEvents.length ? Math.round(schoolEvents.reduce((sum, se) => sum + (se.attendance?.percentage || 0), 0) / schoolEvents.length) : 0;
+    const totalAttended = schoolEvents.filter(se => se.targetSchools?.[0]?.status === 'attended').length;
+    const avgAttendance = schoolEvents.length ? 
+      Math.round(schoolEvents.reduce((sum, se) => sum + (se.targetSchools?.[0]?.attendancePercentage || 0), 0) / schoolEvents.length) : 0;
 
     res.render('dashboard', {
       user: req.session.user,
       page: 'school-profile',
       school,
       scoutGroups,
-      schoolEvents: schoolEvents.map(se => ({ ...se, event: se.eventId })),
+      schoolEvents: schoolEvents.map(event => ({ 
+        ...event, 
+        eventName: event.name, 
+        eventDate: event.startDate,
+        location: event.location,
+        status: event.targetSchools?.[0]?.status || 'invited'
+      })),
       payments,
       documents,
       visitLogs,
@@ -2430,28 +2007,33 @@ app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents')
   try {
     const { schoolId, eventId, participantsCount, primaryContact, assignedStaff, notes } = req.body;
 
-    // Check if already exists
-    let schoolEvent = await SchoolEvent.findOne({ schoolId, eventId });
-    if (schoolEvent) {
+    // Update Event document's targetSchools array for this school
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    // Find or create school entry in targetSchools
+    let schoolTarget = event.targetSchools.find(s => s.schoolId.toString() === schoolId);
+    if (schoolTarget) {
       // Update existing
-      schoolEvent.participantsCount = participantsCount;
-      schoolEvent.primaryContact = primaryContact;
-      schoolEvent.assignedStaff = assignedStaff || [];
-      schoolEvent.notes = notes;
-      await schoolEvent.save();
+      schoolTarget.participantsCount = participantsCount;
+      schoolTarget.primaryContact = primaryContact;
+      schoolTarget.assignedStaff = assignedStaff || [];
+      schoolTarget.notes = notes;
     } else {
-      schoolEvent = new SchoolEvent({
+      // Add new
+      event.targetSchools.push({
         schoolId,
-        eventId,
         participantsCount,
         primaryContact,
         assignedStaff: assignedStaff || [],
         notes,
         status: 'registered',
-        attendance: { registered: participantsCount, attended: 0, percentage: 0 }
+        attendancePercentage: 0
       });
-      await schoolEvent.save();
     }
+    await event.save();
 
     // Update school metrics
     await School.findByIdAndUpdate(schoolId, {
@@ -2459,28 +2041,68 @@ app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents')
       $set: { 'participationMetrics.lastEventDate': new Date() }
     });
 
-    res.json({ success: true, schoolEvent });
+    res.json({ success: true, event });
   } catch (err) {
     console.error('Error recording school event:', err);
     res.status(500).json({ success: false, error: 'Failed to record participation' });
   }
 });
 
-// API: Update school event attendance
-app.post('/api/school-events/:id/attendance', requireAuth, async (req, res) => {
+// API: Update school event attendance (replaces broken SchoolEvent reference)
+app.post('/api/events/:eventId/attendance', requireAuth, requirePermission('canEditEvents'), async (req, res) => {
   try {
-    const { id } = req.params;
-    const { attended } = req.body;
+    const { eventId } = req.params;
+    const { schoolId, attended } = req.body;
 
-    const schoolEvent = await SchoolEvent.findByIdAndUpdate(
-      id,
-      { $set: { 'attendance.attended': attended } },
-      { new: true }
-    );
+    if (!schoolId) {
+      return res.status(400).json({ success: false, error: 'schoolId is required' });
+    }
 
-    if (!schoolEvent) return res.status(404).json({ success: false, error: 'Record not found' });
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
 
-    res.json({ success: true, schoolEvent });
+    // Find the school in targetSchools
+    const schoolIndex = event.targetSchools.findIndex(s => s.schoolId.toString() === schoolId);
+    if (schoolIndex === -1) {
+      return res.status(404).json({ success: false, error: 'School not invited to this event' });
+    }
+
+    // Update attendance
+    event.targetSchools[schoolIndex].attendance = event.targetSchools[schoolIndex].attendance || {};
+    event.targetSchools[schoolIndex].attendance.attended = attended;
+    event.targetSchools[schoolIndex].attendance.recordedAt = new Date();
+    event.targetSchools[schoolIndex].attendance.recordedBy = req.session.user.id;
+
+    // Calculate percentage if we have registered count
+    const registered = event.targetSchools[schoolIndex].numberOfParticipants || 0;
+    if (registered > 0) {
+      event.targetSchools[schoolIndex].attendance.percentage = Math.round((attended / registered) * 100);
+      event.targetSchools[schoolIndex].attendance.registered = registered;
+    } else {
+      event.targetSchools[schoolIndex].attendance.percentage = 0;
+      event.targetSchools[schoolIndex].attendance.registered = 0;
+    }
+
+    await event.save();
+
+    // Log audit
+    await logAudit('attendance_updated', 'event', eventId, event.name, {
+      schoolId,
+      attended,
+      registered
+    }, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userEmail: req.session.user.email,
+      userRole: req.session.user.role,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, event });
   } catch (err) {
     console.error('Error updating attendance:', err);
     res.status(500).json({ success: false, error: 'Failed to update attendance' });
@@ -2620,9 +2242,10 @@ app.get('/api/schools/analytics', requireAuth, requirePermission('canViewAnalyti
       { $group: { _id: '$serviceStatus', count: { $sum: 1 } } }
     ]);
 
-    // Top schools by engagement (most events)
-    const topEngaged = await SchoolEvent.aggregate([
-      { $group: { _id: '$schoolId', eventCount: { $sum: 1 } } },
+    // Top schools by engagement (most events) - aggregate from Event.targetSchools
+    const topEngaged = await Event.aggregate([
+      { $unwind: '$targetSchools' },
+      { $group: { _id: '$targetSchools.schoolId', eventCount: { $sum: 1 } } },
       { $sort: { eventCount: -1 } },
       { $limit: 5 },
       {
@@ -2682,24 +2305,7 @@ app.get('/api/schools/analytics', requireAuth, requirePermission('canViewAnalyti
   }
 });
 
-app.post('/dashboard/events/add', requireAuth, async (req, res) => {
-  try {
-    const { name, date, location, team, registeredCount, status } = req.body;
-    const event = new Event({
-      name,
-      date: date ? new Date(date) : new Date(),
-      location,
-      team,
-      registeredCount: parseInt(registeredCount, 10) || 0,
-      status: status || 'Planning'
-    });
-    await event.save();
-    res.redirect('/dashboard/events');
-  } catch (err) {
-    console.error('Error saving event:', err);
-    res.redirect('/dashboard/events');
-  }
-});
+// Note: Old event creation route removed. Use POST /dashboard/events/create instead.
 
 app.post('/dashboard/programs/add', requireAuth, async (req, res) => {
   try {
@@ -2885,7 +2491,7 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
      }
 
     if (page === 'events') {
-      modelData.eventList = await Event.find().sort({ date: 1 }).lean();
+      modelData.eventList = await Event.find().sort({ startDate: 1 }).lean();
     }
 
     if (page === 'programs') {
@@ -2910,7 +2516,7 @@ app.get('/api/dashboard-data', requireAuth, async (req, res) => {
       { $group: { _id: null, total: { $sum: { $ifNull: ['$studentCount', 0] } } } }
     ]);
     const activeStudents = activeStudentsData[0]?.total || 0;
-    const upcomingEvents = await Event.countDocuments({ date: { $gte: new Date() } });
+    const upcomingEvents = await Event.countDocuments({ startDate: { $gte: new Date() } });
     const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const newSchoolsLast30Days = await School.countDocuments({ createdAt: { $gte: last30Days } });
     const growthRate = totalSchools > 0 ? Math.round((newSchoolsLast30Days / totalSchools) * 100) : 0;
@@ -2957,6 +2563,1452 @@ app.get('/api/dashboard-data', requireAuth, async (req, res) => {
   }
 });
 
+// GET events list with filters
+app.get('/api/events', requireAuth, requirePermission('canViewEvents'), async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      eventType,
+      status,
+      trainerId,
+      schoolId,
+      region,
+      // pagination
+      page = 1,
+      limit = 50,
+      // sorting
+      sortBy = 'startDate',
+      sortOrder = 'asc'
+    } = req.query;
+
+    const filter = {};
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.startDate = {};
+      if (startDate) filter.startDate.$gte = new Date(startDate);
+      if (endDate) filter.startDate.$lte = new Date(endDate);
+    }
+
+    if (eventType) filter.eventType = eventType;
+    if (status) filter.status = status;
+    if (region) filter.region = region;
+
+    // Trainer filter - find events where trainer is assigned
+    if (trainerId) {
+      filter['trainers.trainerId'] = trainerId;
+    }
+
+    // School filter - find events where school is invited
+    if (schoolId) {
+      filter['targetSchools.schoolId'] = schoolId;
+    }
+
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const events = await Event.find(filter)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Event.countDocuments(filter);
+
+    res.json({
+      success: true,
+      events,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching events:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch events' });
+  }
+});
+
+// GET single event with populated references
+app.get('/api/events/:eventId', requireAuth, requirePermission('canViewEvents'), async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.eventId)
+      .populate('trainers.trainerId', 'name email idNumber role status')
+      .populate('targetSchools.schoolId', 'name address city contactPerson')
+      .lean();
+
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    res.json({ success: true, event });
+  } catch (err) {
+    console.error('Error fetching event:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch event' });
+  }
+});
+
+// CREATE event
+app.post('/dashboard/events/create', requireAuth, requirePermission('canCreateEvents'), async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      eventType,
+      agenda,
+      startDate,
+      endDate,
+      defaultInvitationDeadline,
+      // location
+      locationName,
+      locationAddress,
+      locationCity,
+      locationRegion,
+      locationCountry,
+      locationLatitude,
+      locationLongitude,
+      region,
+      // target & capacity
+      maxParticipants,
+      estimatedScoutCount,
+      registrationDeadline,
+      waitlistEnabled,
+      // requirements
+      requiredEquipment,
+      prerequisites,
+      // financial
+      budgetTotal,
+      costPerParticipant,
+      // publishing
+      status,
+      visibility,
+      publishedAt,
+      publishedBy,
+      // trainer modifications
+      trainersToAdd,
+      trainersToRemove,
+      trainerRoles,
+      // school invitations
+      schoolsToInvite
+    } = req.body;
+
+     // Validate required fields
+     if (!name || !eventType || !startDate || !endDate || !locationName || !maxParticipants) {
+       return res.status(400).json({ success: false, error: 'Missing required fields' });
+     }
+
+     // Validate user session
+     if (!req.session.user.id || !mongoose.Types.ObjectId.isValid(req.session.user.id)) {
+       return res.status(401).json({ success: false, error: 'Invalid user session' });
+     }
+
+     // Normalize and validate trainersToAdd and schoolsToInvite
+     const trainersList = Array.isArray(trainersToAdd) ? trainersToAdd : [];
+     const schoolsList = Array.isArray(schoolsToInvite) ? schoolsToInvite : [];
+
+     // Validate each trainer ID
+     for (let i = 0; i < trainersList.length; i++) {
+       const tid = trainersList[i];
+       if (!tid || !mongoose.Types.ObjectId.isValid(tid)) {
+         return res.status(400).json({ success: false, error: `Invalid trainer ID at index ${i}` });
+       }
+     }
+
+     // Validate each school ID
+     for (let i = 0; i < schoolsList.length; i++) {
+       const sid = schoolsList[i];
+       if (!sid || !mongoose.Types.ObjectId.isValid(sid)) {
+         return res.status(400).json({ success: false, error: `Invalid school ID at index ${i}` });
+       }
+     }
+
+     // Parse dates for conflict checking
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+     // Check for school scheduling conflicts if schools are being invited
+     if (schoolsList.length) {
+       for (const schoolId of schoolsList) {
+        // Build conflict query (exclude current event on updates, include all for creates)
+        const conflictQuery = {
+          'targetSchools.schoolId': new mongoose.Types.ObjectId(schoolId),
+          status: { $nin: ['cancelled', 'archived'] },
+          $or: [
+            { startDate: { $lte: end }, endDate: { $gte: start } }
+          ]
+        };
+
+        // For CREATE: no exclusion; for UPDATE: handled separately
+        const conflictingEvents = await Event.find(conflictQuery)
+          .select('name startDate endDate')
+          .lean();
+
+        if (conflictingEvents.length > 0) {
+          const conflictDetails = conflictingEvents.map(e => ({
+            name: e.name,
+            dates: `${new Date(e.startDate).toLocaleDateString()} - ${new Date(e.endDate).toLocaleDateString()}`
+          }));
+          return res.status(409).json({
+            success: false,
+            error: 'Scheduling conflict detected',
+            conflicts: conflictDetails,
+            message: `School is already assigned to overlapping event(s): ${conflictDetails.map(c => c.name).join(', ')}`
+          });
+        }
+      }
+    }
+
+     // Check for trainer scheduling conflicts if trainers are being assigned
+     if (trainersList.length) {
+       for (const trainerId of trainersList) {
+        const trainerConflictQuery = {
+          'trainers.trainerId': new mongoose.Types.ObjectId(trainerId),
+          status: { $nin: ['cancelled', 'archived'] },
+          $or: [
+            { startDate: { $lte: end }, endDate: { $gte: start } }
+          ]
+        };
+
+        if (typeof eventId !== 'undefined' && eventId) {
+          trainerConflictQuery._id = { $ne: eventId };
+        }
+
+        const trainerConflicts = await Event.find(trainerConflictQuery)
+          .select('name startDate endDate')
+          .lean();
+
+        if (trainerConflicts.length > 0) {
+          const conflictDetails = trainerConflicts.map(e => ({
+            name: e.name,
+            dates: `${new Date(e.startDate).toLocaleDateString()} - ${new Date(e.endDate).toLocaleDateString()}`
+          }));
+          return res.status(409).json({
+            success: false,
+            error: 'Trainer scheduling conflict detected',
+            conflicts: conflictDetails,
+            message: `Trainer is already assigned to overlapping event(s): ${conflictDetails.map(c => c.name).join(', ')}`
+          });
+        }
+      }
+    }
+
+    // Resource constraint validation
+    const maxPart = parseInt(maxParticipants);
+    const estScout = parseInt(estimatedScoutCount) || 0;
+
+    if (estScout > maxPart) {
+      return res.status(400).json({
+        success: false,
+        error: 'Resource constraint violation',
+        message: `Estimated scout count (${estScout}) cannot exceed maximum participants (${maxPart})`
+      });
+    }
+
+    // Validate dates: registration deadline should be before start date
+    if (registrationDeadline && new Date(registrationDeadline) >= new Date(startDate)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dates',
+        message: 'Registration deadline must be before event start date'
+      });
+    }
+
+    // Validate defaultInvitationDeadline is before start date
+    if (defaultInvitationDeadline && new Date(defaultInvitationDeadline) >= new Date(startDate)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dates',
+        message: 'Default invitation deadline must be before event start date'
+      });
+    }
+
+      // Build trainers array
+      const trainers = [];
+      for (let i = 0; i < trainersList.length; i++) {
+        trainers.push({
+          trainerId: trainersList[i],
+          role: trainerRoles ? trainerRoles[i] || 'assistant_trainer' : 'assistant_trainer',
+          assignedAt: new Date(),
+          status: 'assigned'
+        });
+      }
+
+    // Validate date order: start must be before end
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dates',
+        message: 'Start date must be before end date'
+      });
+    }
+
+    // Build location object
+    const location = {
+      name: locationName,
+      address: locationAddress || '',
+      city: locationCity || '',
+      region: locationRegion || '',
+      country: locationCountry || 'Kenya'
+    };
+    if (locationLatitude && locationLongitude) {
+      location.coordinates = {
+        latitude: parseFloat(locationLatitude),
+        longitude: parseFloat(locationLongitude)
+      };
+    }
+
+    // Parse equipment and prerequisites JSON
+    const equipmentArray = requiredEquipment && typeof requiredEquipment === 'string' && requiredEquipment.trim() !== '' ? JSON.parse(requiredEquipment) : [];
+    const prerequisitesArray = prerequisites && typeof prerequisites === 'string' && prerequisites.trim() !== '' ? JSON.parse(prerequisites) : [];
+
+     // Build targetSchools array from schoolsList if provided
+     const targetSchools = [];
+     if (schoolsList.length) {
+       for (const schoolId of schoolsList) {
+        targetSchools.push({
+          schoolId,
+          invitedAt: new Date(),
+          invitedBy: req.session.user.id,
+          rsvpStatus: 'invited',
+          rsvpDeadline: defaultInvitationDeadline ? new Date(defaultInvitationDeadline) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+        });
+      }
+    }
+
+    // Create the Event document
+    const event = new Event({
+      name,
+      description: description || '',
+      eventType,
+      agenda: agenda || '',
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      defaultInvitationDeadline: defaultInvitationDeadline ? new Date(defaultInvitationDeadline) : undefined,
+      location,
+      region: region || '',
+      targetSchools,
+      estimatedScoutCount: parseInt(estimatedScoutCount) || 0,
+      requiredEquipment: equipmentArray,
+      prerequisites: prerequisitesArray,
+      trainers,
+      maxParticipants: parseInt(maxParticipants),
+      currentParticipants: 0,
+      waitlistEnabled: waitlistEnabled === 'true' || waitlistEnabled === true,
+      registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : undefined,
+      budget: {
+        total: parseFloat(budgetTotal) || 0,
+        breakdown: {}
+      },
+      costPerParticipant: parseFloat(costPerParticipant) || 0,
+      status: status || 'draft',
+      visibility: visibility || 'private',
+      createdBy: req.session.user.id,
+      lastModifiedBy: req.session.user.id
+    });
+
+    await event.save();
+
+    // Populate for response
+    const populatedEvent = await Event.findById(event._id)
+      .populate('trainers.trainerId', 'name email idNumber role')
+      .populate('targetSchools.schoolId', 'name address city')
+      .lean();
+
+    // Log audit
+    await logAudit('event_created', 'event', event._id, event.name, {}, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userEmail: req.session.user.email,
+      userRole: req.session.user.role,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, event: populatedEvent, message: 'Event created successfully' });
+  } catch (err) {
+    console.error('Error creating event:', err);
+    res.status(500).json({ success: false, error: 'Failed to create event: ' + err.message });
+  }
+});
+
+// UPDATE event
+app.post('/dashboard/events/update/:id', requireAuth, requirePermission('canCreateEvents'), async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const {
+      name,
+      description,
+      eventType,
+      agenda,
+      startDate,
+      endDate,
+      defaultInvitationDeadline,
+      locationName,
+      locationAddress,
+      locationCity,
+      locationRegion,
+      locationCountry,
+      locationLatitude,
+      locationLongitude,
+      region,
+      maxParticipants,
+      estimatedScoutCount,
+      registrationDeadline,
+      waitlistEnabled,
+      requiredEquipment,
+      prerequisites,
+      budgetTotal,
+      costPerParticipant,
+      status,
+      visibility,
+      publishedAt,
+      publishedBy,
+      trainersToAdd,
+      trainersToRemove,
+      trainerRoles,
+      schoolsToInvite
+    } = req.body;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    // Track which fields actually changed
+    const updatedFields = [];
+
+    // Update basic fields
+    if (name !== undefined && name !== event.name) { event.name = name; updatedFields.push('name'); }
+    if (description !== undefined && description !== event.description) { event.description = description; updatedFields.push('description'); }
+    if (eventType !== undefined && eventType !== event.eventType) { event.eventType = eventType; updatedFields.push('eventType'); }
+    if (agenda !== undefined && agenda !== event.agenda) { event.agenda = agenda; updatedFields.push('agenda'); }
+    if (startDate !== undefined) {
+      const newStart = new Date(startDate);
+      if (newStart.getTime() !== event.startDate.getTime()) {
+        event.startDate = newStart;
+        updatedFields.push('startDate');
+      }
+    }
+    if (endDate !== undefined) {
+      const newEnd = new Date(endDate);
+      if (newEnd.getTime() !== event.endDate.getTime()) {
+        event.endDate = newEnd;
+        updatedFields.push('endDate');
+      }
+    }
+    if (defaultInvitationDeadline !== undefined) {
+      const newDeadline = defaultInvitationDeadline ? new Date(defaultInvitationDeadline) : undefined;
+      if (newDeadline !== event.defaultInvitationDeadline) {
+        event.defaultInvitationDeadline = newDeadline;
+        updatedFields.push('defaultInvitationDeadline');
+      }
+    }
+    if (region !== undefined && region !== event.region) { event.region = region; updatedFields.push('region'); }
+    if (maxParticipants !== undefined && parseInt(maxParticipants) !== event.maxParticipants) {
+      event.maxParticipants = parseInt(maxParticipants);
+      updatedFields.push('maxParticipants');
+    }
+    if (estimatedScoutCount !== undefined && parseInt(estimatedScoutCount) !== event.estimatedScoutCount) {
+      event.estimatedScoutCount = parseInt(estimatedScoutCount);
+      updatedFields.push('estimatedScoutCount');
+    }
+    if (registrationDeadline !== undefined) {
+      const newReg = registrationDeadline ? new Date(registrationDeadline) : undefined;
+      if (newReg !== event.registrationDeadline) {
+        event.registrationDeadline = newReg;
+        updatedFields.push('registrationDeadline');
+      }
+    }
+    if (waitlistEnabled !== undefined && waitlistEnabled !== event.waitlistEnabled) {
+      event.waitlistEnabled = (waitlistEnabled === 'true' || waitlistEnabled === true);
+      updatedFields.push('waitlistEnabled');
+    }
+    if (budgetTotal !== undefined && parseFloat(budgetTotal) !== event.budget.total) {
+      event.budget.total = parseFloat(budgetTotal);
+      updatedFields.push('budget.total');
+    }
+    if (costPerParticipant !== undefined && parseFloat(costPerParticipant) !== event.costPerParticipant) {
+      event.costPerParticipant = parseFloat(costPerParticipant);
+      updatedFields.push('costPerParticipant');
+    }
+    if (status !== undefined && status !== event.status) { event.status = status; updatedFields.push('status'); }
+    if (visibility !== undefined && visibility !== event.visibility) { event.visibility = visibility; updatedFields.push('visibility'); }
+
+    // Handle publishing
+    if (publishedAt !== undefined && status === 'published') {
+      event.publishedAt = new Date(publishedAt);
+      event.publishedBy = publishedBy || req.session.user.id;
+      updatedFields.push('publishedAt', 'publishedBy');
+    }
+
+    // Update location if provided
+    if (locationName !== undefined) {
+      event.location = {
+        name: locationName,
+        address: locationAddress || event.location?.address || '',
+        city: locationCity || event.location?.city || '',
+        region: locationRegion || event.location?.region || '',
+        country: locationCountry || event.location?.country || 'Kenya'
+      };
+      if (locationLatitude && locationLongitude) {
+        event.location.coordinates = {
+          latitude: parseFloat(locationLatitude),
+          longitude: parseFloat(locationLongitude)
+        };
+      }
+      updatedFields.push('location');
+    }
+
+     // Update required equipment if provided
+     if (requiredEquipment !== undefined) {
+       event.requiredEquipment = requiredEquipment && typeof requiredEquipment === 'string' && requiredEquipment.trim() !== '' ? JSON.parse(requiredEquipment) : [];
+       updatedFields.push('requiredEquipment');
+     }
+
+     // Update prerequisites if provided
+     if (prerequisites !== undefined) {
+       event.prerequisites = prerequisites && typeof prerequisites === 'string' && prerequisites.trim() !== '' ? JSON.parse(prerequisites) : [];
+       updatedFields.push('prerequisites');
+     }
+
+    // ===== RESOURCE CONSTRAINT VALIDATION =====
+    if (event.estimatedScoutCount > event.maxParticipants) {
+      return res.status(400).json({
+        success: false,
+        error: 'Resource constraint violation',
+        message: `Estimated scout count (${event.estimatedScoutCount}) cannot exceed maximum participants (${event.maxParticipants})`
+      });
+    }
+
+    // Validate date order
+    if (event.startDate >= event.endDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dates',
+        message: 'Start date must be before end date'
+      });
+    }
+
+    // ===== CONFLICT DETECTION =====
+    const start = event.startDate;
+    const end = event.endDate;
+
+    // Check school conflicts for all target schools (existing + new)
+    const allSchoolIds = [...new Set([
+      ...event.targetSchools.map(ts => ts.schoolId.toString()),
+      ...(schoolsToInvite || [])
+    ])];
+    for (const schoolId of allSchoolIds) {
+      const schoolConflicts = await Event.find({
+        _id: { $ne: eventId },
+        'targetSchools.schoolId': new mongoose.Types.ObjectId(schoolId),
+        status: { $nin: ['cancelled', 'archived'] },
+        $or: [{ startDate: { $lte: end }, endDate: { $gte: start } }]
+      }).select('name startDate endDate').lean();
+
+      if (schoolConflicts.length > 0) {
+        const conflictDetails = schoolConflicts.map(e => ({
+          name: e.name,
+          dates: `${new Date(e.startDate).toLocaleDateString()} - ${new Date(e.endDate).toLocaleDateString()}`
+        }));
+        return res.status(409).json({
+          success: false,
+          error: 'School scheduling conflict detected',
+          conflicts: conflictDetails,
+          message: `School is already assigned to overlapping event(s): ${conflictDetails.map(c => c.name).join(', ')}`
+        });
+      }
+    }
+
+    // Check trainer conflicts for all assigned trainers (existing + new)
+    const allTrainerIds = [...new Set([
+      ...event.trainers.map(t => t.trainerId.toString()),
+      ...(trainersToAdd || [])
+    ])];
+    for (const trainerId of allTrainerIds) {
+      const trainerConflicts = await Event.find({
+        _id: { $ne: eventId },
+        'trainers.trainerId': new mongoose.Types.ObjectId(trainerId),
+        status: { $nin: ['cancelled', 'archived'] },
+        $or: [{ startDate: { $lte: end }, endDate: { $gte: start } }]
+      }).select('name startDate endDate').lean();
+
+      if (trainerConflicts.length > 0) {
+        const conflictDetails = trainerConflicts.map(e => ({
+          name: e.name,
+          dates: `${new Date(e.startDate).toLocaleDateString()} - ${new Date(e.endDate).toLocaleDateString()}`
+        }));
+        return res.status(409).json({
+          success: false,
+          error: 'Trainer scheduling conflict detected',
+          conflicts: conflictDetails,
+          message: `Trainer is already assigned to overlapping event(s): ${conflictDetails.map(c => c.name).join(', ')}`
+        });
+      }
+    }
+
+    // Add new trainers
+    if (trainersToAdd && Array.isArray(trainersToAdd)) {
+      for (let i = 0; i < trainersToAdd.length; i++) {
+        const existing = event.trainers.find(t => t.trainerId.toString() === trainersToAdd[i]);
+        if (!existing) {
+          event.trainers.push({
+            trainerId: trainersToAdd[i],
+            role: trainerRoles ? trainerRoles[i] || 'assistant_trainer' : 'assistant_trainer',
+            assignedAt: new Date(),
+            status: 'assigned'
+          });
+          updatedFields.push('trainers');
+        }
+      }
+    }
+
+    // Remove trainers
+    if (trainersToRemove && Array.isArray(trainersToRemove)) {
+      const beforeCount = event.trainers.length;
+      event.trainers = event.trainers.filter(t =>
+        !trainersToRemove.includes(t.trainerId.toString())
+      );
+      if (event.trainers.length < beforeCount) {
+        updatedFields.push('trainers');
+      }
+    }
+
+    // Update trainer roles
+    if (trainerRoles && typeof trainerRoles === 'object') {
+      let rolesChanged = false;
+      for (const trainer of event.trainers) {
+        if (trainerRoles[trainer.trainerId.toString()]) {
+          trainer.role = trainerRoles[trainer.trainerId.toString()];
+          rolesChanged = true;
+        }
+      }
+      if (rolesChanged) updatedFields.push('trainerRoles');
+    }
+
+    // Invite new schools
+    if (schoolsToInvite && Array.isArray(schoolsToInvite)) {
+      for (const schoolId of schoolsToInvite) {
+        const existing = event.targetSchools.find(s => s.schoolId.toString() === schoolId);
+        if (!existing) {
+          event.targetSchools.push({
+            schoolId,
+            invitedAt: new Date(),
+            invitedBy: req.session.user.id,
+            rsvpStatus: 'invited',
+            rsvpDeadline: event.defaultInvitationDeadline ? new Date(event.defaultInvitationDeadline) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+          });
+          updatedFields.push('targetSchools');
+        }
+      }
+    }
+
+    event.lastModifiedBy = req.session.user.id;
+    await event.save();
+
+    // Populate for response
+    const populatedEvent = await Event.findById(eventId)
+      .populate('trainers.trainerId', 'name email idNumber role')
+      .populate('targetSchools.schoolId', 'name address city')
+      .lean();
+
+    // Log audit
+    await logAudit('event_updated', 'event', eventId, event.name, { updatedFields }, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userEmail: req.session.user.email,
+      userRole: req.session.user.role,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, event: populatedEvent, message: 'Event updated successfully' });
+  } catch (err) {
+    console.error('Error updating event:', err);
+    res.status(500).json({ success: false, error: 'Failed to update event: ' + err.message });
+  }
+});
+
+// DELETE event
+app.post('/dashboard/events/delete/:id', requireAuth, requirePermission('canDeleteEvents'), async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    const eventName = event.name;
+    await Event.findByIdAndDelete(req.params.id);
+
+    // Log audit
+    await logAudit('event_deleted', 'event', req.params.id, eventName, {}, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userEmail: req.session.user.email,
+      userRole: req.session.user.role,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, message: 'Event deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting event:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete event' });
+  }
+});
+
+// Check trainer availability for an event
+app.get('/api/trainers/:trainerId/availability', requireAuth, async (req, res) => {
+  try {
+    const { startDate, endDate, excludeEventId } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, error: 'startDate and endDate are required' });
+    }
+
+    const filter = {
+      trainers: {
+        $elemMatch: {
+          trainerId: req.params.trainerId,
+          status: { $in: ['assigned', 'confirmed'] }
+        }
+      },
+      status: { $nin: ['cancelled', 'archived'] }
+    };
+
+    // Exclude current event when checking for conflicts
+    if (excludeEventId) {
+      filter._id = { $ne: excludeEventId };
+    }
+
+    // Check for date conflicts: any event where the trainer is assigned that overlaps with the given date range
+    const conflictingEvents = await Event.find({
+      ...filter,
+      $or: [
+        // Event starts during the requested period
+        { startDate: { $gte: new Date(startDate), $lte: new Date(endDate) } },
+        // Event ends during the requested period
+        { endDate: { $gte: new Date(startDate), $lte: new Date(endDate) } },
+        // Event spans the entire requested period
+        {
+          startDate: { $lte: new Date(startDate) },
+          endDate: { $gte: new Date(endDate) }
+        }
+      ]
+    }).select('name startDate endDate');
+
+    const isAvailable = conflictingEvents.length === 0;
+
+    res.json({
+      success: true,
+      available: isAvailable,
+      conflicts: conflictingEvents.map(e => ({
+        id: e._id,
+        name: e.name,
+        startDate: e.startDate,
+        endDate: e.endDate
+      }))
+    });
+  } catch (err) {
+    console.error('Error checking availability:', err);
+    res.status(500).json({ success: false, error: 'Failed to check availability' });
+  }
+});
+
+// Assign trainer to event
+app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { trainerId, role } = req.body;
+
+    if (!trainerId) {
+      return res.status(400).json({ success: false, error: 'trainerId is required' });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    // Check if trainer is already assigned
+    const existing = event.trainers.find(t => t.trainerId.toString() === trainerId);
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'Trainer already assigned to this event' });
+    }
+
+    // Check for scheduling conflicts
+    const conflictCheck = await Event.find({
+      _id: { $ne: eventId },
+      trainers: { $elemMatch: { trainerId, status: { $in: ['assigned', 'confirmed'] } } },
+      status: { $nin: ['cancelled', 'archived'] },
+      $or: [
+        { startDate: { $lte: event.endDate, $gte: event.startDate } },
+        { endDate: { $lte: event.endDate, $gte: event.startDate } }
+      ]
+    }).select('name startDate endDate');
+
+    if (conflictCheck.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'Trainer has scheduling conflict',
+        conflicts: conflictCheck.map(e => ({
+          name: e.name,
+          dates: `${new Date(e.startDate).toLocaleDateString()} - ${new Date(e.endDate).toLocaleDateString()}`
+        }))
+      });
+    }
+
+    // Assign trainer
+    event.trainers.push({
+      trainerId,
+      role: role || 'assistant_trainer',
+      assignedAt: new Date(),
+      status: 'assigned'
+    });
+
+    await event.save();
+
+    // Notify trainer
+    try {
+      const trainer = await Staff.findById(trainerId);
+      if (trainer && trainer.email) {
+        const emailHtml = `
+          <h2>You've been assigned to an event</h2>
+          <p>Hello ${trainer.name},</p>
+          <p>You have been assigned to <strong>${event.name}</strong>.</p>
+          <p><strong>Event Details:</strong></p>
+          <ul>
+            <li>Date: ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</li>
+            <li>Location: ${event.location?.name}</li>
+            <li>Type: ${event.eventType.replace('_', ' ')}</li>
+          </ul>
+          <p>Please confirm your availability in your trainer dashboard.</p>
+        `;
+        await sendEmail(trainer.email, 'Event Assignment Notification', emailHtml);
+      }
+    } catch (emailErr) {
+      console.error('Error sending assignment email:', emailErr);
+    }
+
+    const populatedEvent = await Event.findById(eventId)
+      .populate('trainers.trainerId', 'name email idNumber role')
+      .lean();
+
+    res.json({ success: true, event: populatedEvent, message: 'Trainer assigned successfully' });
+  } catch (err) {
+    console.error('Error assigning trainer:', err);
+    res.status(500).json({ success: false, error: 'Failed to assign trainer' });
+  }
+});
+
+// Remove trainer from event
+app.post('/api/events/:eventId/remove-trainer', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+  try {
+    const { trainerId } = req.body;
+    const event = await Event.findById(req.params.eventId);
+
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    event.trainers = event.trainers.filter(t => t.trainerId.toString() !== trainerId);
+    await event.save();
+
+    res.json({ success: true, message: 'Trainer removed from event' });
+  } catch (err) {
+    console.error('Error removing trainer:', err);
+    res.status(500).json({ success: false, error: 'Failed to remove trainer' });
+  }
+});
+
+// Invite school to event
+app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { schoolId, rsvpDeadline, customMessage } = req.body;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, error: 'School ID is required' });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    // Check if already invited
+    const existing = event.targetSchools.find(s => s.schoolId.toString() === schoolId);
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'School already invited' });
+    }
+
+    // Add invitation with deadline handling
+    let deadline;
+    if (rsvpDeadline) {
+        deadline = new Date(rsvpDeadline);
+    } else if (event.defaultInvitationDeadline) {
+        deadline = new Date(event.defaultInvitationDeadline);
+    } else {
+        deadline = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 2 weeks default
+    }
+
+    event.targetSchools.push({
+      schoolId,
+      invitedAt: new Date(),
+      rsvpStatus: 'invited',
+      rsvpDeadline: deadline
+    });
+
+    // No need to increment currentParticipants here; it will be updated upon RSVP
+
+    await event.save();
+
+    // Send invitation email to school
+    try {
+      const school = await School.findById(schoolId);
+      if (school && school.contactPerson?.email) {
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const rsvpLink = `${protocol}://${host}/events/${eventId}/rsvp?school=${schoolId}&token=${encodeURIComponent(btoa(schoolId + ':' + eventId))}`;
+
+         const emailHtml = `
+           <h2>Invitation to ${event.name}</h2>
+           <p>Dear ${school.contactPerson.name || 'School Representative'},</p>
+           <p>You are invited to participate in:</p>
+           <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+             <h3>${event.name}</h3>
+             <p><strong>Type:</strong> ${event.eventType.replace('_', ' ')}</p>
+             <p><strong>Date:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</p>
+             <p><strong>Location:</strong> ${event.location?.name}, ${event.location?.city}</p>
+             ${event.agenda ? `<p><strong>Agenda:</strong> ${event.agenda}</p>` : ''}
+           </div>
+           <p>Please confirm your participation by clicking the link below:</p>
+           <p><a href="${rsvpLink}" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;">RSVP Now</a></p>
+           ${customMessage ? `<p>${customMessage}</p>` : ''}
+           <p>RSVP Deadline: ${rsvpDeadline ? new Date(rsvpDeadline).toLocaleDateString() : (event.defaultInvitationDeadline ? new Date(event.defaultInvitationDeadline).toLocaleDateString() : 'TBD')}</p>
+         `;
+
+        await sendEmail(school.contactPerson.email, `Invitation: ${event.name}`, emailHtml);
+      }
+    } catch (emailErr) {
+      console.error('Error sending invitation email:', emailErr);
+    }
+
+    const populatedEvent = await Event.findById(eventId)
+      .populate('targetSchools.schoolId', 'name contactPerson email')
+      .lean();
+
+    res.json({ success: true, event: populatedEvent, message: 'School invited successfully' });
+  } catch (err) {
+    console.error('Error inviting school:', err);
+    res.status(500).json({ success: false, error: 'Failed to invite school' });
+  }
+});
+
+// School RSVP to event (public endpoint - no auth required)
+app.post('/api/events/rsvp', async (req, res) => {
+  try {
+    const { eventId, schoolId, status, participantCount, notes } = req.body;
+
+    if (!eventId || !schoolId || !status) {
+      return res.status(400).json({ success: false, error: 'eventId, schoolId, and status are required' });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    const schoolIndex = event.targetSchools.findIndex(s => s.schoolId.toString() === schoolId);
+    if (schoolIndex === -1) {
+      return res.status(404).json({ success: false, error: 'School not invited to this event' });
+    }
+
+    // Update RSVP
+    event.targetSchools[schoolIndex].rsvpStatus = status;
+    event.targetSchools[schoolIndex].rsvpResponseDate = new Date();
+    if (participantCount !== undefined) {
+      event.targetSchools[schoolIndex].numberOfParticipants = parseInt(participantCount);
+    }
+    if (notes) {
+      event.targetSchools[schoolIndex].notes = notes;
+    }
+
+    // Recalculate total participants from confirmed RSVPs
+    event.currentParticipants = event.targetSchools.reduce((sum, s) => {
+      return sum + (s.rsvpStatus === 'confirmed' ? (s.numberOfParticipants || 0) : 0);
+    }, 0);
+
+    await event.save();
+
+    // Send confirmation email
+    try {
+      const school = await School.findById(schoolId);
+      if (school && school.contactPerson?.email) {
+        const confirmationMsg = status === 'confirmed'
+          ? 'Your participation has been confirmed!'
+          : status === 'declined'
+            ? 'We are sorry you cannot make it.'
+            : 'Thank you for your response.';
+
+        const emailHtml = `
+          <h2>RSVP Confirmation</h2>
+          <p>Dear ${school.contactPerson.name || 'School Representative'},</p>
+          <p>Your RSVP for <strong>${event.name}</strong> has been recorded as: <strong>${status.replace('_', ' ')}</strong>.</p>
+          <p>${confirmationMsg}</p>
+        `;
+
+        await sendEmail(school.contactPerson.email, 'RSVP Confirmation', emailHtml);
+      }
+    } catch (emailErr) {
+      console.error('Error sending RSVP confirmation:', emailErr);
+    }
+
+    res.json({ success: true, message: 'RSVP submitted successfully' });
+  } catch (err) {
+    console.error('Error submitting RSVP:', err);
+    res.status(500).json({ success: false, error: 'Failed to submit RSVP' });
+  }
+});
+
+// RSVP form page (public)
+app.get('/events/:eventId/rsvp', async (req, res) => {
+  try {
+    const { school } = req.query;
+    const eventId = req.params.eventId;
+
+    const event = await Event.findById(eventId)
+      .populate('targetSchools.schoolId', 'name')
+      .lean();
+
+    if (!event) {
+      return res.status(404).send('Event not found');
+    }
+
+    // Verify school is invited
+    const invitation = event.targetSchools.find(ts => ts.schoolId.toString() === school);
+    if (!invitation) {
+      return res.status(403).send('School not invited to this event');
+    }
+
+    res.render('event_rsvp', {
+      user: null,
+      event: {
+        _id: event._id,
+        name: event.name,
+        description: event.description,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        agenda: event.agenda
+      },
+      schoolId: school,
+      currentStatus: invitation.rsvpStatus,
+      rsvpDeadline: invitation.rsvpDeadline
+    });
+  } catch (err) {
+    console.error('Error loading RSVP page:', err);
+    res.status(500).send('Error loading RSVP page');
+  }
+});
+
+// ===== POST-EVENT REVIEW & SIGN-OFF =====
+
+// Submit trainer post-event report
+app.post('/api/events/:id/submit-report', requireAuth, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { trainerReport, actualAttendeeCount } = req.body;
+    const userId = req.session.user.id;
+    const userRole = req.session.user.role;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    // Check if user is assigned trainer OR admin/supervisor
+    const isAssignedTrainer = event.trainers.some(t => t.trainerId.toString() === userId);
+    const canEdit = ['admin', 'supervisor', 'coordinator'].includes(userRole);
+    if (!isAssignedTrainer && !canEdit) {
+      return res.status(403).json({ success: false, error: 'Only assigned trainers or admins can submit reports' });
+    }
+
+    // Update review fields
+    event.review = event.review || {};
+    event.review.trainerReport = trainerReport;
+    event.review.reportSubmittedAt = new Date();
+    event.review.reportSubmittedBy = userId;
+    event.review.reviewStatus = 'pending';
+    event.status = 'completed'; // Event finished, report submitted
+    event.lastModifiedBy = userId;
+
+    // If actual attendee count provided, update attendance aggregates
+    if (actualAttendeeCount !== undefined) {
+      event.review.actualAttendeeCount = parseInt(actualAttendeeCount);
+      // Also update attendance for each school if needed? Not required.
+    }
+
+    await event.save();
+
+    // Notify admins of report submission
+    try {
+      const admins = await Staff.find({ role: { $in: ['admin', 'supervisor', 'coordinator'] } }).select('email name').lean();
+      for (const admin of admins) {
+        if (admin.email) {
+          const emailHtml = `
+            <h2>Trainer Report Submitted</h2>
+            <p>Hello ${admin.name},</p>
+            <p>A post-event report has been submitted for <strong>${event.name}</strong>.</p>
+            <p><strong>Event:</strong> ${event.name}<br>
+               <strong>Dates:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</p>
+            <p>Please review the report in the admin dashboard.</p>
+          `;
+          await sendEmail(admin.email, 'Event Report Ready for Review', emailHtml);
+        }
+      }
+    } catch (emailErr) {
+      console.error('Error sending admin notification:', emailErr);
+    }
+
+    // Log audit
+    await logAudit('report_submitted', 'event', eventId, event.name, {}, {
+      userId, userRole,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, message: 'Report submitted successfully', event });
+  } catch (err) {
+    console.error('Error submitting report:', err);
+    res.status(500).json({ success: false, error: 'Failed to submit report' });
+  }
+});
+
+// Review/approve event (admin) - supports approve or request revision
+app.post('/api/events/:id/review', requireAuth, requirePermission('canApproveReports'), async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { action, reviewNotes, closureStatus = 'closed' } = req.body; // action: 'approve' | 'request_revision'
+    const userId = req.session.user.id;
+
+    if (!['approve', 'request_revision'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'Invalid action. Use "approve" or "request_revision".' });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    if (!event.review?.trainerReport) {
+      return res.status(400).json({ success: false, error: 'Cannot review: no trainer report submitted yet' });
+    }
+
+    // Update review fields
+    event.review.reviewStatus = action === 'approve' ? 'approved' : 'needs_revision';
+    event.review.reviewedBy = userId;
+    event.review.reviewedAt = new Date();
+    if (reviewNotes) event.review.reviewNotes = reviewNotes;
+
+    if (action === 'approve') {
+      event.status = 'reviewed';
+      event.review.closureStatus = closureStatus;
+      event.closedAt = new Date();
+      event.closedBy = userId;
+    } else {
+      // Request revision: event stays completed but reviewStatus indicates needs revision
+      event.status = 'completed';
+      event.review.closureStatus = 'reopened';
+    }
+
+    event.lastModifiedBy = userId;
+    await event.save();
+
+    // Notify trainer
+    try {
+      const trainerIds = event.trainers.map(t => t.trainerId);
+      const trainers = await Staff.find({ _id: { $in: trainerIds } }).select('email name').lean();
+      for (const trainer of trainers) {
+        if (trainer.email) {
+          const message = action === 'approve'
+            ? 'Your event report has been approved and the event is now closed.'
+            : 'Your event report requires revisions. Please update and resubmit.';
+          const emailHtml = `
+            <h2>Event Review Update</h2>
+            <p>Hello ${trainer.name},</p>
+            <p>Regarding event <strong>${event.name}</strong>: ${message}</p>
+            ${reviewNotes ? `<p><strong>Reviewer notes:</strong> ${reviewNotes}</p>` : ''}
+          `;
+          await sendEmail(trainer.email, 'Event Review Update', emailHtml);
+        }
+      }
+    } catch (emailErr) {
+      console.error('Error notifying trainer:', emailErr);
+    }
+
+    // Log audit
+    await logAudit(action === 'approve' ? 'event_approved' : 'event_revision_requested', 'event', eventId, event.name, { reviewNotes }, {
+      userId, userRole: req.session.user.role,
+      ipAddress: req.ip, userAgent: req.get('User-Agent'), sessionId: req.sessionID
+    });
+
+    res.json({ success: true, message: `Event ${action === 'approve' ? 'approved' : 'revision requested'}`, event });
+  } catch (err) {
+    console.error('Error reviewing event:', err);
+    res.status(500).json({ success: false, error: 'Failed to review event' });
+  }
+});
+
+// Get calendar data for month/week view
+app.get('/api/calendar', requireAuth, requirePermission('canViewEvents'), async (req, res) => {
+  try {
+    const { startDate, endDate, view, eventType, trainerId, schoolId, region } = req.query;
+
+    const filter = { status: { $nin: ['cancelled', 'archived'] } };
+
+    // Date range filter (required)
+    if (startDate && endDate) {
+      filter.startDate = { $lte: new Date(endDate) };
+      filter.endDate = { $gte: new Date(startDate) };
+    }
+
+    // Optional filters
+    if (eventType) filter.eventType = eventType;
+    if (region) filter.region = region;
+    if (trainerId) filter['trainers.trainerId'] = trainerId;
+    if (schoolId) filter['targetSchools.schoolId'] = schoolId;
+
+    const events = await Event.find(filter)
+      .populate('trainers.trainerId', 'name email')
+      .populate('targetSchools.schoolId', 'name')
+      .lean();
+
+    // Transform data for calendar display
+    const calendarEvents = events.map(event => ({
+      id: event._id,
+      title: event.name,
+      start: event.startDate,
+      end: event.endDate,
+      type: event.eventType,
+      status: event.status,
+      location: event.location?.name || '',
+      region: event.region || '',
+      trainers: event.trainers.map(t => ({
+        name: t.trainerId?.name || 'Unassigned',
+        role: t.role
+      })),
+      schools: event.targetSchools.map(s => ({
+        name: s.schoolId?.name || 'Unknown',
+        rsvp: s.rsvpStatus
+      })),
+      participants: event.currentParticipants,
+      maxParticipants: event.maxParticipants
+    }));
+
+    res.json({ success: true, events: calendarEvents });
+  } catch (err) {
+    console.error('Error fetching calendar:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch calendar' });
+  }
+});
+
+// Export calendar to CSV
+app.get('/api/calendar/export', requireAuth, requirePermission('canViewEvents'), async (req, res) => {
+  try {
+    const { startDate, endDate, eventType } = req.query;
+
+    // Validate date range (max 1 year)
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysDiff = (end - start) / (1000 * 60 * 60 * 24);
+      if (daysDiff > 365) {
+        return res.status(400).json({ success: false, error: 'Date range cannot exceed 1 year' });
+      }
+    }
+
+    const filter = { status: { $nin: ['cancelled', 'archived'] } };
+    if (startDate && endDate) {
+      filter.startDate = { $lte: new Date(endDate) };
+      filter.endDate = { $gte: new Date(startDate) };
+    }
+    if (eventType) filter.eventType = eventType;
+
+    const events = await Event.find(filter)
+      .sort({ startDate: 1 })
+      .lean();
+
+    const headers = ['Event Name', 'Type', 'Start Date', 'End Date', 'Location', 'Region', 'Status', 'Current Participants', 'Max Participants'];
+    const rows = events.map(e => [
+      e.name,
+      e.eventType.replace('_', ' '),
+      e.startDate ? new Date(e.startDate).toLocaleDateString() : '',
+      e.endDate ? new Date(e.endDate).toLocaleDateString() : '',
+      e.location?.name || '',
+      e.region || '',
+      e.status,
+      e.currentParticipants,
+      e.maxParticipants
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="events-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (err) {
+    console.error('Error exporting calendar:', err);
+    res.status(500).json({ success: false, error: 'Failed to export calendar' });
+  }
+});
+
+// Export calendar to PDF
+app.get('/api/calendar/export/pdf', requireAuth, requirePermission('canViewEvents'), async (req, res) => {
+  try {
+    const { startDate, endDate, eventType, trainerId, schoolId, region } = req.query;
+
+    // Validate date range (max 1 year)
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysDiff = (end - start) / (1000 * 60 * 60 * 24);
+      if (daysDiff > 365) {
+        return res.status(400).json({ success: false, error: 'Date range cannot exceed 1 year' });
+      }
+    }
+
+    const filter = { status: { $nin: ['cancelled', 'archived'] } };
+    if (startDate && endDate) {
+      filter.startDate = { $lte: new Date(endDate) };
+      filter.endDate = { $gte: new Date(startDate) };
+    }
+    if (eventType) filter.eventType = eventType;
+    if (region) filter.region = region;
+    if (trainerId) filter['trainers.trainerId'] = trainerId;
+    if (schoolId) filter['targetSchools.schoolId'] = schoolId;
+
+    const events = await Event.find(filter)
+      .sort({ startDate: 1 })
+      .lean();
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="events-export-${new Date().toISOString().split('T')[0]}.pdf"`);
+
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(20).text('Event Calendar Export', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`);
+    doc.moveDown();
+
+    // Table column definitions
+    const columns = [
+      { label: 'Event Name', key: 'name', width: 180 },
+      { label: 'Type', key: 'eventType', width: 80 },
+      { label: 'Start', key: 'startDate', width: 70 },
+      { label: 'End', key: 'endDate', width: 70 },
+      { label: 'Location', key: 'location', width: 100 },
+      { label: 'Region', key: 'region', width: 70 },
+      { label: 'Status', key: 'status', width: 70 },
+      { label: 'Part', key: 'currentParticipants', width: 30 },
+      { label: 'Max', key: 'maxParticipants', width: 30 }
+    ];
+
+    // Table header
+    let x = 50;
+    let y = doc.y;
+    doc.font('Helvetica-Bold');
+    columns.forEach(col => {
+      doc.text(col.label, x, y, { width: col.width, align: 'left' });
+      x += col.width;
+    });
+    doc.moveTo(50, y + 20).lineTo(550, y + 20).stroke();
+    y += 25;
+
+    // Table rows
+    doc.font('Helvetica');
+    for (const ev of events) {
+      if (y > 750) {
+        doc.addPage();
+        y = 50;
+      }
+      x = 50;
+      const row = [
+        ev.name,
+        ev.eventType.replace('_', ' '),
+        ev.startDate ? new Date(ev.startDate).toLocaleDateString() : '',
+        ev.endDate ? new Date(ev.endDate).toLocaleDateString() : '',
+        ev.location?.name || '',
+        ev.region || '',
+        ev.status,
+        ev.currentParticipants.toString(),
+        ev.maxParticipants.toString()
+      ];
+      row.forEach((text, i) => {
+        doc.text(text, x, y, { width: columns[i].width, align: 'left', valign: 'top' });
+        x += columns[i].width;
+      });
+      y += 15;
+      doc.moveTo(50, y).lineTo(550, y).stroke();
+      y += 5;
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error('Error exporting PDF:', err);
+    res.status(500).json({ success: false, error: 'Failed to export PDF' });
+  }
+});
+
+// Duplicate route removed - use GET /api/events/:eventId instead
+
+// GET trainers list for dropdowns
+app.get('/api/trainers/list', requireAuth, requirePermission('canViewStaff'), async (req, res) => {
+  try {
+    const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor', 'coordinator'] } })
+      .select('name email idNumber role status')
+      .sort({ name: 1 })
+      .lean();
+
+    res.json({ success: true, trainers });
+  } catch (err) {
+    console.error('Error fetching trainers list:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch trainers' });
+  }
+});
+
+// GET schools list for dropdowns
+app.get('/api/schools/list', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
+  try {
+    const schools = await School.find({ status: { $ne: 'inactive' } })
+      .select('name address city contactPerson')
+      .sort({ name: 1 })
+      .lean();
+
+    res.json({ success: true, schools });
+  } catch (err) {
+    console.error('Error fetching schools list:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch schools' });
+  }
+});
+
 // Middleware to check for founder role
 function requireFounder(req, res, next) {
   if (req.session && req.session.user && req.session.user.role === 'founder') return next();
@@ -2969,6 +4021,143 @@ app.use((req, res) => {
 });
 
 // Start server
+const initializePermissions = async () => {
+  try {
+    const defaultPermissions = [
+      {
+        role: 'trainer',
+        permissions: {
+          canViewStaff: false,
+          canCreateStaff: false,
+          canEditStaff: false,
+          canDeleteStaff: false,
+          canInviteStaff: false,
+          canResetPasswords: false,
+          canViewSchools: true,
+          canCreateSchools: false,
+          canEditSchools: false,
+          canDeleteSchools: false,
+          canAssignTrainers: false,
+          canViewEvents: true,
+          canCreateEvents: false,
+          canEditEvents: false,
+          canDeleteEvents: false,
+          canScheduleEvents: false,
+          canViewPrograms: true,
+          canCreatePrograms: false,
+          canEditPrograms: false,
+          canDeletePrograms: false,
+          canViewBookings: false,
+          canCreateBookings: false,
+          canEditBookings: false,
+          canDeleteBookings: false,
+          canApproveBookings: false,
+          canViewFinancials: false,
+          canManageBudgets: false,
+          canViewAnalytics: false,
+          canGenerateReports: false,
+          canApproveReports: false,
+          canManageSystem: false,
+          canViewAuditLogs: false,
+          canManagePermissions: false
+        },
+        description: 'Basic trainer role with limited access'
+      },
+      {
+        role: 'senior trainer',
+        permissions: {
+          canViewStaff: true,
+          canCreateStaff: false,
+          canEditStaff: false,
+          canDeleteStaff: false,
+          canInviteStaff: false,
+          canResetPasswords: false,
+          canViewSchools: true,
+          canCreateSchools: false,
+          canEditSchools: false,
+          canDeleteSchools: false,
+          canAssignTrainers: true,
+          canViewEvents: true,
+          canCreateEvents: true,
+          canEditEvents: true,
+          canDeleteEvents: false,
+          canScheduleEvents: true,
+          canViewPrograms: true,
+          canCreatePrograms: false,
+          canEditPrograms: false,
+          canDeletePrograms: false,
+          canViewBookings: true,
+          canCreateBookings: false,
+          canEditBookings: false,
+          canDeleteBookings: false,
+          canApproveBookings: false,
+          canViewFinancials: false,
+          canManageBudgets: false,
+          canViewAnalytics: true,
+          canGenerateReports: true,
+          canApproveReports: false,
+          canManageSystem: false,
+          canViewAuditLogs: false,
+          canManagePermissions: false
+        },
+        description: 'Senior trainer with event creation and trainer assignment capabilities'
+      },
+      {
+        role: 'coordinator',
+        permissions: {
+          canViewStaff: true,
+          canCreateStaff: false,
+          canEditStaff: false,
+          canDeleteStaff: false,
+          canInviteStaff: false,
+          canResetPasswords: false,
+          canViewSchools: true,
+          canCreateSchools: false,
+          canEditSchools: false,
+          canDeleteSchools: false,
+          canAssignTrainers: true,
+          canViewEvents: true,
+          canCreateEvents: true,
+          canEditEvents: true,
+          canDeleteEvents: true,
+          canScheduleEvents: true,
+          canViewPrograms: true,
+          canCreatePrograms: true,
+          canEditPrograms: true,
+          canDeletePrograms: false,
+          canViewBookings: true,
+          canCreateBookings: true,
+          canEditBookings: true,
+          canDeleteBookings: false,
+          canApproveBookings: true,
+          canViewFinancials: false,
+          canManageBudgets: false,
+          canViewAnalytics: true,
+          canGenerateReports: true,
+          canApproveReports: false,
+          canManageSystem: false,
+          canViewAuditLogs: false,
+          canManagePermissions: false
+        },
+        description: 'Coordinator for scheduling and assignments'
+      }
+    ];
+
+    for (const perm of defaultPermissions) {
+      await Permission.findOneAndUpdate(
+        { role: perm.role },
+        perm,
+        { upsert: true, new: true }
+      );
+    }
+
+    console.log('Γ£ô Default permissions initialized');
+  } catch (err) {
+    console.error('Permissions init error:', err);
+    throw err;
+  }
+};
+
 const startServer = async () => {
   try {
     await initializePermissions();

@@ -94,6 +94,7 @@ paymentSchema.pre('save', function(next) {
   paymentSchema.index({ schoolId: 1, paymentDate: -1 });
   paymentSchema.index({ status: 1 });
   paymentSchema.index({ dueDate: 1 });
+  paymentSchema.index({ paidDate: 1 }); // For revenue collected queries
   // Note: invoiceNumber already indexed by unique:true constraint (line 18)
 
   module.exports = mongoose.model('Payment', paymentSchema);

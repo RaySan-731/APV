@@ -222,11 +222,29 @@ function updateStats(data) {
     const activeStudentsEl = document.getElementById('activeStudents');
     const upcomingEventsEl = document.getElementById('upcomingEvents');
     const growthRateEl = document.getElementById('growthRate');
+    // New KPI elements
+    const activeSchoolsEl = document.getElementById('activeSchools');
+    const eventsThisMonthEl = document.getElementById('eventsThisMonth');
+    const trainersDeployedEl = document.getElementById('trainersDeployed');
+    const totalScoutsReachedEl = document.getElementById('totalScoutsReached');
+    const revenueCollectedEl = document.getElementById('revenueCollected');
+    const outstandingPaymentsEl = document.getElementById('outstandingPayments');
+    const reportSubmissionRateEl = document.getElementById('reportSubmissionRate');
 
-    if (totalSchoolsEl) totalSchoolsEl.textContent = data.totalSchools;
-    if (activeStudentsEl) activeStudentsEl.textContent = data.activeStudents;
-    if (upcomingEventsEl) upcomingEventsEl.textContent = data.upcomingEvents;
-    if (growthRateEl) growthRateEl.textContent = `+${data.growthRate}%`;
+    // Existing ones
+    if (totalSchoolsEl) totalSchoolsEl.textContent = data.totalSchools || 0;
+    if (activeStudentsEl) activeStudentsEl.textContent = data.activeStudents || 0;
+    if (upcomingEventsEl) upcomingEventsEl.textContent = data.upcomingEvents || 0;
+    if (growthRateEl) growthRateEl.textContent = `+${data.growthRate || 0}%`;
+
+    // New KPIs
+    if (activeSchoolsEl) activeSchoolsEl.textContent = data.activeSchools || 0;
+    if (eventsThisMonthEl) eventsThisMonthEl.textContent = data.eventsThisMonth || 0;
+    if (trainersDeployedEl) trainersDeployedEl.textContent = data.trainersDeployed || 0;
+    if (totalScoutsReachedEl) totalScoutsReachedEl.textContent = data.totalScoutsReached || 0;
+    if (revenueCollectedEl) revenueCollectedEl.textContent = `KES ${(data.revenueCollected || 0).toLocaleString()}`;
+    if (outstandingPaymentsEl) outstandingPaymentsEl.textContent = `KES ${(data.outstandingPayments || 0).toLocaleString()}`;
+    if (reportSubmissionRateEl) reportSubmissionRateEl.textContent = `${data.reportSubmissionRate || 0}%`;
 }
 
 function updateActivities(activities) {

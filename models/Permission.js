@@ -55,6 +55,8 @@ const permissionSchema = new mongoose.Schema({
     // Analytics & Reports
     canViewAnalytics: { type: Boolean, default: false },
     canGenerateReports: { type: Boolean, default: false },
+    canExportData: { type: Boolean, default: false },
+    canScheduleReports: { type: Boolean, default: false },
     canApproveReports: { type: Boolean, default: false },
 
     // System Administration

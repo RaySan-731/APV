@@ -1,0 +1,125 @@
+<%
+/**
+ * Trainer Performance Report View
+ * Path: views/reports/trainer_performance.ejs
+ */
+%>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trainer Performance Report - APV</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Trainer Performance Report</h1>
+                <div class="user-info">
+                    <span>Welcome, <%= user.name %></span>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Filters -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Filters</h3>
+                    </div>
+                    <div class="card-content">
+                        <form id="filterForm" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <label>Date Range
+                                <select id="dateRange" name="dateRange">
+                                    <option value="30d" selected>Last 30 Days</option>
+                                    <option value="90d">Last 90 Days</option>
+                                    <option value="1y">Last Year</option>
+                                </select>
+                            </label>
+                            <label>Trainer
+                                <select id="trainerFilter" name="trainerId">
+                                    <option value="">All Trainers</option>
+                                    <% trainers.forEach(trainer => { %>
+                                        <option value="<%= trainer._id %>"><%= trainer.name %> (<%= trainer.role %>)</option>
+                                    <% }) %>
+                                </select>
+                            </label>
+                            <label>Sort By
+                                <select id="sortBy" name="sortBy">
+                                    <option value="eventsCompleted">Events Completed</option>
+                                    <option value="totalAttendance">Total Attendance</option>
+                                    <option value="avgFeedback">Avg Feedback</option>
+                                    <option value="schoolsVisited">Schools Visited</option>
+                                </select>
+                            </label>
+                            <label>Order
+                                <select id="sortOrder" name="sortOrder">
+                                    <option value="desc">Descending</option>
+                                    <option value="asc">Ascending</option>
+                                </select>
+                            </label>
+                            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                                <button type="button" class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Export Actions -->
+                <div class="content-card" style="padding: 1rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-primary" onclick="exportReport('csv')">Export CSV</button>
+                        <button class="btn btn-primary" onclick="exportReport('pdf')">Export PDF</button>
+                    </div>
+                </div>
+
+                <!-- Results Table -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Performance Summary</h3>
+                        <div id="loadingSpinner" class="spinner" style="display: none;"></div>
+                    </div>
+                    <div class="card-content">
+                        <table class="data-table" id="performanceTable">
+                            <thead>
+                                <tr>
+                                    <th>Trainer</th>
+                                    <th>Events Completed</th>
+                                    <th>Total Attendance</th>
+                                    <th>Reports On-Time</th>
+                                    <th>Reports Late</th>
+                                    <th>Avg Feedback</th>
+                                    <th>Schools Visited</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBody">
+                                <!-- Data will be loaded via JavaScript -->
+                            </tbody>
+                        </table>
+                        <div id="noResults" class="placeholder-text" style="display: none;">
+                            No data available for the selected filters.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/js/reports/trainer_performance.js"></script>
+</body>
+</html>

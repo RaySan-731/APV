@@ -234,6 +234,7 @@ eventSchema.index({ 'targetSchools.schoolId': 1 });
 eventSchema.index({ createdAt: -1 });
 eventSchema.index({ 'review.reviewStatus': 1 });
 eventSchema.index({ 'review.closureStatus': 1 });
+eventSchema.index({ 'review.reportSubmittedAt': 1 }); // For report submission rate queries
 eventSchema.index({ 'trainers.trainerId': 1, startDate: 1, endDate: 1 }, { name: 'idx_trainer_availability' });
 eventSchema.index({ 'targetSchools.schoolId': 1, startDate: 1, endDate: 1 }, { name: 'idx_school_conflicts' });
 

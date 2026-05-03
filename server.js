@@ -54,12 +54,26 @@ const Permission = require('./models/Permission');
 const ScoutGroup = require('./models/ScoutGroup');
 const Payment = require('./models/Payment');
 const SchoolDocument = require('./models/SchoolDocument');
+const ReportTemplate = require('./models/ReportTemplate');
+const ScheduledReport = require('./models/ScheduledReport');
+
+// Import controllers
+const analyticsController = require('./backend/controllers/analyticsController');
+const reportsController = require('./backend/controllers/reportsController');
+const exportController = require('./backend/controllers/exportController');
+
+// Import and start report scheduler
+const reportScheduler = require('./backend/services/reportScheduler');
 
 // MongoDB connection
 if (process.env.MONGODB_URI) {
   // Connect without deprecated options; mongoose v6+ uses sensible defaults
   mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(() => {
+    console.log('Connected to MongoDB');
+    // Start report scheduler
+    reportScheduler.start();
+  })
   .catch(err => {
     console.error('MongoDB connection error:', err.message);
     console.log('Make sure MongoDB is running on localhost:27017');
@@ -1285,123 +1299,8 @@ app.post('/api/permissions/init', requireAuth, requirePermission('canManagePermi
           canManageBudgets: false,
           canViewAnalytics: true,
           canGenerateReports: true,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Senior trainer with additional responsibilities'
-      },
-      {
-        role: 'supervisor',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: true,
-          canEditStaff: true,
-          canDeleteStaff: false,
-          canInviteStaff: true,
-          canResetPasswords: true,
-          canViewSchools: true,
-          canCreateSchools: true,
-          canEditSchools: true,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: true,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: true,
-          canEditPrograms: true,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: true,
-          canApproveBookings: true,
-          canViewFinancials: true,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: true,
-          canManageSystem: false,
-          canViewAuditLogs: true,
-          canManagePermissions: false
-        },
-        description: 'Supervisor with management capabilities'
-      },
-      {
-        role: 'admin',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: true,
-          canEditStaff: true,
-          canDeleteStaff: true,
-          canInviteStaff: true,
-          canResetPasswords: true,
-          canViewSchools: true,
-          canCreateSchools: true,
-          canEditSchools: true,
-          canDeleteSchools: true,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: true,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: true,
-          canEditPrograms: true,
-          canDeletePrograms: true,
-          canViewBookings: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: true,
-          canApproveBookings: true,
-          canViewFinancials: true,
-          canManageBudgets: true,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canApproveReports: true,
-          canManageSystem: true,
-          canViewAuditLogs: true,
-          canManagePermissions: true
-        },
-        description: 'Full administrative access'
-      },
-      {
-        role: 'coordinator',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: false,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: false,
-          canEditPrograms: false,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: false,
-          canEditBookings: false,
-          canDeleteBookings: false,
-          canApproveBookings: true,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
+          canExportData: false,
+          canScheduleReports: false,
           canApproveReports: false,
           canManageSystem: false,
           canViewAuditLogs: false,
@@ -2402,18 +2301,140 @@ app.get('/api/schools/:schoolId/visit-logs', requireAuth, async (req, res) => {
   }
 });
 
+// ============ REPORTS DASHBOARD ROUTES ============
+
+// Trainer Performance Report page
+app.get('/dashboard/reports/trainers', requireAuth, async (req, res) => {
+  try {
+    if (req.session.user && req.session.user.role === 'trainer') {
+      return res.redirect('/trainer/dashboard');
+    }
+    const perm = await Permission.findOne({ role: req.session.user.role });
+    if (!perm || !perm.permissions.canViewAnalytics) {
+      return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
+    }
+    const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } })
+      .select('name email idNumber role status')
+      .sort({ name: 1 })
+      .lean();
+    return res.render('reports/trainer_performance', { user: req.session.user, trainers, page: 'reports-trainers' });
+  } catch (err) {
+    console.error('Trainer performance report error:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
+// Event Effectiveness Report page
+app.get('/dashboard/reports/events', requireAuth, async (req, res) => {
+  try {
+    if (req.session.user && req.session.user.role === 'trainer') {
+      return res.redirect('/trainer/dashboard');
+    }
+    const perm = await Permission.findOne({ role: req.session.user.role });
+    if (!perm || !perm.permissions.canViewAnalytics) {
+      return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
+    }
+    const Event = require('./models/Event');
+    const eventTypes = await Event.distinct('eventType');
+    return res.render('reports/event_effectiveness', { user: req.session.user, eventTypes, page: 'reports-events' });
+  } catch (err) {
+    console.error('Event effectiveness report error:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
+// School Engagement Report page
+app.get('/dashboard/reports/schools', requireAuth, async (req, res) => {
+  try {
+    if (req.session.user && req.session.user.role === 'trainer') {
+      return res.redirect('/trainer/dashboard');
+    }
+    const perm = await Permission.findOne({ role: req.session.user.role });
+    if (!perm || !perm.permissions.canViewAnalytics) {
+      return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
+    }
+    const schools = await School.find({}).select('name').sort({ name: 1 }).lean();
+    return res.render('reports/school_engagement', { user: req.session.user, schools, page: 'reports-schools' });
+  } catch (err) {
+    console.error('School engagement report error:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
+// Custom Report Builder page
+app.get('/dashboard/reports/builder', requireAuth, async (req, res) => {
+  try {
+    if (req.session.user && req.session.user.role === 'trainer') {
+      return res.redirect('/trainer/dashboard');
+    }
+    const perm = await Permission.findOne({ role: req.session.user.role });
+    if (!perm || !perm.permissions.canGenerateReports) {
+      return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
+    }
+    const schools = await School.find({}).select('name _id').sort({ name: 1 }).lean();
+    const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } }).select('name _id').sort({ name: 1 }).lean();
+    const events = await Event.distinct('eventType');
+    return res.render('reports/custom_builder', { user: req.session.user, schools, trainers, eventTypes: events, page: 'reports-builder' });
+  } catch (err) {
+    console.error('Custom report builder error:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
 app.get('/dashboard/:page', requireAuth, async (req, res) => {
   try {
     const page = req.params.page;
-    const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health', 'audit-logs', 'permissions'];
 
+    // If trainer role, redirect
     if (req.session.user && req.session.user.role === 'trainer') {
       return res.redirect('/trainer/dashboard');
     }
 
+    // Handle new report pages directly with permission checks
+    if (page === 'reports-trainers' || page === 'reports-events' || page === 'reports-schools') {
+      const perm = await Permission.findOne({ role: req.session.user.role });
+      if (!perm || !perm.permissions.canViewAnalytics) {
+        return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
+      }
+    }
+    if (page === 'reports-builder') {
+      const perm = await Permission.findOne({ role: req.session.user.role });
+      if (!perm || !perm.permissions.canGenerateReports) {
+        return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
+      }
+    }
+
+    if (page === 'reports-trainers') {
+      const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } })
+        .select('name email idNumber role status')
+        .sort({ name: 1 })
+        .lean();
+      return res.render('reports/trainer_performance', { user: req.session.user, trainers, page });
+    }
+    if (page === 'reports-events') {
+      const Event = require('./models/Event');
+      const eventTypes = await Event.distinct('eventType');
+      return res.render('reports/event_effectiveness', { user: req.session.user, eventTypes, page });
+    }
+    if (page === 'reports-schools') {
+      const schools = await School.find({}).select('name').sort({ name: 1 }).lean();
+      return res.render('reports/school_engagement', { user: req.session.user, schools, page });
+    }
+    if (page === 'reports-builder') {
+      const schools = await School.find({}).select('name _id').sort({ name: 1 }).lean();
+      const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } }).select('name _id').sort({ name: 1 }).lean();
+      const events = await Event.distinct('eventType');
+      return res.render('reports/custom_builder', { user: req.session.user, schools, trainers, eventTypes: events, page });
+    }
+
+    // Existing allowed pages for standard dashboard
+    const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health', 'audit-logs', 'permissions'];
+
     if (!allowedPages.includes(page)) {
       return res.status(404).render('404', { user: req.session.user });
     }
+
+    // ... rest of existing code stays the same (modelData and rendering dashboard for those pages)
 
     const modelData = {
       staffList: [],
@@ -2509,59 +2530,7 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/dashboard-data', requireAuth, async (req, res) => {
-  try {
-    const totalSchools = await School.countDocuments();
-    const activeStudentsData = await School.aggregate([
-      { $group: { _id: null, total: { $sum: { $ifNull: ['$studentCount', 0] } } } }
-    ]);
-    const activeStudents = activeStudentsData[0]?.total || 0;
-    const upcomingEvents = await Event.countDocuments({ startDate: { $gte: new Date() } });
-    const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const newSchoolsLast30Days = await School.countDocuments({ createdAt: { $gte: last30Days } });
-    const growthRate = totalSchools > 0 ? Math.round((newSchoolsLast30Days / totalSchools) * 100) : 0;
-
-    const recentAuditLogs = await AuditLog.find().sort({ timestamp: -1 }).limit(3).lean();
-    const recentActivities = recentAuditLogs.map(log => ({
-      title: log.entityName ? `${log.entityName} ${log.action.replace(/_/g, ' ')}` : log.action.replace(/_/g, ' '),
-      description: `Performed by ${log.performedBy?.userName || log.performedBy?.userEmail || 'System'}`,
-      time: new Date(log.timestamp).toLocaleString()
-    }));
-
-    res.json({
-      totalSchools,
-      activeStudents,
-      upcomingEvents,
-      growthRate,
-      recentActivities: recentActivities.length ? recentActivities : [
-        {
-          title: 'New trainer onboarded',
-          description: 'John Smith joined as Rover Scout',
-          time: '2 hours ago'
-        },
-        {
-          title: 'Summer Camp registration opened',
-          description: '15 students already registered',
-          time: '1 day ago'
-        },
-        {
-          title: 'New school partnership',
-          description: 'Greenwood Elementary joined our program',
-          time: '3 days ago'
-        }
-      ]
-    });
-  } catch (error) {
-    console.error('Error loading dashboard data:', error);
-    res.json({
-      totalSchools: 0,
-      activeStudents: 0,
-      upcomingEvents: 0,
-      growthRate: 0,
-      recentActivities: []
-    });
-  }
-});
+app.get('/api/dashboard-data', requireAuth, analyticsController.getDashboardData);
 
 // GET events list with filters
 app.get('/api/events', requireAuth, requirePermission('canViewEvents'), async (req, res) => {
@@ -4009,6 +3978,32 @@ app.get('/api/schools/list', requireAuth, requirePermission('canViewSchools'), a
   }
 });
 
+
+// Dashboard KPI data (enhanced)
+app.get('/api/dashboard/kpi', requireAuth, async (req, res) => {
+  try {
+    const { timeRange = '30d' } = req.query;
+    const result = await analyticsController.getDashboardData(req, res);
+    return res.json(result);
+  } catch (error) {
+    console.error('Error fetching KPI data:', error);
+    res.status(500).json({ error: 'Failed to fetch KPI data' });
+  }
+});
+
+// Reports endpoints
+app.get('/api/reports/trainer-performance', requireAuth, requirePermission('canViewAnalytics'), reportsController.getTrainerPerformanceReport);
+app.get('/api/reports/event-effectiveness', requireAuth, requirePermission('canViewAnalytics'), reportsController.getEventEffectivenessReport);
+app.get('/api/reports/school-engagement', requireAuth, requirePermission('canViewAnalytics'), reportsController.getSchoolEngagementReport);
+
+// Export endpoints
+app.get('/api/export/:reportType', requireAuth, requirePermission('canExportData'), exportController.exportReport);
+app.post('/api/reports/templates/save', requireAuth, requirePermission('canGenerateReports'), exportController.saveTemplate);
+app.get('/api/reports/templates', requireAuth, requirePermission('canGenerateReports'), exportController.getReportTemplates);
+app.get('/api/reports/scheduled', requireAuth, requirePermission('canGenerateReports'), exportController.getScheduledReports);
+app.post('/api/reports/scheduled', requireAuth, requirePermission('canGenerateReports'), exportController.createScheduledReport);
+
+
 // Middleware to check for founder role
 function requireFounder(req, res, next) {
   if (req.session && req.session.user && req.session.user.role === 'founder') return next();
@@ -4056,6 +4051,8 @@ const initializePermissions = async () => {
           canManageBudgets: false,
           canViewAnalytics: false,
           canGenerateReports: false,
+          canExportData: false,
+          canScheduleReports: false,
           canApproveReports: false,
           canManageSystem: false,
           canViewAuditLogs: false,
@@ -4095,6 +4092,8 @@ const initializePermissions = async () => {
           canManageBudgets: false,
           canViewAnalytics: true,
           canGenerateReports: true,
+          canExportData: false,
+          canScheduleReports: false,
           canApproveReports: false,
           canManageSystem: false,
           canViewAuditLogs: false,
@@ -4134,6 +4133,8 @@ const initializePermissions = async () => {
           canManageBudgets: false,
           canViewAnalytics: true,
           canGenerateReports: true,
+          canExportData: false,
+          canScheduleReports: false,
           canApproveReports: false,
           canManageSystem: false,
           canViewAuditLogs: false,

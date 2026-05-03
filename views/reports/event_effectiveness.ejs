@@ -1,0 +1,112 @@
+<%
+/**
+ * Event Effectiveness Report View
+ * Path: views/reports/event_effectiveness.ejs
+ */
+%>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Effectiveness Report - APV</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Event Effectiveness Report</h1>
+                <div class="user-info"><span>Welcome, <%= user.name %></span></div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Filters -->
+                <div class="content-card">
+                    <div class="card-header"><h3>Filters</h3></div>
+                    <div class="card-content">
+                        <form id="filterForm" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <label>Date Range
+                                <select id="dateRange" name="dateRange">
+                                    <option value="30d">Last 30 Days</option>
+                                    <option value="90d" selected>Last 90 Days</option>
+                                    <option value="1y">Last Year</option>
+                                </select>
+                            </label>
+                            <label>Event Type
+                                <select id="eventType" name="eventType">
+                                    <option value="">All Types</option>
+                                    <% eventTypes.forEach(type => { %>
+                                        <option value="<%= type %>"><%= type.replace('_', ' ') %></option>
+                                    <% }) %>
+                                </select>
+                            </label>
+                            <label>Region
+                                <input type="text" id="region" name="region" placeholder="Optional region filter">
+                            </label>
+                            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                                <button type="button" class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Export -->
+                <div class="content-card" style="padding: 1rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-primary" onclick="exportReport('csv')">Export CSV</button>
+                        <button class="btn btn-primary" onclick="exportReport('pdf')">Export PDF</button>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="stats-grid">
+                    <div class="stat-card" style="grid-column: span 2;">
+                        <canvas id="attendanceChart" height="300"></canvas>
+                    </div>
+                    <div class="stat-card" style="grid-column: span 2;">
+                        <canvas id="feedbackChart" height="300"></canvas>
+                    </div>
+                </div>
+
+                <!-- Data Table -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Event Type Summary</h3>
+                        <div id="loading" class="spinner" style="display: none;"></div>
+                    </div>
+                    <div class="card-content">
+                        <table class="data-table" id="effectivenessTable">
+                            <thead>
+                                <tr>
+                                    <th>Event Type</th>
+                                    <th>Total Events</th>
+                                    <th>Avg Attendance Rate</th>
+                                    <th>Trainer-to-Scout Ratio</th>
+                                    <th>Avg Feedback Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBody"></tbody>
+                        </table>
+                        <div id="noResults" class="placeholder-text" style="display: none;">No data available.</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/js/reports/event_effectiveness.js"></script>
+</body>
+</html>

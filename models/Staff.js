@@ -120,5 +120,6 @@ staffSchema.pre('save', function(next) {
 });
 
 staffSchema.index({ role: 1 });
+staffSchema.index({ status: 1 }); // For active staff queries
 
 module.exports = mongoose.model('Staff', staffSchema);

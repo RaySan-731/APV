@@ -1,0 +1,154 @@
+<%
+/**
+ * Custom Report Builder View
+ * Path: views/reports/custom_builder.ejs
+ */
+%>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Report Builder - APV</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        .builder-section { margin-bottom: 2rem; }
+        .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--foreground); }
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+        .checkbox-label { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); cursor: pointer; }
+        .checkbox-label:hover { background: var(--accent); }
+        .preview-section { margin-top: 2rem; }
+        .saved-templates { margin-top: 1rem; }
+        .template-card { padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; background: var(--card); }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Custom Report Builder</h1>
+                <div class="user-info"><span>Welcome, <%= user.name %></span></div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Saved Templates -->
+                <div class="content-card">
+                    <div class="card-header"><h3>Saved Templates</h3></div>
+                    <div class="card-content">
+                        <div id="templatesList" class="saved-templates">
+                            <!-- Loaded via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Builder Form -->
+                <div class="content-card">
+                    <div class="card-header"><h3>Build Custom Report</h3></div>
+                    <div class="card-content">
+                        <form id="builderForm">
+                            <!-- Dimensions -->
+                            <div class="builder-section">
+                                <div class="section-title">Group By (Dimensions)</div>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-label"><input type="radio" name="groupBy" value="eventType" checked> Event Type</label>
+                                    <label class="checkbox-label"><input type="radio" name="groupBy" value="region"> Region</label>
+                                </div>
+                            </div>
+
+                            <!-- Metrics -->
+                            <div class="builder-section">
+                                <div class="section-title">Metrics</div>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-label"><input type="checkbox" name="metrics" value="totalEvents" checked> Total Events</label>
+                                    <label class="checkbox-label"><input type="checkbox" name="metrics" value="totalScouts"> Total Scouts</label>
+                                    <label class="checkbox-label"><input type="checkbox" name="metrics" value="avgAttendance"> Avg Attendance Rate (%)</label>
+                                </div>
+                            </div>
+
+                            <!-- Filters -->
+                            <div class="builder-section">
+                                <div class="section-title">Filters</div>
+                                <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                    <label>Date Range
+                                        <select name="dateRange">
+                                            <option value="30d">Last 30 Days</option>
+                                            <option value="90d">Last 90 Days</option>
+                                            <option value="1y">Last Year</option>
+                                        </select>
+                                    </label>
+                                    <label>Event Types
+                                        <select name="eventTypes" multiple style="height: 100px;">
+                                            <% eventTypes.forEach(type => { %>
+                                                <option value="<%= type %>"><%= type.replace('_', ' ') %></option>
+                                            <% }) %>
+                                        </select>
+                                    </label>
+                                    <label>Schools
+                                        <select name="schoolIds" multiple style="height: 100px;">
+                                            <% schools.forEach(school => { %>
+                                                <option value="<%= school._id %>"><%= school.name %></option>
+                                            <% }) %>
+                                        </select>
+                                    </label>
+                                    <label>Trainers
+                                        <select name="trainerIds" multiple style="height: 100px;">
+                                            <% trainers.forEach(trainer => { %>
+                                                <option value="<%= trainer._id %>"><%= trainer.name %></option>
+                                            <% }) %>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button type="button" class="btn btn-primary" onclick="previewReport()">Preview Report</button>
+                                <button type="button" class="btn btn-secondary" onclick="saveTemplate()">Save Template</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div id="previewSection" class="content-card preview-section" style="display: none;">
+                    <div class="card-header"><h3>Report Preview</h3></div>
+                    <div class="card-content">
+                        <table class="data-table" id="previewTable">
+                            <thead id="previewHead"></thead>
+                            <tbody id="previewBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Save Template Modal -->
+    <div id="saveTemplateModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Save Template</h3><button onclick="closeModal('saveTemplateModal')" class="close-btn">&times;</button></div>
+            <div class="modal-body">
+                <label>Template Name<input type="text" id="templateName" placeholder="e.g., Monthly Event Summary"></label>
+                <label>Description<textarea id="templateDesc" placeholder="Brief description..."></textarea></label>
+                <label><input type="checkbox" id="templateShared" checked> Share with team</label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('saveTemplateModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmSaveTemplate()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/reports/custom_builder.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<%
+/**
+ * School Engagement Report View
+ * Path: views/reports/school_engagement.ejs
+ */
+%>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Engagement Report - APV</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">School Engagement Report</h1>
+                <div class="user-info"><span>Welcome, <%= user.name %></span></div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Filters -->
+                <div class="content-card">
+                    <div class="card-header"><h3>Filters</h3></div>
+                    <div class="card-content">
+                        <form id="filterForm" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <label>Date Range
+                                <select id="dateRange" name="dateRange">
+                                    <option value="30d">Last 30 Days</option>
+                                    <option value="90d" selected>Last 90 Days</option>
+                                    <option value="1y">Last Year</option>
+                                </select>
+                            </label>
+                            <label>School
+                                <select id="schoolFilter" name="schoolId">
+                                    <option value="">All Schools</option>
+                                    <% schools.forEach(school => { %>
+                                        <option value="<%= school._id %>"><%= school.name %></option>
+                                    <% }) %>
+                                </select>
+                            </label>
+                            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                                <button type="button" class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Export -->
+                <div class="content-card" style="padding: 1rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-primary" onclick="exportReport('csv')">Export CSV</button>
+                        <button class="btn btn-primary" onclick="exportReport('pdf')">Export PDF</button>
+                    </div>
+                </div>
+
+                <!-- Engagement Table -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>School Engagement Summary</h3>
+                        <div id="loading" class="spinner" style="display: none;"></div>
+                    </div>
+                    <div class="card-content">
+                        <table class="data-table" id="engagementTable">
+                            <thead>
+                                <tr>
+                                    <th>School</th>
+                                    <th>Students</th>
+                                    <th>Events Attended</th>
+                                    <th>On-Time Payments</th>
+                                    <th>Avg Feedback</th>
+                                    <th>Engagement Score</th>
+                                    <th>Service Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBody"></tbody>
+                        </table>
+                        <div id="noResults" class="placeholder-text" style="display: none;">No data available.</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/reports/school_engagement.js"></script>
+</body>
+</html>

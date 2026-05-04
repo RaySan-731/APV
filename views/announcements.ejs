@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcements - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Announcements</h1>
+                <div class="user-info">
+                    <span>Welcome, <%= user.name %></span>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Create Announcement</h3>
+                    </div>
+                    <div class="card-content">
+                        <form id="createAnnouncementForm" class="form-grid">
+                            <label style="grid-column: 1 / -1;">
+                                Title
+                                <input type="text" name="title" required placeholder="Announcement title">
+                            </label>
+
+                            <label style="grid-column: 1 / -1;">
+                                Content
+                                <textarea name="content" rows="6" required placeholder="Enter announcement content..."></textarea>
+                            </label>
+
+                            <label>
+                                Target Audience
+                                <select name="targetType" id="targetType" required>
+                                    <option value="">Select target</option>
+                                    <option value="all_trainers">All Trainers</option>
+                                    <option value="all_staff">All Staff</option>
+                                    <option value="specific_roles">Specific Roles</option>
+                                    <option value="specific_zones">Specific Zones</option>
+                                    <option value="specific_schools">Specific Schools</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Priority
+                                <select name="priority">
+                                    <option value="low">Low</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </label>
+
+                            <div id="targetDetails" style="grid-column: 1 / -1; display: none;">
+                                <!-- Dynamically populated based on targetType -->
+                            </div>
+
+                            <div id="composeMessage" class="message" style="display: none; grid-column: 1 / -1;"></div>
+
+                            <div style="grid-column: 1 / -1;">
+                                <button type="submit" class="btn btn-primary">Send Announcement</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <% } %>
+
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3><%= ['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role) ? 'All Announcements' : 'Recent Announcements' %></h3>
+                        <div id="unreadCount" class="badge badge-primary">0 unread</div>
+                    </div>
+                    <div class="card-content">
+                        <div class="announcement-list" id="announcementList">
+                            <div class="placeholder-text">Loading announcements...</div>
+                        </div>
+                    </div>
+                    <div class="card-footer" id="announcementPagination" style="display: none;">
+                        <button class="btn btn-outline" id="loadMoreAnnouncements" onclick="loadMoreAnnouncements()">Load More</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Announcement Detail Modal -->
+    <div id="announcementModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3 id="modalAnnouncementTitle"></h3>
+                <button type="button" class="close-btn" onclick="closeAnnouncementModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="announcementMeta" style="margin-bottom: 1rem; color: var(--muted-foreground);"></div>
+                <div id="announcementContent" style="line-height: 1.6;"></div>
+                <div id="announcementAttachments" style="margin-top: 1rem;"></div>
+                <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+                <div id="announcementMetrics" style="margin-top: 1rem; padding: 1rem; background: var(--muted); border-radius: var(--radius); display: none;">
+                    <h4>Delivery Metrics</h4>
+                    <p><strong>Sent to:</strong> <span id="metricRecipients"></span> recipients</p>
+                    <p><strong>Acknowledged:</strong> <span id="metricAcknowledged"></span></p>
+                </div>
+                <% } %>
+            </div>
+            <div class="modal-footer" id="announcementFooter">
+                <button type="button" class="btn btn-secondary" onclick="closeAnnouncementModal()">Close</button>
+                <button type="button" class="btn btn-primary" id="acknowledgeBtn" onclick="acknowledgeAnnouncement()">Acknowledge</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAnnouncementPage = 1;
+        let currentAnnouncement = null;
+
+        async function loadAnnouncements(page = 1) {
+            currentAnnouncementPage = page;
+            const listEl = document.getElementById('announcementList');
+            listEl.innerHTML = '<div class="placeholder-text">Loading...</div>';
+
+            try {
+                const res = await fetch(`/api/announcements?page=${page}&limit=20`);
+                const data = await res.json();
+
+                if (data.announcements) {
+                    renderAnnouncements(data.announcements);
+                    const unread = data.announcements.filter(a => !isAcknowledged(a)).length;
+                    document.getElementById('unreadCount').textContent = unread + (unread === 1 ? ' unread' : ' unread');
+                }
+            } catch (err) {
+                console.error('Error loading announcements:', err);
+            }
+        }
+
+        function renderAnnouncements(announcements) {
+            const listEl = document.getElementById('announcementList');
+            if (!announcements || announcements.length === 0) {
+                listEl.innerHTML = '<div class="placeholder-text">No announcements found</div>';
+                return;
+            }
+
+            listEl.innerHTML = announcements.map(ann => `
+                <div class="announcement-item ${isAcknowledged(ann) ? 'acknowledged' : ''}" onclick="viewAnnouncement('${ann._id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h4>${ann.title}</h4>
+                            <p style="color: var(--muted-foreground); font-size: 0.875rem;">
+                                By ${ann.createdBy?.name || 'System'} &bull; ${new Date(ann.createdAt).toLocaleDateString()}
+                            </p>
+                        </div>
+                        ${ann.priority === 'urgent' ? '<span class="badge badge-danger">Urgent</span>' : ann.priority === 'high' ? '<span class="badge badge-warning">High</span>' : ''}
+                    </div>
+                    <p style="margin-top: 0.5rem;">${ann.content.substring(0, 150)}${ann.content.length > 150 ? '...' : ''}</p>
+                </div>
+            `).join('');
+        }
+
+        function isAcknowledged(ann) {
+            return ann.acknowledgments?.some(a => a.staffId === '<%= user._id %>');
+        }
+
+        async function viewAnnouncement(id) {
+            try {
+                const res = await fetch(`/api/announcements/${id}`);
+                const data = await res.json();
+
+                if (data.announcement || data.success) {
+                    const ann = data.announcement || data;
+                    currentAnnouncement = ann;
+                    document.getElementById('modalAnnouncementTitle').textContent = ann.title;
+                    document.getElementById('announcementMeta').innerHTML = `
+                        <strong>Posted:</strong> ${new Date(ann.createdAt).toLocaleString()}
+                        ${ann.acknowledgmentDeadline ? ` | <strong>Acknowledge by:</strong> ${new Date(ann.acknowledgmentDeadline).toLocaleDateString()}` : ''}
+                    `;
+                    document.getElementById('announcementContent').innerHTML = ann.content.replace(/\n/g, '<br>');
+
+                    // Show/hide acknowledge button
+                    const ackBtn = document.getElementById('acknowledgeBtn');
+                    if (ann.requiresAcknowledgment && !isAcknowledged(ann)) {
+                        ackBtn.style.display = 'inline-block';
+                    } else {
+                        ackBtn.style.display = 'none';
+                    }
+
+                    openModal('announcementModal');
+                }
+            } catch (err) {
+                console.error('Error loading announcement:', err);
+                alert('Failed to load announcement');
+            }
+        }
+
+        async function acknowledgeAnnouncement() {
+            if (!currentAnnouncement) return;
+
+            try {
+                const res = await fetch(`/api/announcements/${currentAnnouncement._id}/acknowledge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes: '' })
+                });
+
+                if (res.ok) {
+                    closeAnnouncementModal();
+                    loadAnnouncements(1);
+                    alert('Announcement acknowledged');
+                }
+            } catch (err) {
+                console.error('Error acknowledging:', err);
+                alert('Failed to acknowledge');
+            }
+        }
+
+        function closeAnnouncementModal() {
+            closeModal('announcementModal');
+            currentAnnouncement = null;
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        async function submitAnnouncement(e) {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+
+            const data = {
+                title: formData.get('title'),
+                content: formData.get('content'),
+                targetType: formData.get('targetType'),
+                priority: formData.get('priority'),
+                sendEmail: true,
+                sendAsNotification: true,
+                deliveryType: 'immediate'
+            };
+
+            try {
+                const res = await fetch('/api/announcements', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await res.json();
+                if (result.success) {
+                    alert('Announcement sent!');
+                    form.reset();
+                    loadAnnouncements(1);
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Failed to send announcement');
+            }
+        }
+
+        // Dynamic target details
+        document.getElementById('targetType').addEventListener('change', function() {
+            const container = document.getElementById('targetDetails');
+            container.innerHTML = '';
+
+            switch (this.value) {
+                case 'specific_roles':
+                    container.innerHTML = `
+                        <label style="grid-column: 1 / -1;">
+                            Roles
+                            <select name="targetDetails[roles][]" multiple style="width: 100%; min-height: 100px;">
+                                <option value="trainer">Trainer</option>
+                                <option value="senior trainer">Senior Trainer</option>
+                                <option value="supervisor">Supervisor</option>
+                                <option value="admin">Admin</option>
+                                <option value="coordinator">Coordinator</option>
+                                <option value="staff">Staff</option>
+                            </select>
+                        </label>
+                    `;
+                    break;
+                case 'specific_zones':
+                    container.innerHTML = `
+                        <label style="grid-column: 1 / -1;">
+                            Zones (comma separated)
+                            <input type="text" name="targetDetails[zones]" placeholder="Zone 1, Zone 2, ...">
+                        </label>
+                    `;
+                    break;
+                case 'specific_schools':
+                    container.innerHTML = `
+                        <label style="grid-column: 1 / -1;">
+                            Schools
+                            <small>To be implemented - school selector</small>
+                        </label>
+                    `;
+                    break;
+            }
+        });
+
+        document.getElementById('createAnnouncementForm').addEventListener('submit', submitAnnouncement);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAnnouncements(1);
+        });
+    </script>
+</body>
+</html>

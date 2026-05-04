@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Notification Preferences - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Notification Settings</h1>
+                <div class="user-info">
+                    <span>Welcome, <%= user.name %></span>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Notification Preferences</h3>
+                        <p class="muted">Control how and when you receive notifications</p>
+                    </div>
+                    <div class="card-content">
+                        <form id="preferencesForm">
+                            <!-- Global Enable/Disable -->
+                            <div class="form-section">
+                                <h4>Overall</h4>
+                                <label>
+                                    <input type="checkbox" id="notificationsEnabled" name="notificationsEnabled">
+                                    Enable all notifications
+                                </label>
+                            </div>
+
+                            <!-- Channel Preferences -->
+                            <div class="form-section">
+                                <h4>Notification Channels</h4>
+                                <div class="channel-grid">
+                                    <div class="channel-card">
+                                        <h5>In-App Notifications</h5>
+                                        <label>
+                                            <input type="checkbox" id="inAppEnabled" name="inAppEnabled" checked>
+                                            Show notifications in the app
+                                        </label>
+                                        <label>
+                                            <input type="checkbox" id="inAppSound" name="inAppSound" checked>
+                                            Play sound for notifications
+                                        </label>
+                                    </div>
+                                    <div class="channel-card">
+                                        <h5>Email Notifications</h5>
+                                        <label>
+                                            <input type="checkbox" id="emailEnabled" name="emailEnabled">
+                                            Send email notifications
+                                        </label>
+                                        <label>
+                                            <input type="checkbox" id="emailDigest" name="emailDigest">
+                                            Send daily digest instead of immediate
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Type-specific preferences -->
+                            <div class="form-section">
+                                <h4>Notification Types</h4>
+                                <p class="muted" style="margin-bottom: 1rem;">Choose which events trigger notifications and through which channel.</p>
+
+                                <div class="preference-grid">
+                                    <!-- Event Assignments -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Event Assignments</strong>
+                                            <div class="muted">When you are assigned to an event</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="assignment" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="assignment" checked>
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Overdue Items -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Overdue Items</strong>
+                                            <div class="muted">Payments, reports, or tasks that are overdue</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="overdue" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="overdue" checked>
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Upcoming Events -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Upcoming Events</strong>
+                                            <div class="muted">Events starting within 48 hours</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="upcoming_event" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="upcoming_event">
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Payment Received -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Payment Received</strong>
+                                            <div class="muted">When a payment is received</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="payment_received" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="payment_received" checked>
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- New Messages -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>New Messages</strong>
+                                            <div class="muted">When you receive a new internal message</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="new_message" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="new_message">
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Document Approvals -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Document Approvals</strong>
+                                            <div class="muted">When documents are approved or rejected</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="document_approval" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="document_approval" checked>
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Event Reminders -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Event Reminders</strong>
+                                            <div class="muted">General reminders about upcoming events</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="event_reminder" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="event_reminder">
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Report Reminders -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Report Reminders</strong>
+                                            <div class="muted">Reminders to submit after-event reports</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="report_reminder" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="report_reminder">
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Announcements -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Bulk Announcements</strong>
+                                            <div class="muted">Admin-issued broadcast messages</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="announcement" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="announcement" checked>
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- System Notifications -->
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>System Notifications</strong>
+                                            <div class="muted">Maintenance, updates, security alerts</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" class="type-toggle" data-type="system" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                            <label title="Also send email">
+                                                <input type="checkbox" class="email-toggle" data-type="system">
+                                                📧
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Escalation Rules -->
+                            <div class="form-section">
+                                <h4>Escalation Rules</h4>
+                                <p class="muted" style="margin-bottom: 1rem;">Automatically escalate critical issues to higher management.</p>
+
+                                <div class="preference-grid">
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Overdue Payments Escalation</strong>
+                                            <div class="muted">Escalate to supervisors after days overdue</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label>
+                                                <input type="number" name="overduePaymentsAfter" value="3" min="1" max="30" style="width: 60px;">
+                                                days
+                                            </label>
+                                            <label class="switch">
+                                                <input type="checkbox" name="overduePaymentsEnabled" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Missed Reports Escalation</strong>
+                                            <div class="muted">Escalate to admins after days overdue</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label>
+                                                <input type="number" name="missedReportsAfter" value="2" min="1" max="30" style="width: 60px;">
+                                                days
+                                            </label>
+                                            <label class="switch">
+                                                <input type="checkbox" name="missedReportsEnabled" checked>
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quiet Hours -->
+                            <div class="form-section">
+                                <h4>Quiet Hours (Do Not Disturb)</h4>
+                                <div class="preference-grid">
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <strong>Enable Quiet Hours</strong>
+                                            <div class="muted">Suppress non-critical notifications during these hours</div>
+                                        </div>
+                                        <div class="preference-controls">
+                                            <label class="switch">
+                                                <input type="checkbox" id="quietHoursEnabled" name="quietHoursEnabled">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div id="quietHoursFields" style="display: none; grid-column: 1 / -1; gap: 1rem; margin-top: 1rem;">
+                                        <div style="display: flex; gap: 1rem; align-items: center;">
+                                            <label>
+                                                Start
+                                                <input type="time" name="quietStartTime" value="22:00">
+                                            </label>
+                                            <label>
+                                                End
+                                                <input type="time" name="quietEndTime" value="07:00">
+                                            </label>
+                                            <label>
+                                                Timezone
+                                                <select name="timezone">
+                                                    <option value="Africa/Nairobi" selected>East Africa (EAT)</option>
+                                                </select>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Weekly Digest -->
+                            <div class="form-section">
+                                <h4>Weekly Digest</h4>
+                                <p class="muted">Receive a weekly summary of your activity.</p>
+
+                                <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
+                                    <label>
+                                        <input type="checkbox" id="weeklyDigestEnabled" name="weeklyDigestEnabled" checked>
+                                        Enable Weekly Digest
+                                    </label>
+                                    <label>
+                                        Send on
+                                        <select name="weeklyDigestDay" id="weeklyDigestDay">
+                                            <option value="0">Sunday</option>
+                                            <option value="1">Monday</option>
+                                            <option value="2">Tuesday</option>
+                                            <option value="3">Wednesday</option>
+                                            <option value="4">Thursday</option>
+                                            <option value="5">Friday</option>
+                                            <option value="6">Saturday</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="saveMessage" class="message" style="display: none;"></div>
+
+                            <div style="margin-top: 2rem;">
+                                <button type="button" class="btn btn-primary" onclick="savePreferences()">Save Preferences</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let preferences = {};
+
+        async function loadPreferences() {
+            try {
+                const res = await fetch('/api/notification-preferences');
+                const data = await res.json();
+                preferences = data;
+                populateForm(data);
+            } catch (err) {
+                console.error('Error loading preferences:', err);
+            }
+        }
+
+        function populateForm(prefs) {
+            // Global toggle
+            document.getElementById('notificationsEnabled').checked = prefs.notificationsEnabled !== false;
+
+            // Channels
+            const inAppEnabled = prefs.channels?.inApp?.enabled !== false;
+            const inAppSound = prefs.channels?.inApp?.sound !== false;
+            document.getElementById('inAppEnabled').checked = inAppEnabled;
+            document.getElementById('inAppSound').checked = inAppSound;
+
+            const emailEnabled = prefs.channels?.email?.enabled === true;
+            const emailDigest = prefs.channels?.email?.digest === true;
+            document.getElementById('emailEnabled').checked = emailEnabled;
+            document.getElementById('emailDigest').checked = emailDigest;
+
+            // Type-specific toggles
+            if (prefs.types) {
+                Object.keys(prefs.types).forEach(type => {
+                    const typePref = prefs.types[type];
+                    const toggle = document.querySelector(`.type-toggle[data-type="${type}"]`);
+                    const emailToggle = document.querySelector(`.email-toggle[data-type="${type}"]`);
+
+                    if (toggle) toggle.checked = typePref.enabled !== false;
+                    if (emailToggle) emailToggle.checked = typePref.email === true;
+                });
+            }
+
+            // Escalation
+            document.querySelector('[name="overduePaymentsAfter"]').value = prefs.escalation?.overduePayments?.escalateAfterDays || 3;
+            document.querySelector('[name="overduePaymentsEnabled"]').checked = prefs.escalation?.overduePayments?.enabled !== false;
+            document.querySelector('[name="missedReportsAfter"]').value = prefs.escalation?.missedReports?.escalateAfterDays || 2;
+            document.querySelector('[name="missedReportsEnabled"]').checked = prefs.escalation?.missedReports?.enabled !== false;
+
+            // Quiet hours
+            document.getElementById('quietHoursEnabled').checked = prefs.quietHours?.enabled === true;
+            document.getElementById('quietHoursFields').style.display = prefs.quietHours?.enabled ? 'grid' : 'none';
+            if (prefs.quietHours) {
+                document.querySelector('[name="quietStartTime"]').value = prefs.quietHours?.startTime || '22:00';
+                document.querySelector('[name="quietEndTime"]').value = prefs.quietHours?.endTime || '07:00';
+            }
+
+            // Weekly digest
+            document.getElementById('weeklyDigestEnabled').checked = prefs.weeklyDigest?.enabled !== false;
+            document.querySelector('[name="weeklyDigestDay"]').value = prefs.weeklyDigest?.dayOfWeek || 0;
+        }
+
+        async function savePreferences() {
+            const form = document.getElementById('preferencesForm');
+            const formData = new FormData(form);
+
+            const prefs = {
+                notificationsEnabled: document.getElementById('notificationsEnabled').checked,
+                channels: {
+                    inApp: {
+                        enabled: document.getElementById('inAppEnabled').checked,
+                        sound: document.getElementById('inAppSound').checked
+                    },
+                    email: {
+                        enabled: document.getElementById('emailEnabled').checked,
+                        digest: document.getElementById('emailDigest').checked
+                    }
+                },
+                types: {},
+                escalation: {
+                    overduePayments: {
+                        enabled: document.querySelector('[name="overduePaymentsEnabled"]').checked,
+                        escalateAfterDays: parseInt(document.querySelector('[name="overduePaymentsAfter"]').value)
+                    },
+                    missedReports: {
+                        enabled: document.querySelector('[name="missedReportsEnabled"]').checked,
+                        escalateAfterDays: parseInt(document.querySelector('[name="missedReportsAfter"]').value)
+                    }
+                },
+                quietHours: {
+                    enabled: document.getElementById('quietHoursEnabled').checked,
+                    startTime: document.querySelector('[name="quietStartTime"]').value,
+                    endTime: document.querySelector('[name="quietEndTime"]').value
+                },
+                weeklyDigest: {
+                    enabled: document.getElementById('weeklyDigestEnabled').checked,
+                    dayOfWeek: parseInt(document.querySelector('[name="weeklyDigestDay"]').value)
+                }
+            };
+
+            // Build types object from checkboxes
+            document.querySelectorAll('.type-toggle').forEach(el => {
+                const type = el.dataset.type;
+                prefs.types[type] = prefs.types[type] || {};
+                prefs.types[type].enabled = el.checked;
+            });
+            document.querySelectorAll('.email-toggle').forEach(el => {
+                const type = el.dataset.type;
+                prefs.types[type] = prefs.types[type] || {};
+                prefs.types[type].email = el.checked;
+            });
+
+            try {
+                const res = await fetch('/api/notification-preferences', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(prefs)
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showMessage('Preferences saved successfully!', 'success');
+                } else {
+                    showMessage('Error: ' + data.error, 'error');
+                }
+            } catch (err) {
+                console.error('Error saving preferences:', err);
+                showMessage('Failed to save preferences', 'error');
+            }
+        }
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('saveMessage');
+            el.textContent = msg;
+            el.className = 'message ' + (type === 'success' ? 'success' : 'error');
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 3000);
+        }
+
+        // Toggle quiet hours visibility
+        document.getElementById('quietHoursEnabled').addEventListener('change', function() {
+            document.getElementById('quietHoursFields').style.display = this.checked ? 'grid' : 'none';
+        });
+
+        document.addEventListener('DOMContentLoaded', loadPreferences);
+    </script>
+
+    <style>
+        .form-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .form-section h4 {
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+        .channel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .channel-card {
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--muted);
+        }
+        .channel-card h5 {
+            margin: 0 0 0.5rem 0;
+        }
+        .preference-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .preference-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .preference-info strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .preference-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border);
+            transition: .3s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--success);
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+    </style>
+</body>
+</html>

@@ -57,6 +57,16 @@ const SchoolDocument = require('./models/SchoolDocument');
 const ReportTemplate = require('./models/ReportTemplate');
 const ScheduledReport = require('./models/ScheduledReport');
 
+// Communication models
+const Message = require('./models/Message');
+const Notification = require('./models/Notification');
+const NotificationPreference = require('./models/NotificationPreference');
+const Announcement = require('./models/Announcement');
+const EmailLog = require('./models/EmailLog');
+
+// Email service (enhanced)
+const emailService = require('./backend/services/emailService');
+
 // Import controllers
 const analyticsController = require('./backend/controllers/analyticsController');
 const reportsController = require('./backend/controllers/reportsController');
@@ -65,14 +75,18 @@ const exportController = require('./backend/controllers/exportController');
 // Import and start report scheduler
 const reportScheduler = require('./backend/services/reportScheduler');
 
+// Import the new notification scheduler
+const notificationScheduler = require('./backend/services/notificationScheduler');
+
 // MongoDB connection
 if (process.env.MONGODB_URI) {
   // Connect without deprecated options; mongoose v6+ uses sensible defaults
   mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    // Start report scheduler
+    // Start schedulers
     reportScheduler.start();
+    notificationScheduler.start();
   })
   .catch(err => {
     console.error('MongoDB connection error:', err.message);
@@ -134,21 +148,48 @@ const requirePermission = (permission) => {
       next();
     } catch (err) {
       console.error('Permission check error:', err);
-      const isApiRequest = req.xhr || 
-                           req.headers.accept?.includes('application/json') ||
-                           req.headers['content-type']?.includes('application/json') ||
-                           req.path.startsWith('/api/') ||
-                           (req.path.startsWith('/dashboard/') && (
-                             req.method === 'POST' || 
-                             req.headers['content-type']?.includes('application/json')
-                           ));
-      if (isApiRequest) {
-        return res.status(500).json({ success: false, error: 'Internal server error' });
-      }
-      res.status(500).render('404', { user: req.session.user });
+      res.status(500).json({ success: false, error: 'Permission check failed' });
     }
   };
 };
+
+// Helper: Get Staff document from session (converts User session to Staff)
+async function getCurrentStaff(req) {
+  if (!req.session.user) return null;
+  
+  let staff = await Staff.findOne({ email: req.session.user.email.toLowerCase() });
+  
+  // Auto-create Staff profile for admin/founder roles if missing
+  if (!staff && ['admin', 'founder', 'commissioner', 'supervisor', 'training_officer', 'medical', 'coordinator'].includes(req.session.user.role)) {
+    const user = await User.findOne({ email: req.session.user.email.toLowerCase() });
+    if (user) {
+      const staffRole = user.role === 'founder' ? 'admin' : user.role;
+      const isAdminRole = ['admin', 'founder'].includes(user.role);
+      
+      staff = new Staff({
+        name: user.name,
+        email: user.email,
+        role: staffRole,
+        status: 'Active',
+        department: 'Administration',
+        employmentStartDate: new Date(),
+        permissions: isAdminRole ? {
+          canViewFinancials: true,
+          canApproveReports: true,
+          canScheduleEvents: true,
+          canManageStaff: true,
+          canViewAnalytics: true,
+          canManageSchools: true,
+          canSendInvitations: true
+        } : {}
+      });
+      await staff.save();
+      console.log(`[getCurrentStaff] Created Staff profile for ${user.email} (role: ${staff.role})`);
+    }
+  }
+  
+  return staff;
+}
 
 const logAudit = async (action, entityType, entityId, entityName, changes = {}, metadata = {}) => {
   try {
@@ -274,9 +315,44 @@ app.post('/login', async (req, res) => {
       return res.render('login', { error: 'Invalid credentials', user: req.session.user });
     }
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
+     // Update last login
+     user.lastLogin = new Date();
+     await user.save();
+
+      // Ensure Staff record exists for admin/founder roles (for messaging/notifications)
+      if (['admin', 'founder', 'commissioner', 'supervisor', 'training_officer', 'medical', 'coordinator'].includes(user.role)) {
+        let staff = await Staff.findOne({ email: user.email.toLowerCase() });
+        if (!staff) {
+          // Create a Staff profile corresponding to this User with full permissions for admin/founder
+          const staffRole = user.role === 'founder' ? 'admin' : user.role;
+          const isAdminRole = ['admin', 'founder'].includes(user.role);
+          
+          staff = new Staff({
+            name: user.name,
+            email: user.email,
+            role: staffRole,
+            status: 'Active',
+            department: 'Administration',
+            employmentStartDate: new Date(),
+            permissions: isAdminRole ? {
+              canViewFinancials: true,
+              canApproveReports: true,
+              canScheduleEvents: true,
+              canManageStaff: true,
+              canViewAnalytics: true,
+              canManageSchools: true,
+              canSendInvitations: true
+            } : {}
+          });
+          await staff.save();
+          console.log(`[Login] Created Staff profile for ${user.email} (role: ${staff.role})`);
+        } else if (user.role === 'founder' && staff.role !== 'admin') {
+          // Update founder Staff role to admin if needed
+          staff.role = 'admin';
+          await staff.save();
+          console.log(`[Login] Updated founder Staff role to admin: ${user.email}`);
+        }
+      }
 
      req.session.user = {
        id: user._id.toString(),
@@ -560,20 +636,67 @@ app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'
     await staff.save();
     console.log('✓ Staff saved successfully:', staff._id, staff.idNumber, staff.name);
 
-    // Send invitation email
+    // Send invitation email (using centralized email service)
     const invitationUrl = `${req.protocol}://${req.get('host')}/activate/${invitationToken}`;
-    const emailHtml = `
-      <h2>Welcome to APV Staff Portal</h2>
-      <p>Dear ${staff.name},</p>
-      <p>You have been invited to join the APV Staff Portal as a ${staff.role}.</p>
-      <p>Please click the link below to activate your account and set your password:</p>
-      <p><a href="${invitationUrl}">Activate Account</a></p>
-      <p>This invitation will expire in 7 days.</p>
-      <p>If you have any questions, please contact your administrator.</p>
-      <p>Best regards,<br>APV Administration Team</p>
-    `;
+    await emailService.sendEmail({
+      to: staff.email,
+      subject: 'APV Staff Portal Invitation',
+      html: emailHtml,
+      templateId: 'staff_invitation',
+      templateData: { name: staff.name, activationUrl: invitationUrl },
+      triggeredBy: req.session.user.id,
+      entityType: 'staff',
+      entityId: staff._id,
+      triggerReason: 'staff_invitation',
+      priority: 'high'
+    });
 
-    await sendEmail(staff.email, 'APV Staff Portal Invitation', emailHtml);
+    // Get current staff for use in notifications and messages
+    const currentStaff = await getCurrentStaff(req);
+
+    // Send welcome message in inbox
+    const welcomeMessage = new Message({
+      senderId: currentStaff ? currentStaff._id : req.session.user.id, // Fallback to User ID if no Staff record
+      senderName: req.session.user.name,
+      senderRole: req.session.user.role,
+      recipients: [{ staffId: staff._id, status: 'sent' }],
+      subject: 'Welcome to APV Staff Portal',
+      body: `Welcome ${staff.name}! We are excited to have you join our team as a ${staff.role}. Please activate your account using the link sent to your email. If you have any questions, don't hesitate to reach out.`,
+      messageType: 'direct',
+      priority: 'normal'
+    });
+    await welcomeMessage.save();
+
+    // Send notification to current user confirming invitation sent
+    if (currentStaff) {
+      await Notification.create({
+        recipientId: currentStaff._id,
+        type: 'system',
+        title: 'Staff Invitation Sent',
+        message: `Invitation sent to ${staff.name} (${staff.email})`,
+        entityType: 'staff',
+        entityId: staff._id,
+        priority: 'normal',
+        channels: ['in-app']
+      });
+    }
+
+    // Notify all admins about new staff member
+    const admins = await Staff.find({ role: { $in: ['admin', 'supervisor', 'founder'] } });
+    for (const admin of admins) {
+      if (admin._id.toString() !== currentStaff?._id.toString()) {
+        await Notification.create({
+          recipientId: admin._id,
+          type: 'system',
+          title: 'New Staff Member Added',
+          message: `${staff.name} has been added as a ${staff.role}`,
+          actionUrl: '/dashboard/staff',
+          entityType: 'staff',
+          entityId: staff._id,
+          priority: 'normal'
+        });
+      }
+    }
 
     // Log audit
     await logAudit('staff_created', 'staff', staff._id, staff.name, {
@@ -919,18 +1042,20 @@ app.post('/forgot-password', async (req, res) => {
     staff.passwordResetExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
     await staff.save();
 
-    // Send reset email
+    // Send reset email using centralized service
     const resetUrl = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
-    const emailHtml = `
-      <h2>Password Reset Request</h2>
-      <p>You requested a password reset for your APV Staff account.</p>
-      <p>Click the link below to reset your password:</p>
-      <p><a href="${resetUrl}">Reset Password</a></p>
-      <p>This link will expire in 1 hour.</p>
-      <p>If you didn't request this, please ignore this email.</p>
-    `;
-
-    await sendEmail(staff.email, 'APV Password Reset', emailHtml);
+    await emailService.sendEmail({
+      to: staff.email,
+      subject: 'APV Password Reset',
+      html: emailHtml,
+      templateId: 'password_reset',
+      templateData: { name: staff.name, resetUrl: resetUrl },
+      triggeredBy: null, // System-generated
+      entityType: 'staff',
+      entityId: staff._id,
+      triggerReason: 'password_reset_request',
+      priority: 'high'
+    });
 
     res.json({ success: true, message: 'If an account exists, a reset link has been sent.' });
   } catch (err) {
@@ -1062,6 +1187,17 @@ app.post('/api/leave/approve', requireAuth, requirePermission('canEditStaff'), a
     staff.leaveHistory[leaveIndex].approvedDate = new Date();
 
     await staff.save();
+
+    // Notify staff member about leave decision
+    await Notification.create({
+      recipientId: staffId,
+      type: action === 'approved' ? 'system' : 'approval_required',
+      title: `Leave Request ${action === 'approved' ? 'Approved' : 'Rejected'}`,
+      message: `Your leave request from ${new Date(staff.leaveHistory[leaveIndex].startDate).toLocaleDateString()} to ${new Date(staff.leaveHistory[leaveIndex].endDate).toLocaleDateString()} has been ${action}. ${notes ? 'Notes: ' + notes : ''}`,
+      entityType: 'staff',
+      entityId: staffId,
+      priority: action === 'approved' ? 'normal' : 'high'
+    });
 
     // Log audit
     await logAudit(action === 'approved' ? 'leave_approved' : 'leave_rejected', 'staff', staffId, staff.name, {
@@ -2069,6 +2205,64 @@ app.post('/api/payments', requireAuth, requirePermission('canViewFinancials'), a
     });
 
     await payment.save();
+
+    // Send payment received notification to relevant users (school contact, admins)
+    try {
+      const school = await School.findById(schoolId);
+      const event = eventBooked ? await Event.findById(eventBooked) : null;
+
+      // Get current staff for notifications
+      const currentStaff = await getCurrentStaff(req);
+
+      // Notify school contact
+      if (school?.contactPerson?.email) {
+        await emailService.sendEmail({
+          to: school.contactPerson.email,
+          subject: 'Payment Confirmation',
+          html: `
+            <h2>Payment Received</h2>
+            <p>Dear ${school.contactPerson.name || 'School Representative'},</p>
+            <p>We have received your payment:</p>
+            <ul>
+              <li><strong>Amount:</strong> KES ${amount.toLocaleString()}</li>
+              <li><strong>Invoice:</strong> ${invoiceNumber || 'N/A'}</li>
+              <li><strong>Date:</strong> ${new Date(paymentDate).toLocaleDateString()}</li>
+              ${programBooked ? `<li><strong>Program:</strong> ${programBooked}</li>` : ''}
+              ${event ? `<li><strong>Event:</strong> ${event.name}</li>` : ''}
+            </ul>
+            <p>Thank you for your payment.</p>
+          `,
+          templateId: 'payment_received',
+          templateData: {
+            recipientName: school.contactPerson.name,
+            amount: amount,
+            reference: reference || invoiceNumber,
+            description: programBooked || event?.name || 'Payment'
+          },
+          entityType: 'payment',
+          entityId: payment._id,
+          triggerReason: 'payment_received',
+          priority: 'normal'
+        });
+      }
+
+      // Also send notification to the user who recorded the payment (confirmation)
+      if (currentStaff) {
+        await Notification.create({
+          recipientId: currentStaff._id,
+          type: 'payment_received',
+          title: 'Payment Recorded',
+          message: `Payment of KES ${amount.toLocaleString()} recorded for ${school?.name || 'school'}`,
+          entityType: 'payment',
+          entityId: payment._id,
+          priority: 'normal'
+        });
+      }
+
+    } catch (notifErr) {
+      console.error('Notification error for payment:', notifErr);
+    }
+
     res.json({ success: true, payment });
   } catch (err) {
     console.error('Error saving payment:', err);
@@ -2375,11 +2569,47 @@ app.get('/dashboard/reports/builder', requireAuth, async (req, res) => {
     const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } }).select('name _id').sort({ name: 1 }).lean();
     const events = await Event.distinct('eventType');
     return res.render('reports/custom_builder', { user: req.session.user, schools, trainers, eventTypes: events, page: 'reports-builder' });
+   } catch (err) {
+     console.error('Custom report builder error:', err);
+     res.status(500).render('404', { user: req.session.user });
+   }
+ });
+
+// ============ COMMUNICATION PAGE ROUTES ============
+// These must be defined BEFORE the catch-all /dashboard/:page route
+
+app.get('/dashboard/messages', requireAuth, async (req, res) => {
+  try {
+    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
+      .select('_id name email role')
+      .sort({ name: 1 })
+      .lean();
+    res.render('messages', { user: req.session.user, page: 'messages', staffList });
   } catch (err) {
-    console.error('Custom report builder error:', err);
+    console.error('Messages page error:', err);
     res.status(500).render('404', { user: req.session.user });
   }
 });
+
+app.get('/dashboard/announcements', requireAuth, async (req, res) => {
+  try {
+    res.render('announcements', { user: req.session.user, page: 'announcements' });
+  } catch (err) {
+    console.error('Announcements page error:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
+app.get('/dashboard/settings', requireAuth, async (req, res) => {
+  try {
+    res.render('settings', { user: req.session.user, page: 'settings' });
+  } catch (err) {
+    console.error('Settings page error:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
+
+// ============ END COMMUNICATION PAGE ROUTES ============
 
 app.get('/dashboard/:page', requireAuth, async (req, res) => {
   try {
@@ -2427,12 +2657,20 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
       return res.render('reports/custom_builder', { user: req.session.user, schools, trainers, eventTypes: events, page });
     }
 
-    // Existing allowed pages for standard dashboard
-    const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health', 'audit-logs', 'permissions'];
+     // Existing allowed pages for standard dashboard
+     const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health', 'audit-logs', 'permissions', 'messages', 'announcements'];
 
-    if (!allowedPages.includes(page)) {
-      return res.status(404).render('404', { user: req.session.user });
-    }
+     if (!allowedPages.includes(page)) {
+       return res.status(404).render('404', { user: req.session.user });
+     }
+
+     // Handle special pages with dedicated handlers
+     if (page === 'messages') {
+       return res.render('messages', { user: req.session.user, page: 'messages' });
+     }
+     if (page === 'announcements') {
+       return res.render('announcements', { user: req.session.user, page: 'announcements' });
+     }
 
     // ... rest of existing code stays the same (modelData and rendering dashboard for those pages)
 
@@ -3345,7 +3583,7 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
 
     await event.save();
 
-    // Notify trainer
+    // Notify trainer via email and in-app notification
     try {
       const trainer = await Staff.findById(trainerId);
       if (trainer && trainer.email) {
@@ -3361,7 +3599,40 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
           </ul>
           <p>Please confirm your availability in your trainer dashboard.</p>
         `;
-        await sendEmail(trainer.email, 'Event Assignment Notification', emailHtml);
+
+        const eventUrl = `${req.protocol}://${req.get('host')}/dashboard/events/${eventId}`;
+        await emailService.sendEmail({
+          to: trainer.email,
+          subject: 'Event Assignment Notification',
+          html: emailHtml,
+          templateId: 'event_assignment',
+          templateData: {
+            trainerName: trainer.name,
+            eventName: event.name,
+            eventDate: `${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}`,
+            location: event.location?.name,
+            role: role || 'assistant_trainer',
+            eventUrl: eventUrl
+          },
+          triggeredBy: req.session.user.id,
+          entityType: 'event',
+          entityId: eventId,
+          triggerReason: 'trainer_assigned',
+          priority: 'normal'
+        });
+
+        // Send in-app notification
+        await Notification.create({
+          recipientId: trainerId,
+          type: 'assignment',
+          title: 'New Event Assignment',
+          message: `You have been assigned to "${event.name}"`,
+          actionUrl: `/dashboard/events/${eventId}`,
+          entityType: 'event',
+          entityId: eventId,
+          priority: 'normal',
+          metadata: { relatedNames: [event.name] }
+        });
       }
     } catch (emailErr) {
       console.error('Error sending assignment email:', emailErr);
@@ -3440,7 +3711,7 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
 
     await event.save();
 
-    // Send invitation email to school
+    // Send invitation email to school using centralized service
     try {
       const school = await School.findById(schoolId);
       if (school && school.contactPerson?.email) {
@@ -3448,24 +3719,44 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
         const host = req.get('host');
         const rsvpLink = `${protocol}://${host}/events/${eventId}/rsvp?school=${schoolId}&token=${encodeURIComponent(btoa(schoolId + ':' + eventId))}`;
 
-         const emailHtml = `
-           <h2>Invitation to ${event.name}</h2>
-           <p>Dear ${school.contactPerson.name || 'School Representative'},</p>
-           <p>You are invited to participate in:</p>
-           <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-             <h3>${event.name}</h3>
-             <p><strong>Type:</strong> ${event.eventType.replace('_', ' ')}</p>
-             <p><strong>Date:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</p>
-             <p><strong>Location:</strong> ${event.location?.name}, ${event.location?.city}</p>
-             ${event.agenda ? `<p><strong>Agenda:</strong> ${event.agenda}</p>` : ''}
-           </div>
-           <p>Please confirm your participation by clicking the link below:</p>
-           <p><a href="${rsvpLink}" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;">RSVP Now</a></p>
-           ${customMessage ? `<p>${customMessage}</p>` : ''}
-           <p>RSVP Deadline: ${rsvpDeadline ? new Date(rsvpDeadline).toLocaleDateString() : (event.defaultInvitationDeadline ? new Date(event.defaultInvitationDeadline).toLocaleDateString() : 'TBD')}</p>
-         `;
+        const emailHtml = `
+          <h2>Invitation to ${event.name}</h2>
+          <p>Dear ${school.contactPerson.name || 'School Representative'},</p>
+          <p>You are invited to participate in:</p>
+          <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+            <h3>${event.name}</h3>
+            <p><strong>Type:</strong> ${event.eventType.replace('_', ' ')}</p>
+            <p><strong>Date:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</p>
+            <p><strong>Location:</strong> ${event.location?.name}, ${event.location?.city}</p>
+            ${event.agenda ? `<p><strong>Agenda:</strong> ${event.agenda}</p>` : ''}
+          </div>
+          <p>Please confirm your participation by clicking the link below:</p>
+          <p><a href="${rsvpLink}" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;">RSVP Now</a></p>
+          ${customMessage ? `<p>${customMessage}</p>` : ''}
+          <p>RSVP Deadline: ${rsvpDeadline ? new Date(rsvpDeadline).toLocaleDateString() : (event.defaultInvitationDeadline ? new Date(event.defaultInvitationDeadline).toLocaleDateString() : 'TBD')}</p>
+        `;
 
-        await sendEmail(school.contactPerson.email, `Invitation: ${event.name}`, emailHtml);
+        await emailService.sendEmail({
+          to: school.contactPerson.email,
+          subject: `Invitation: ${event.name}`,
+          html: emailHtml,
+          templateId: 'event_invitation',
+          templateData: {
+            contactName: school.contactPerson.name,
+            schoolName: school.name,
+            eventName: event.name,
+            eventDate: `${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}`,
+            location: `${event.location?.name}, ${event.location?.city}`,
+            rsvpUrl: rsvpLink,
+            rsvpDeadline: rsvpDeadline ? new Date(rsvpDeadline).toLocaleDateString() : undefined,
+            customMessage: customMessage
+          },
+          triggeredBy: req.session.user.id,
+          entityType: 'event',
+          entityId: eventId,
+          triggerReason: 'school_invited',
+          priority: 'normal'
+        });
       }
     } catch (emailErr) {
       console.error('Error sending invitation email:', emailErr);
@@ -3535,7 +3826,38 @@ app.post('/api/events/rsvp', async (req, res) => {
           <p>${confirmationMsg}</p>
         `;
 
-        await sendEmail(school.contactPerson.email, 'RSVP Confirmation', emailHtml);
+        await emailService.sendEmail({
+          to: school.contactPerson.email,
+          subject: 'RSVP Confirmation',
+          html: emailHtml,
+          templateId: 'rsvp_confirmation',
+          templateData: {
+            contactName: school.contactPerson.name,
+            eventName: event.name,
+            rsvpStatus: status,
+            eventDate: `${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}`,
+            location: event.location?.name
+          },
+          triggeredBy: req.session.user.id,
+          entityType: 'event',
+          entityId: eventId,
+          triggerReason: 'rsvp_submitted',
+          priority: 'normal'
+        });
+
+        // Notify event creator about RSVP update (if not the same user)
+        if (event.createdBy && event.createdBy.toString() !== req.session.user.id.toString()) {
+          await Notification.create({
+            recipientId: event.createdBy,
+            type: 'event_reminder',
+            title: 'RSVP Update',
+            message: `${school.name} has ${status} the invitation to ${event.name}`,
+            actionUrl: '/dashboard/events/' + eventId,
+            entityType: 'event',
+            entityId: eventId,
+            priority: 'normal'
+          });
+        }
       }
     } catch (emailErr) {
       console.error('Error sending RSVP confirmation:', emailErr);
@@ -3630,7 +3952,9 @@ app.post('/api/events/:id/submit-report', requireAuth, async (req, res) => {
 
     // Notify admins of report submission
     try {
-      const admins = await Staff.find({ role: { $in: ['admin', 'supervisor', 'coordinator'] } }).select('email name').lean();
+      const admins = await Staff.find({ role: { $in: ['admin', 'supervisor', 'coordinator'] } }).select('email name _id').lean();
+      const eventUrl = `${req.protocol}://${req.get('host')}/dashboard/events/${eventId}/review`;
+
       for (const admin of admins) {
         if (admin.email) {
           const emailHtml = `
@@ -3641,7 +3965,36 @@ app.post('/api/events/:id/submit-report', requireAuth, async (req, res) => {
                <strong>Dates:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</p>
             <p>Please review the report in the admin dashboard.</p>
           `;
-          await sendEmail(admin.email, 'Event Report Ready for Review', emailHtml);
+
+          await emailService.sendEmail({
+            to: admin.email,
+            subject: 'Event Report Ready for Review',
+            html: emailHtml,
+            templateId: 'report_submitted',
+            templateData: {
+              eventName: event.name,
+              trainerName: req.session.user.name,
+              reviewUrl: eventUrl
+            },
+            triggeredBy: req.session.user.id,
+            entityType: 'event',
+            entityId: eventId,
+            triggerReason: 'report_submitted',
+            priority: 'high'
+          });
+
+          // Send in-app notification
+          await Notification.create({
+            recipientId: admin._id,
+            type: 'approval_required',
+            title: 'Report Ready for Review',
+            message: `A report for "${event.name}" has been submitted and requires your review`,
+            actionUrl: '/dashboard/events/' + eventId + '/review',
+            entityType: 'event',
+            entityId: eventId,
+            priority: 'high',
+            metadata: { relatedNames: [event.name, req.session.user.name] }
+          });
         }
       }
     } catch (emailErr) {
@@ -3703,22 +4056,56 @@ app.post('/api/events/:id/review', requireAuth, requirePermission('canApproveRep
     event.lastModifiedBy = userId;
     await event.save();
 
-    // Notify trainer
+    // Notify trainer of review decision
     try {
       const trainerIds = event.trainers.map(t => t.trainerId);
-      const trainers = await Staff.find({ _id: { $in: trainerIds } }).select('email name').lean();
+      const trainers = await Staff.find({ _id: { $in: trainerIds } }).select('email name _id').lean();
+      const eventUrl = `${req.protocol}://${req.get('host')}/dashboard/events/${eventId}`;
+
       for (const trainer of trainers) {
         if (trainer.email) {
           const message = action === 'approve'
             ? 'Your event report has been approved and the event is now closed.'
             : 'Your event report requires revisions. Please update and resubmit.';
+
           const emailHtml = `
             <h2>Event Review Update</h2>
             <p>Hello ${trainer.name},</p>
             <p>Regarding event <strong>${event.name}</strong>: ${message}</p>
             ${reviewNotes ? `<p><strong>Reviewer notes:</strong> ${reviewNotes}</p>` : ''}
           `;
-          await sendEmail(trainer.email, 'Event Review Update', emailHtml);
+
+          await emailService.sendEmail({
+            to: trainer.email,
+            subject: 'Event Review Update',
+            html: emailHtml,
+            templateId: 'report_reviewed',
+            templateData: {
+              trainerName: trainer.name,
+              eventName: event.name,
+              reviewStatus: action === 'approve' ? 'approved' : 'needs revision',
+              reviewNotes: reviewNotes,
+              eventUrl: eventUrl
+            },
+            triggeredBy: req.session.user.id,
+            entityType: 'event',
+            entityId: eventId,
+            triggerReason: 'report_' + action,
+            priority: action === 'approve' ? 'normal' : 'high'
+          });
+
+          // Send in-app notification
+          await Notification.create({
+            recipientId: trainer._id,
+            type: action === 'approve' ? 'system' : 'approval_required',
+            title: 'Event Report Reviewed',
+            message: `Your report for "${event.name}" has been ${action === 'approve' ? 'approved' : 'marked as needs revision'}`,
+            actionUrl: '/dashboard/events/' + eventId,
+            entityType: 'event',
+            entityId: eventId,
+            priority: action === 'approve' ? 'normal' : 'high',
+            metadata: { reviewNotes: reviewNotes ? [reviewNotes.substring(0, 100)] : [] }
+          });
         }
       }
     } catch (emailErr) {
@@ -4003,6 +4390,752 @@ app.get('/api/reports/templates', requireAuth, requirePermission('canGenerateRep
 app.get('/api/reports/scheduled', requireAuth, requirePermission('canGenerateReports'), exportController.getScheduledReports);
 app.post('/api/reports/scheduled', requireAuth, requirePermission('canGenerateReports'), exportController.createScheduledReport);
 
+// ============ COMMUNICATION API ROUTES ============
+
+// ============ COMMUNICATION ROUTES ============
+
+// --- Messaging Routes ---
+
+// Send direct message to staff
+app.post('/api/messages/send', requireAuth, async (req, res) => {
+  try {
+    const { recipientIds, subject, body, parentMessageId, priority = 'normal', labels, messageType } = req.body;
+    if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'At least one recipient is required' });
+    }
+    if (!body) {
+      return res.status(400).json({ success: false, error: 'Message body is required' });
+    }
+
+     // Get sender's Staff record (auto-creates for admin/founder if missing)
+     const sender = await getCurrentStaff(req);
+     if (!sender) {
+       return res.status(404).json({ success: false, error: 'Sender staff profile not found. Please contact admin.' });
+     }
+
+     const msgType = messageType || (recipientIds.length > 1 ? 'group' : 'direct');
+
+    const message = new Message({
+      senderId: sender._id,
+      senderName: sender.name,
+      senderRole: sender.role,
+      recipients: recipientIds.map(rid => ({
+        staffId: rid,
+        status: 'sent'
+      })),
+      subject,
+      body,
+      parentMessageId,
+      messageType: msgType,
+      priority,
+      labels
+    });
+
+    await message.save();
+
+    // Create in-app notifications for recipients
+    for (const recipientId of recipientIds) {
+      await Notification.create({
+        recipientId,
+        type: 'new_message',
+        title: subject || 'New Message',
+        message: body.substring(0, 100) + (body.length > 100 ? '...' : ''),
+        actionUrl: '/messages?thread=' + message._id,
+        entityType: 'message',
+        entityId: message._id,
+        priority: priority === 'urgent' ? 'high' : 'normal'
+      });
+    }
+
+    res.json({ success: true, messageId: message._id, message });
+  } catch (err) {
+    console.error('Error sending message:', err);
+    res.status(500).json({ success: false, error: 'Failed to send message' });
+  }
+});
+
+// Get messages for current user (inbox/sent)
+app.get('/api/messages', requireAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, folder = 'inbox' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get current user's Staff ID (auto-creates for admin/founder if missing)
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    let query;
+    if (folder === 'inbox') {
+      query = {
+        'recipients.staffId': staffId,
+        'recipients.deleted': { $ne: true }
+      };
+    } else if (folder === 'sent') {
+      query = { senderId: staffId };
+    } else if (folder === 'important') {
+      query = {
+        $or: [
+          { senderId: staffId, isImportant: true },
+          { 'recipients.staffId': staffId, 'recipients.deleted': { $ne: true }, isImportant: true }
+        ]
+      };
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid folder' });
+    }
+
+    const messages = await Message.find(query)
+      .sort({ sentAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('senderId', 'name email role')
+      .populate('recipients.staffId', 'name email')
+      .lean();
+
+    const unreadCount = await Message.countDocuments({
+      'recipients.staffId': staffId,
+      'recipients.status': 'sent',
+      'recipients.deleted': { $ne: true }
+    });
+
+    res.json({ messages, unreadCount, page: parseInt(page) });
+  } catch (err) {
+    console.error('Error fetching messages:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch messages' });
+  }
+});
+
+// Get single message
+app.get('/api/messages/:messageId', requireAuth, async (req, res) => {
+  try {
+    // Get current user's Staff ID
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    const message = await Message.findOne({
+      _id: req.params.messageId,
+      $or: [
+        { senderId: staffId },
+        { 'recipients.staffId': staffId }
+      ]
+    }).populate('senderId', 'name email role')
+      .populate('recipients.staffId', 'name email role');
+
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+
+    // Mark as read for current user if they are a recipient
+    if (message.senderId.toString() !== staffId.toString()) {
+      const recipient = message.recipients.find(r => r.staffId.toString() === staffId.toString());
+      if (recipient && recipient.status !== 'read') {
+        recipient.status = 'read';
+        recipient.readAt = new Date();
+        await message.save();
+      }
+    }
+
+    res.json({ message });
+  } catch (err) {
+    console.error('Error fetching message:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch message' });
+  }
+});
+
+// Mark message as read
+app.post('/api/messages/:messageId/read', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    await Message.findOneAndUpdate(
+      { _id: req.params.messageId, 'recipients.staffId': staffId },
+      { $set: { 'recipients.$.status': 'read', 'recipients.$.readAt': new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking message as read:', err);
+    res.status(500).json({ success: false, error: 'Failed to mark message as read' });
+  }
+});
+
+// Mark message as deleted (soft delete for recipient)
+app.post('/api/messages/:messageId/delete', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    await Message.findOneAndUpdate(
+      { _id: req.params.messageId, 'recipients.staffId': staffId },
+      { $set: { 'recipients.$.deleted': true, 'recipients.$.deletedAt': new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting message:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete message' });
+  }
+});
+
+// Search messages
+app.get('/api/messages/search', requireAuth, async (req, res) => {
+  try {
+    const { q, limit = 20 } = req.query;
+    if (!q) {
+      return res.status(400).json({ success: false, error: 'Search query required' });
+    }
+
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    // Search in messages where user is sender or recipient
+    const messages = await Message.find({
+      $or: [
+        { senderId: staffId, $text: { $search: q } },
+        { 'recipients.staffId': staffId, $text: { $search: q } }
+      ],
+      'recipients.deleted': { $ne: true }
+    })
+      .sort({ score: { $meta: 'textScore' }, sentAt: -1 })
+      .limit(parseInt(limit))
+      .populate('senderId', 'name email role')
+      .lean();
+
+    res.json({ messages });
+  } catch (err) {
+    console.error('Error searching messages:', err);
+    res.status(500).json({ success: false, error: 'Search failed' });
+  }
+});
+
+// Get unread message count
+app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    const count = await Message.countDocuments({
+      'recipients.staffId': staffId,
+      'recipients.status': 'sent',
+      'recipients.deleted': { $ne: true }
+    });
+    res.json({ unreadCount: count });
+  } catch (err) {
+    console.error('Error getting unread count:', err);
+    res.status(500).json({ success: false, error: 'Failed to get unread count' });
+  }
+});
+
+// --- Notification Routes ---
+
+// Get user notifications
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, unreadOnly = false } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get current user's Staff ID
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    const query = { recipientId: staffId };
+    if (unreadOnly === 'true') {
+      query.isRead = false;
+    }
+
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const unreadCount = await Notification.countDocuments({
+      recipientId: staffId,
+      isRead: false,
+      dismissed: false
+    });
+
+    res.json({ notifications, unreadCount, page: parseInt(page) });
+  } catch (err) {
+    console.error('Error fetching notifications:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
+  }
+});
+
+// Mark notification as read
+app.post('/api/notifications/:notificationId/read', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    await Notification.findOneAndUpdate(
+      { _id: req.params.notificationId, recipientId: staffId },
+      { $set: { isRead: true, readAt: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking notification as read:', err);
+    res.status(500).json({ success: false, error: 'Failed to mark notification as read' });
+  }
+});
+
+// Mark all notifications as read
+app.post('/api/notifications/read-all', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    await Notification.updateMany(
+      { recipientId: staffId, isRead: false },
+      { $set: { isRead: true, readAt: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking all as read:', err);
+    res.status(500).json({ success: false, error: 'Failed to mark all as read' });
+  }
+});
+
+// Dismiss notification (soft delete)
+app.post('/api/notifications/:notificationId/dismiss', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    await Notification.findOneAndUpdate(
+      { _id: req.params.notificationId, recipientId: staffId },
+      { $set: { dismissed: true, dismissedAt: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error dismissing notification:', err);
+    res.status(500).json({ success: false, error: 'Failed to dismiss notification' });
+  }
+});
+
+// Get notification preferences
+app.get('/api/notification-preferences', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      // Return defaults if no staff record
+      const defaultPrefs = new NotificationPreference({
+        staffId: req.session.user.id, // fallback
+        notificationsEnabled: true
+      });
+      return res.json(defaultPrefs);
+    }
+    const staffId = currentStaff._id;
+
+    let prefs = await NotificationPreference.findOne({ staffId });
+
+    if (!prefs) {
+      // Create default preferences
+      prefs = new NotificationPreference({ staffId });
+      await prefs.save();
+    }
+
+    res.json(prefs);
+  } catch (err) {
+    console.error('Error fetching preferences:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch preferences' });
+  }
+});
+
+// Update notification preferences
+app.post('/api/notification-preferences', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    const prefs = await NotificationPreference.findOneAndUpdate(
+      { staffId },
+      req.body,
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, prefs });
+  } catch (err) {
+    console.error('Error updating preferences:', err);
+    res.status(500).json({ success: false, error: 'Failed to update preferences' });
+  }
+});
+
+// Get all active staff (for messaging)
+app.get('/api/staff/all', requireAuth, async (req, res) => {
+  try {
+    const staff = await Staff.find({ status: { $ne: 'Inactive' } })
+      .select('_id name email role')
+      .sort({ name: 1 })
+      .lean();
+    res.json(staff);
+  } catch (err) {
+    console.error('Error fetching staff list:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch staff' });
+  }
+});
+
+// --- Announcement Routes ---
+
+// Create announcement (admin only)
+app.post('/api/announcements', requireAuth, async (req, res) => {
+  try {
+    // Check permission - only admins/supervisors can create announcements
+    if (!['admin', 'founder', 'commissioner', 'supervisor'].includes(req.session.user.role)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    }
+
+    // Get current staff record (auto-creates for admin/founder if missing)
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(403).json({ success: false, error: 'Staff profile not found. Cannot create announcement.' });
+    }
+
+    const {
+      title,
+      content,
+      format = 'plain',
+      attachments,
+      targetType,
+      targetDetails,
+      deliveryType = 'immediate',
+      scheduledAt,
+      recurrence,
+      priority = 'normal',
+      requiresAcknowledgment = false,
+      acknowledgmentDeadline,
+      sendAsNotification = true,
+      sendEmail = true,
+      emailSubject,
+      emailTemplate = 'default'
+    } = req.body;
+
+    if (!title || !content || !targetType) {
+      return res.status(400).json({ success: false, error: 'Title, content, and targetType are required' });
+    }
+
+    const announcement = new Announcement({
+      createdBy: currentStaff._id,
+      createdByRole: req.session.user.role,
+      title,
+      content,
+      format,
+      attachments,
+      targetType,
+      targetDetails: targetDetails || {},
+      deliveryType,
+      scheduledAt,
+      recurrence,
+      priority,
+      requiresAcknowledgment,
+      acknowledgmentDeadline,
+      sendAsNotification,
+      sendEmail,
+      emailSubject: emailSubject || title,
+      emailTemplate,
+      status: deliveryType === 'scheduled' && scheduledAt ? 'scheduled' : 'draft'
+    });
+
+    await announcement.save();
+
+    // Immediate delivery - send email and create notifications
+    if (deliveryType === 'immediate') {
+      await deliverAnnouncement(announcement);
+    }
+
+    res.json({ success: true, announcementId: announcement._id, announcement });
+  } catch (err) {
+    console.error('Error creating announcement:', err);
+    res.status(500).json({ success: false, error: 'Failed to create announcement' });
+  }
+});
+
+// Get announcements (visible to current user based on targeting)
+app.get('/api/announcements', requireAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status = 'sent' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const userId = req.session.user.id;
+    const userRole = req.session.user.role;
+
+    // Get user's staff record for targeting (zone, school, etc.)
+    const currentStaff = await Staff.findById(userId).select('zones assignedSchools role');
+    const userZones = currentStaff?.zones || [];
+    const userSchoolIds = currentStaff?.assignedSchools?.map(a => a.schoolId.toString()) || [];
+
+    // Build query for announcements visible to this user
+    let query = { status: 'sent' };
+
+    // Admins see everything; others see only targeted to them
+    if (!['admin', 'founder', 'commissioner', 'supervisor'].includes(userRole)) {
+      const targetingMatch = {
+        $or: [
+          { targetType: 'all_trainers', targetDetails: { roles: userRole === 'trainer' ? ['trainer'] : [] } },
+          { targetType: 'all_staff' },
+          { targetType: 'specific_roles', targetDetails: { roles: { $in: [userRole] } } }
+        ]
+      };
+
+      // Add zone targeting
+      if (userZones.length > 0) {
+        targetingMatch.$or.push({
+          targetType: 'specific_zones',
+          'targetDetails.zones': { $in: userZones }
+        });
+      }
+
+      // Add school targeting
+      if (userSchoolIds.length > 0) {
+        targetingMatch.$or.push({
+          targetType: 'specific_schools',
+          'targetDetails.ids': { $in: userSchoolIds }
+        });
+      }
+
+      query.$or = targetingMatch.$or;
+    }
+
+    const announcements = await Announcement.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('createdBy', 'name email role')
+      .lean();
+
+    const total = await Announcement.countDocuments(query);
+
+    res.json({
+      announcements,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit))
+    });
+  } catch (err) {
+    console.error('Error fetching announcements:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch announcements' });
+  }
+});
+
+// Acknowledge announcement
+app.post('/api/announcements/:announcementId/acknowledge', requireAuth, async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.announcementId);
+    if (!announcement) {
+      return res.status(404).json({ success: false, error: 'Announcement not found' });
+    }
+
+    // Check if user is targeted by this announcement (optional: enforce)
+    // For now, allow any logged-in user to acknowledge
+
+    // Prevent duplicate acknowledgment
+    const alreadyAcknowledged = announcement.acknowledgments?.some(
+      a => a.staffId.toString() === req.session.user.id
+    );
+
+    if (!alreadyAcknowledged) {
+      announcement.acknowledgments = announcement.acknowledgments || [];
+      announcement.acknowledgments.push({
+        staffId: req.session.user.id,
+        acknowledgedAt: new Date(),
+        notes: req.body.notes || ''
+      });
+
+      announcement.metrics = announcement.metrics || {};
+      announcement.metrics.acknowledgedCount = (announcement.metrics.acknowledgedCount || 0) + 1;
+
+      await announcement.save();
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error acknowledging announcement:', err);
+    res.status(500).json({ success: false, error: 'Failed to acknowledge announcement' });
+  }
+});
+
+// Bulk send announcement (for future scheduled delivery)
+async function deliverAnnouncement(announcement) {
+  try {
+    const { targetType, targetDetails, sendEmail, emailSubject, emailTemplate } = announcement;
+
+    // Resolve all recipients based on targetType
+    let recipients = [];
+    switch (targetType) {
+      case 'all_trainers':
+        recipients = await Staff.find({ role: 'trainer' }).select('email name _id').lean();
+        break;
+      case 'all_staff':
+        recipients = await Staff.find({}).select('email name _id').lean();
+        break;
+      case 'specific_zones':
+        recipients = await Staff.find({ zones: { $in: targetDetails.zones || [] } }).select('email name _id').lean();
+        break;
+      case 'specific_roles':
+        recipients = await Staff.find({ role: { $in: targetDetails.roles || [] } }).select('email name _id').lean();
+        break;
+      case 'specific_schools':
+        // Get staff assigned to these schools
+        const schools = await School.find({ _id: { $in: targetDetails.ids || [] } });
+        const staffIds = new Set();
+        for (const school of schools) {
+          // Could also email school contacts directly
+          // For now, notify assigned staff
+        }
+        recipients = await Staff.find({ _id: { $in: Array.from(staffIds) } }).select('email name _id').lean();
+        break;
+      default:
+        console.warn('Unknown targetType:', targetType);
+    }
+
+    // Deliver to each recipient
+    for (const recipient of recipients) {
+      // Create in-app notification
+      await Notification.create({
+        recipientId: recipient._id,
+        type: 'announcement',
+        title: announcement.title,
+        message: announcement.content.substring(0, 150) + (announcement.content.length > 150 ? '...' : ''),
+        actionUrl: '/announcements/' + announcement._id,
+        entityType: 'announcement',
+        entityId: announcement._id,
+        priority: announcement.priority,
+        channels: ['in-app']
+      });
+
+      // Send email if requested
+      if (sendEmail) {
+        await emailService.sendEmail({
+          to: recipient.email,
+          subject: emailSubject || announcement.title,
+          html: announcement.content,
+          templateId: emailTemplate === 'default' ? 'announcement' : emailTemplate,
+          templateData: {
+            title: announcement.title,
+            content: announcement.content,
+            actionUrl: `${req.protocol}://${req.get('host')}${announcement.actionUrl || '/dashboard'}`,
+            priority: announcement.priority
+          },
+          triggeredBy: announcement.createdBy,
+          entityType: 'announcement',
+          entityId: announcement._id,
+          triggerReason: 'bulk_announcement',
+          priority: announcement.priority
+        });
+      }
+    }
+
+    // Update announcement status
+    announcement.status = 'sent';
+    announcement.sentAt = new Date();
+    announcement.metrics = announcement.metrics || {};
+    announcement.metrics.totalRecipients = recipients.length;
+    await announcement.save();
+
+    console.log(`[Announcement] Delivered to ${recipients.length} recipients`);
+
+  } catch (err) {
+    console.error('Error delivering announcement:', err);
+    // Mark as failed if all fail
+    announcement.status = 'failed';
+    await announcement.save();
+  }
+}
+
+// --- System Notification Triggers (internal) ---
+
+// Create notification (internal endpoint)
+app.post('/api/notifications/create', requireAuth, async (req, res) => {
+  try {
+    const { recipientId, type, title, message, actionUrl, entityType, entityId, priority = 'normal', channels = ['in-app'], metadata, isSticky = false } = req.body;
+
+    if (!recipientId || !type || !title || !message) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    // Check recipient preferences before sending
+    const prefs = await NotificationPreference.findOne({ staffId: recipientId });
+    if (prefs && prefs.notificationsEnabled === false) {
+      return res.json({ success: false, skipped: true, reason: 'User disabled notifications' });
+    }
+
+    if (prefs && prefs.types && prefs.types[type] && prefs.types[type].enabled === false) {
+      return res.json({ success: false, skipped: true, reason: 'Notification type disabled by user' });
+    }
+
+    const notification = new Notification({
+      recipientId,
+      type,
+      title,
+      message,
+      actionUrl,
+      entityType,
+      entityId,
+      priority,
+      channels,
+      isSticky,
+      metadata
+    });
+
+    await notification.save();
+
+    // Send email if channel includes email and user prefers it
+    if (channels.includes('email') && prefs && prefs.channels?.email?.enabled) {
+      // Email would be sent via a background job in production
+      // For now, just log
+      await emailService.sendEmail({
+        to: (await Staff.findById(recipientId))?.email || 'unknown',
+        subject: `[${type.toUpperCase()}] ${title}`,
+        html: `<p>${message}</p>${actionUrl ? `<p><a href="${actionUrl}">Take action</a></p>` : ''}`,
+        triggeredBy: req.session.user.id,
+        entityType: entityType,
+        entityId: entityId,
+        triggerReason: type
+      });
+      notification.emailSent = true;
+      notification.emailSentAt = new Date();
+      await notification.save();
+    }
+
+    res.json({ success: true, notificationId: notification._id, notification });
+  } catch (err) {
+    console.error('Error creating notification:', err);
+    res.status(500).json({ success: false, error: 'Failed to create notification' });
+  }
+});
+
+
+
 
 // Middleware to check for founder role
 function requireFounder(req, res, next) {
@@ -4159,9 +5292,110 @@ const initializePermissions = async () => {
   }
 };
 
+const ensureFounderPermissionsAndStaff = async () => {
+  try {
+    const founders = await User.find({ role: 'founder' });
+    if (founders.length === 0) {
+      console.log('No founder users found.');
+      return;
+    }
+
+    for (const founder of founders) {
+      let staff = await Staff.findOne({ email: founder.email.toLowerCase() });
+      if (!staff) {
+        staff = new Staff({
+          name: founder.name,
+          email: founder.email,
+          role: 'admin',
+          status: 'Active',
+          department: 'Administration',
+          employmentStartDate: new Date(),
+          permissions: {
+            canViewFinancials: true,
+            canApproveReports: true,
+            canScheduleEvents: true,
+            canManageStaff: true,
+            canViewAnalytics: true,
+            canManageSchools: true,
+            canSendInvitations: true
+          }
+        });
+        await staff.save();
+        console.log(`[Setup] Created Staff profile for founder: ${founder.email}`);
+      } else {
+        const update = {};
+        if (staff.role !== 'admin') {
+          update.role = 'admin';
+        }
+        const permFlags = {
+          canViewFinancials: true,
+          canApproveReports: true,
+          canScheduleEvents: true,
+          canManageStaff: true,
+          canViewAnalytics: true,
+          canManageSchools: true,
+          canSendInvitations: true
+        };
+        let changed = false;
+        for (const [key, value] of Object.entries(permFlags)) {
+          if (staff.permissions[key] !== value) {
+            update[`permissions.${key}`] = value;
+            changed = true;
+          }
+        }
+        if (Object.keys(update).length > 0) {
+          await Staff.findByIdAndUpdate(staff._id, { $set: update });
+          console.log(`[Setup] Updated Staff profile for founder: ${founder.email}`);
+        }
+      }
+
+      const allPermissionKeys = [
+        'canViewStaff','canCreateStaff','canEditStaff','canDeleteStaff','canInviteStaff','canResetPasswords',
+        'canViewSchools','canCreateSchools','canEditSchools','canDeleteSchools','canAssignTrainers',
+        'canViewEvents','canCreateEvents','canEditEvents','canDeleteEvents','canScheduleEvents',
+        'canViewPrograms','canCreatePrograms','canEditPrograms','canDeletePrograms',
+        'canViewBookings','canCreateBookings','canEditBookings','canDeleteBookings','canApproveBookings',
+        'canViewFinancials','canManageBudgets',
+        'canViewAnalytics','canGenerateReports','canExportData','canScheduleReports','canApproveReports',
+        'canSendMessages','canViewMessages','canCreateAnnouncements','canManageAnnouncements','canViewAllNotifications',
+        'canManageSystem','canViewAuditLogs','canManagePermissions'
+      ];
+      const allTrue = {};
+      allPermissionKeys.forEach(k => allTrue[k] = true);
+
+      let perm = await Permission.findOne({ role: 'founder' });
+      if (!perm) {
+        perm = new Permission({
+          role: 'founder',
+          permissions: allTrue,
+          description: 'Full permissions for founder role'
+        });
+        await perm.save();
+        console.log('[Setup] Created Permission for founder with full permissions');
+      } else {
+        const updateFields = {};
+        let permChanged = false;
+        for (const key of allPermissionKeys) {
+          if (perm.permissions[key] !== true) {
+            updateFields[`permissions.${key}`] = true;
+            permChanged = true;
+          }
+        }
+        if (permChanged) {
+          await Permission.updateOne({ role: 'founder' }, { $set: updateFields });
+          console.log('[Setup] Updated Permission for founder to ensure all permissions are true');
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error in ensureFounderPermissionsAndStaff:', err);
+  }
+};
+
 const startServer = async () => {
   try {
     await initializePermissions();
+    await ensureFounderPermissionsAndStaff();
 
     const server = app.listen(PORT, '127.0.0.1', () => {
       console.log(`Server running on http://127.0.0.1:${PORT}`);

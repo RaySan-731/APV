@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Messages</h1>
+                <div class="user-info">
+                    <span>Welcome, <%= user.name %></span>
+                    <span id="unreadMessageBadge" class="badge badge-danger" style="margin-left: 0.5rem; display: none;">0</span>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Inbox</h3>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-primary" onclick="openComposeModal()">+ Compose</button>
+                            <button class="btn btn-outline active" id="btnInbox" onclick="loadMessages('inbox')">Inbox</button>
+                            <button class="btn btn-outline" id="btnSent" onclick="loadMessages('sent')">Sent</button>
+                            <button class="btn btn-outline" id="btnImportant" onclick="loadMessages('important')">Important</button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="message-list" id="messageList">
+                            <div class="placeholder-text">Loading messages...</div>
+                        </div>
+                    </div>
+                    <div class="card-footer" id="messagePagination" style="display: none;">
+                        <button class="btn btn-outline" id="loadMoreBtn" onclick="loadMoreMessages()">Load More</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Compose Message Modal -->
+    <div id="composeModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3>Compose Message</h3>
+                <button type="button" class="close-btn" onclick="closeComposeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="composeForm" class="form-grid">
+                    <input type="hidden" id="parentMessageId" name="parentMessageId">
+
+                    <label style="grid-column: 1 / -1;">
+                        To
+                        <select id="recipientSelect" name="recipientIds" multiple required style="width: 100%; min-height: 100px;">
+                            <option value="">Select recipient(s)...</option>
+                            <% if (staffList && staffList.length > 0) { %>
+                                <% staffList.forEach(staff => { %>
+                                    <option value="<%= staff._id %>"><%= staff.name %> (<%= staff.role %>)</option>
+                                <% }) %>
+                            <% } else { %>
+                                <option value="" disabled>No active staff available</option>
+                            <% } %>
+                        </select>
+                        <small>Hold Ctrl/Cmd (Windows) or Cmd (Mac) to select multiple recipients</small>
+                    </label>
+
+                    <label style="grid-column: 1 / -1;">
+                        Subject
+                        <input type="text" id="messageSubject" name="subject" placeholder="Enter subject (optional)">
+                    </label>
+
+                    <label style="grid-column: 1 / -1;">
+                        Message
+                        <textarea id="messageBody" name="body" rows="8" placeholder="Type your message here..." required></textarea>
+                    </label>
+
+                    <label style="grid-column: 1 / -1; display: flex; gap: 1rem; align-items: center;">
+                        <select id="messagePriority" name="priority" style="padding: 0.5rem;">
+                            <option value="low">Low Priority</option>
+                            <option value="normal" selected>Normal Priority</option>
+                            <option value="high">High Priority</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+
+                        <label style="display: flex; align-items: center; gap: 0.25rem;">
+                            <input type="checkbox" id="markImportant" name="isImportant"> Mark as Important
+                        </label>
+                    </label>
+
+                    <div id="composeMessage" class="message" style="display: none; grid-column: 1 / -1;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeComposeModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Detail Modal -->
+    <div id="messageDetailModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3 id="modalMessageSubject">Message</h3>
+                <button type="button" class="close-btn" onclick="closeMessageModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="messageDetailContent"></div>
+                <div id="messageAttachments" style="margin-top: 1rem;"></div>
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-outline btn-sm" onclick="replyToMessage()">Reply</button>
+                    <button class="btn btn-outline btn-sm" onclick="forwardMessage()">Forward</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let currentFolder = 'inbox';
+
+        async function loadMessages(folder, page = 1) {
+            currentFolder = folder;
+            currentPage = page;
+            const listEl = document.getElementById('messageList');
+            listEl.innerHTML = '<div class="placeholder-text">Loading...</div>';
+
+            // Update button states
+            ['inbox', 'sent', 'important'].forEach(f => {
+                const btn = document.getElementById('btn' + f.charAt(0).toUpperCase() + f.slice(1));
+                if (btn) btn.classList.toggle('active', f === folder);
+            });
+
+            try {
+                const res = await fetch(`/api/messages?folder=${folder}&page=${page}&limit=20`);
+                const data = await res.json();
+
+                if (data.messages !== undefined) {
+                    renderMessages(data.messages, folder);
+                    updateUnreadBadge(data.unreadCount || 0);
+                }
+            } catch (err) {
+                console.error('Error loading messages:', err);
+                listEl.innerHTML = '<div class="message error">Failed to load messages</div>';
+            }
+        }
+
+        function renderMessages(messages, folder) {
+            const listEl = document.getElementById('messageList');
+            if (!messages || messages.length === 0) {
+                listEl.innerHTML = '<div class="placeholder-text">No messages found</div>';
+                return;
+            }
+
+            listEl.innerHTML = messages.map(msg => {
+                const isRead = folder === 'sent' || msg.recipients?.some(r => r.staffId === '<%= user._id %>' && r.status === 'read');
+                const date = new Date(msg.sentAt).toLocaleDateString();
+                const sender = msg.senderId?.name || 'Unknown';
+                const subject = msg.subject || '(No subject)';
+                const preview = msg.body.substring(0, 80) + (msg.body.length > 80 ? '...' : '');
+
+                return `
+                    <div class="message-item ${!isRead && folder === 'inbox' ? 'unread' : ''}" onclick="viewMessage('${msg._id}')">
+                        <div class="message-avatar">
+                            <strong>${sender.charAt(0).toUpperCase()}</strong>
+                        </div>
+                        <div class="message-body">
+                            <div class="message-header">
+                                <strong>${sender}</strong>
+                                <span class="message-date">${date}</span>
+                            </div>
+                            <div class="message-subject">${subject}</div>
+                            <div class="message-preview">${preview}</div>
+                        </div>
+                        ${msg.priority === 'urgent' ? '<span class="badge badge-danger">Urgent</span>' : ''}
+                        ${msg.isImportant ? '<span class="badge badge-warning">Important</span>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function viewMessage(messageId) {
+            try {
+                const res = await fetch(`/api/messages/${messageId}`);
+                const data = await res.json();
+
+                if (data.message) {
+                    const msg = data.message;
+                    document.getElementById('modalMessageSubject').textContent = msg.subject || '(No subject)';
+                    document.getElementById('messageDetailContent').innerHTML = `
+                        <div style="margin-bottom: 1rem; color: var(--muted-foreground);">
+                            <strong>From:</strong> ${msg.senderId?.name || 'Unknown'} (${msg.senderId?.role || ''})<br>
+                            <strong>Date:</strong> ${new Date(msg.sentAt).toLocaleString()}
+                        </div>
+                        <div style="line-height: 1.6; white-space: pre-wrap;">${msg.body}</div>
+                    `;
+
+                    // Mark as read if recipient
+                    if (msg.senderId.toString() !== '<%= user._id %>') {
+                        await fetch(`/api/messages/${messageId}/read`, { method: 'POST' });
+                        loadMessages(currentFolder, currentPage);
+                    }
+
+                    openModal('messageDetailModal');
+                }
+            } catch (err) {
+                console.error('Error viewing message:', err);
+                alert('Failed to load message');
+            }
+        }
+
+        async function sendMessage() {
+            const recipientIds = Array.from(document.getElementById('recipientSelect').selectedOptions).map(o => o.value);
+            const subject = document.getElementById('messageSubject').value;
+            const body = document.getElementById('messageBody').value;
+            const priority = document.getElementById('messagePriority').value;
+            const isImportant = document.getElementById('markImportant').checked;
+
+            if (!recipientIds.length || !body) {
+                alert('Please fill in required fields');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/messages/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        recipientIds,
+                        subject,
+                        body,
+                        priority,
+                        isImportant
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    closeComposeModal();
+                    loadMessages('inbox', 1);
+                    alert('Message sent!');
+                } else {
+                    alert('Failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Error sending message:', err);
+                alert('Failed to send message');
+            }
+        }
+
+        function openComposeModal(parentMessageId = null) {
+            if (parentMessageId) {
+                document.getElementById('parentMessageId').value = parentMessageId;
+            }
+            openModal('composeModal');
+        }
+
+        function closeComposeModal() {
+            closeModal('composeModal');
+            document.getElementById('composeForm').reset();
+        }
+
+        function replyToMessage() {
+            const subject = document.getElementById('modalMessageSubject').textContent;
+            closeMessageModal();
+            openComposeModal();
+            document.getElementById('messageSubject').value = 'Re: ' + subject;
+        }
+
+        function forwardMessage() {
+            const subject = document.getElementById('modalMessageSubject').textContent;
+            const body = document.querySelector('#messageDetailContent div[style*="white-space"]').textContent;
+            closeMessageModal();
+            openComposeModal();
+            document.getElementById('messageSubject').value = 'Fwd: ' + subject;
+            document.getElementById('messageBody').value = '--- Forwarded message ---\n\n' + body;
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        function updateUnreadBadge(count) {
+            const badge = document.getElementById('unreadMessageBadge');
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'inline' : 'none';
+        }
+
+        function loadMoreMessages() {
+            loadMessages(currentFolder, currentPage + 1);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMessages('inbox', 1);
+        });
+    </script>
+</body>
+</html>

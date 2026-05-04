@@ -1859,6 +1859,230 @@ body {
     font-size: 0.875rem;
 }
 
+/* Message List Styles */
+.message-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.message-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.message-item:hover {
+    background: var(--muted);
+    border-color: var(--primary);
+}
+
+.message-item.unread {
+    background: hsl(140, 45%, 98%);
+    border-left: 3px solid var(--primary);
+}
+
+.message-item.unread .message-subject {
+    font-weight: 600;
+}
+
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.message-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.message-date {
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+}
+
+.message-subject {
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+    color: var(--foreground);
+}
+
+.message-preview {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.message-item .badge {
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+}
+
+/* Announcement List Styles */
+.announcement-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.announcement-item {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.announcement-item:hover {
+    background: var(--muted);
+    border-color: var(--primary);
+}
+
+.announcement-item.acknowledged {
+    opacity: 0.7;
+    background: var(--muted);
+}
+
+.announcement-item h4 {
+    margin: 0 0 0.25rem 0;
+    color: var(--foreground);
+}
+
+/* Preference Page Styles */
+.channel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.channel-card {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--muted);
+}
+
+.channel-card h5 {
+    margin: 0 0 0.75rem 0;
+    color: var(--primary);
+}
+
+.preference-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.preference-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+}
+
+.preference-info strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.preference-info .muted {
+    font-size: 0.85rem;
+    color: var(--muted-foreground);
+}
+
+.preference-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+/* Toggle Switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border);
+    transition: .3s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--success, #22c55e);
+}
+
+input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+/* Modal message box */
+#composeMessage, #saveMessage {
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    margin-top: 0.5rem;
+}
+
+/* Active button state in header */
+.btn-outline.active {
+    background: var(--primary);
+    color: var(--primary-foreground);
+}
+
 /* Calendar navigation */
 #calendarTitle {
     font-weight: 600;
@@ -1875,5 +2099,24 @@ body {
     .modal-content {
         width: 95%;
         padding: 1rem;
+    }
+
+    .message-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .message-avatar {
+        display: none;
+    }
+
+    .preference-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .preference-controls {
+        align-self: flex-end;
     }
 }

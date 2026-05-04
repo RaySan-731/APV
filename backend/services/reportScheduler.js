@@ -106,42 +106,58 @@ class ReportScheduler {
 
       console.log(`Processing ${dueReports.length} scheduled report(s)`);
 
-      for (const report of dueReports) {
-        try {
-          // Generate report data based on type
-          const reportData = await this.generateReportData(report.reportType, report.config);
+      // Process reports in limited concurrency to avoid blocking event loop
+      const CONCURRENCY_LIMIT = 2;
+      for (let i = 0; i < dueReports.length; i += CONCURRENCY_LIMIT) {
+        const batch = dueReports.slice(i, i + CONCURRENCY_LIMIT);
+        await Promise.all(
+          batch.map(async (report) => {
+            try {
+              // Generate report data based on type
+              const reportData = await this.generateReportData(report.reportType, report.config);
 
-          // Create PDF attachment
-          const pdfBuffer = await this.generatePDF(report.reportType, reportData);
+              // Create PDF attachment (CPU-intensive, done in separate tick)
+              const pdfBuffer = await new Promise(resolve => {
+                setImmediate(() => {
+                  this.generatePDF(report.reportType, reportData)
+                    .then(resolve)
+                    .catch(resolve);
+                });
+              });
 
-          // Get recipient emails
-          const recipients = report.recipients.map(r => ({
-            name: r.name || '',
-            email: r.email
-          }));
+              // Get recipient emails
+              const recipients = report.recipients.map(r => ({
+                name: r.name || '',
+                email: r.email
+              }));
 
-          // Send email to each recipient
-          for (const recipient of recipients) {
-            await emailService.sendReportEmail(recipient, reportData, [
-              {
-                filename: `${report.reportType}_report_${new Date().toISOString().split('T')[0]}.pdf`,
-                content: pdfBuffer,
-                contentType: 'application/pdf'
+              // Send email to each recipient
+              for (const recipient of recipients) {
+                await emailService.sendReportEmail(recipient, reportData, [
+                  {
+                    filename: `${report.reportType}_report_${new Date().toISOString().split('T')[0]}.pdf`,
+                    content: pdfBuffer,
+                    contentType: 'application/pdf'
+                  }
+                ]);
               }
-            ]);
-          }
 
-          // Update last sent and next send dates
-          report.lastSentAt = now;
-          report.nextSendAt = this.calculateNextSendDate(report.frequency);
+              // Update last sent and next send dates
+              report.lastSentAt = now;
+              report.nextSendAt = this.calculateNextSendDate(report.frequency);
 
-          await report.save();
+              await report.save();
 
-          console.log(`✓ Sent scheduled report: ${report.name} to ${recipients.length} recipient(s)`);
-        } catch (error) {
-          console.error(`Error processing scheduled report ${report._id}:`, error);
-          // Log error but continue with other reports
-        }
+              console.log(`✓ Sent scheduled report: ${report.name} to ${recipients.length} recipient(s)`);
+            } catch (error) {
+              console.error(`Error processing scheduled report ${report._id}:`, error);
+              // Log error but continue with other reports
+            }
+          })
+        );
+
+        // Yield to event loop between batches to prevent blocking
+        await new Promise(resolve => setImmediate(resolve));
       }
     } catch (error) {
       console.error('Error in scheduled report processing:', error);

@@ -10,6 +10,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
+// connect-mongo is loaded only in production when MongoDB session persistence is enabled
+// const MongoStore = require('connect-mongo');
 // const bodyParser = require('body-parser');
 // const cors = require('cors');
 const path = require('path');
@@ -19,22 +21,47 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-// app.use(cors());
-// app.use(bodyParser.urlencoded({ extended: true }));
-// app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Body parsing middleware (needed for form POSTs)
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // Session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'apv-ventures-secret-key',
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET || 'apv-ventures-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Set to true in production with HTTPS
-}));
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // true in prod with HTTPS
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: process.env.SESSION_MAX_AGE ? parseInt(process.env.SESSION_MAX_AGE) : 7 * 24 * 60 * 60 * 1000 // 7 days default
+  }
+};
+
+// Use MongoDB session store if MONGODB_URI is available, otherwise fallback to MemoryStore
+if (process.env.MONGODB_URI) {
+  try {
+    const MongoStore = require('connect-mongo');
+    if (MongoStore && typeof MongoStore.create === 'function') {
+      sessionConfig.store = MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI,
+        collectionName: 'sessions',
+        ttl: 14 * 24 * 60 * 60,
+        autoRemove: 'native'
+      });
+      console.log('Using MongoDB session store');
+    } else {
+      console.log('connect-mongo loaded but .create() not available; using memory store');
+    }
+  } catch (e) {
+    console.error('Failed to initialize MongoDB session store:', e.message);
+    console.log('Falling back to in-memory session store');
+  }
+} else {
+  console.log('Using in-memory session store (development only)');
+}
+
+app.use(session(sessionConfig));
 
 // Set view engine
 app.set('view engine', 'ejs');
@@ -56,6 +83,7 @@ const Payment = require('./models/Payment');
 const SchoolDocument = require('./models/SchoolDocument');
 const ReportTemplate = require('./models/ReportTemplate');
 const ScheduledReport = require('./models/ScheduledReport');
+const Student = require('./models/Student');
 
 // Communication models
 const Message = require('./models/Message');
@@ -296,83 +324,103 @@ app.post('/login', async (req, res) => {
 
     // Trainer fallback from Staff collection using default trainer password 0000
     const trainerFallback = await Staff.findOne({ email: email.toLowerCase(), role: 'trainer' });
-    if ((!user || !await require('bcryptjs').compare(password, user.password)) && trainerFallback && password === '0000') {
-      req.session.user = {
-        id: trainerFallback._id.toString(),
-        email: trainerFallback.email,
-        role: 'trainer',
-        name: trainerFallback.name || 'Trainer'
-      };
-      return res.redirect('/trainer/dashboard');
-    }
+    const isTrainerFallback = trainerFallback && password === '0000';
+    const isUserValid = user && await require('bcryptjs').compare(password, user.password);
 
-    if (!user) {
-      return res.render('login', { error: 'Invalid credentials', user: req.session.user });
-    }
-
-    const match = await require('bcryptjs').compare(password, user.password);
-    if (!match) {
-      return res.render('login', { error: 'Invalid credentials', user: req.session.user });
-    }
-
-     // Update last login
-     user.lastLogin = new Date();
-     await user.save();
-
-      // Ensure Staff record exists for admin/founder roles (for messaging/notifications)
-      if (['admin', 'founder', 'commissioner', 'supervisor', 'training_officer', 'medical', 'coordinator'].includes(user.role)) {
-        let staff = await Staff.findOne({ email: user.email.toLowerCase() });
-        if (!staff) {
-          // Create a Staff profile corresponding to this User with full permissions for admin/founder
-          const staffRole = user.role === 'founder' ? 'admin' : user.role;
-          const isAdminRole = ['admin', 'founder'].includes(user.role);
-          
-          staff = new Staff({
-            name: user.name,
-            email: user.email,
-            role: staffRole,
-            status: 'Active',
-            department: 'Administration',
-            employmentStartDate: new Date(),
-            permissions: isAdminRole ? {
-              canViewFinancials: true,
-              canApproveReports: true,
-              canScheduleEvents: true,
-              canManageStaff: true,
-              canViewAnalytics: true,
-              canManageSchools: true,
-              canSendInvitations: true
-            } : {}
-          });
-          await staff.save();
-          console.log(`[Login] Created Staff profile for ${user.email} (role: ${staff.role})`);
-        } else if (user.role === 'founder' && staff.role !== 'admin') {
-          // Update founder Staff role to admin if needed
-          staff.role = 'admin';
-          await staff.save();
-          console.log(`[Login] Updated founder Staff role to admin: ${user.email}`);
+    if (isTrainerFallback && !isUserValid) {
+      // Regenerate session for trainer login
+      req.session.regenerate(err => {
+        if (err) {
+          console.error('Session regeneration error:', err);
+          return res.render('login', { error: 'Login failed', user: null });
         }
+        req.session.user = {
+          id: trainerFallback._id.toString(),
+          email: trainerFallback.email,
+          role: 'trainer',
+          name: trainerFallback.name || 'Trainer'
+        };
+        return res.redirect('/trainer/dashboard');
+      });
+      return;
+    }
+
+    if (!isUserValid) {
+      return res.render('login', { error: 'Invalid credentials', user: req.session.user });
+    }
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Ensure Staff record exists for admin/founder roles (for messaging/notifications)
+    if (['admin', 'founder', 'commissioner', 'supervisor', 'training_officer', 'medical', 'coordinator'].includes(user.role)) {
+      let staff = await Staff.findOne({ email: user.email.toLowerCase() });
+      if (!staff) {
+        const staffRole = user.role === 'founder' ? 'admin' : user.role;
+        const isAdminRole = ['admin', 'founder'].includes(user.role);
+        staff = new Staff({
+          name: user.name,
+          email: user.email,
+          role: staffRole,
+          status: 'Active',
+          department: 'Administration',
+          employmentStartDate: new Date(),
+          permissions: isAdminRole ? {
+            canViewFinancials: true,
+            canApproveReports: true,
+            canScheduleEvents: true,
+            canManageStaff: true,
+            canViewAnalytics: true,
+            canManageSchools: true,
+            canSendInvitations: true
+          } : {}
+        });
+        await staff.save();
+        console.log(`[Login] Created Staff profile for ${user.email} (role: ${staff.role})`);
+      } else if (user.role === 'founder' && staff.role !== 'admin') {
+        staff.role = 'admin';
+        await staff.save();
+        console.log(`[Login] Updated founder Staff role to admin: ${user.email}`);
       }
+    }
 
-     req.session.user = {
-       id: user._id.toString(),
-       email: user.email,
-       role: user.role || 'rover',
-       name: user.name || 'Member'
-     };
-
-    // redirect to requested page if present
-    const nextUrl = req.body.next || req.query.next || (req.session.user.role === 'trainer' ? '/trainer/dashboard' : '/dashboard');
-    return res.redirect(nextUrl);
-  } catch (err) {
-    console.error('Login error:', err);
-    return res.render('login', { error: 'Internal error', user: req.session.user });
-  }
+    // Regenerate session to prevent fixation
+    req.session.regenerate(err => {
+      if (err) {
+        console.error('Session regeneration error:', err);
+        return res.render('login', { error: 'Login failed', user: null });
+      }
+      req.session.user = {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role || 'rover',
+        name: user.name || 'Member'
+      };
+      const nextUrl = req.body.next || req.query.next || (user.role === 'trainer' ? '/trainer/dashboard' : '/dashboard');
+      return res.redirect(nextUrl);
+    });
+   } catch (err) {
+     console.error('Login error:', err);
+     return res.render('login', { error: 'Internal error', user: null });
+   }
 });
 
 app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/');
+  // Destroy session completely
+  req.session.destroy(err => {
+    if (err) {
+      console.error('Logout error:', err);
+    }
+    // Clear cookie on client
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    });
+    res.redirect('/');
+  });
 });
 
 // Static landing pages
@@ -475,6 +523,611 @@ app.get('/trainer/dashboard', requireAuth, (req, res) => {
     user: req.session.user,
     page: 'trainer_dashboard'
   });
+});
+
+// === TRAINER SPECIFIC ROUTES ===
+
+ // Trainer Profile Page
+ app.get('/trainer/profile', requireAuth, async (req, res) => {
+   if (!req.session.user || req.session.user.role !== 'trainer') {
+     return res.redirect('/dashboard');
+   }
+   const currentStaff = await Staff.findOne({ email: req.session.user.email });
+   res.render('trainer_profile', {
+     user: req.session.user,
+     trainer: currentStaff
+   });
+ });
+
+ // Trainer Schools Page (assigned schools only)
+ app.get('/trainer/schools', requireAuth, async (req, res) => {
+   if (!req.session.user || req.session.user.role !== 'trainer') {
+     return res.redirect('/dashboard');
+   }
+   try {
+     const currentStaff = await Staff.findOne({ email: req.session.user.email });
+     if (!currentStaff) {
+       return res.status(404).render('404', { user: req.session.user, error: 'Trainer profile not found' });
+     }
+
+     // Get schools assigned to this trainer via Staff.assignedSchools
+     const trainerAssignments = currentStaff.assignedSchools || [];
+     const schoolIds = trainerAssignments
+       .filter(assignment => assignment.schoolId && assignment.status === 'active')
+       .map(assignment => assignment.schoolId);
+
+     let schoolList = [];
+     if (schoolIds.length > 0) {
+       schoolList = await School.find({ _id: { $in: schoolIds } })
+         .sort({ name: 1 })
+         .lean();
+
+       // Enrich with participation metrics
+       const schoolIdsForAgg = schoolList.map(s => s._id);
+       const eventAggregates = await Event.aggregate([
+         { $match: { 'targetSchools.schoolId': { $in: schoolIdsForAgg } } },
+         {
+           $group: {
+             _id: '$targetSchools.schoolId',
+             eventCount: { $sum: 1 },
+             avgAttendance: { $avg: '$participationMetrics.averageAttendanceRate' }
+           }
+         }
+       ]);
+       const eventMap = new Map(eventAggregates.map(a => [a._id.toString(), a]));
+
+       schoolList = schoolList.map(school => ({
+         ...school,
+         participationMetrics: {
+           ...(school.participationMetrics || {}),
+           totalEventsAttended: eventMap.get(school._id.toString())?.eventCount || 0,
+           averageAttendanceRate: Math.round(eventMap.get(school._id.toString())?.avgAttendance || 0),
+           engagementScore: Math.min(100, Math.round(((eventMap.get(school._id.toString())?.eventCount || 0) * 10) + (eventMap.get(school._id.toString())?.avgAttendance || 0)))
+         }
+       }));
+     }
+
+     res.render('trainer_schools', {
+       user: req.session.user,
+       trainer: currentStaff,
+       schoolList,
+       page: 'trainer_schools'
+     });
+   } catch (err) {
+     console.error('Error loading trainer schools:', err);
+     res.status(500).render('404', { user: req.session.user, error: 'Failed to load schools' });
+   }
+ });
+
+// Trainer Notification Center Page
+// API: Trainer Dashboard Overview (Home)
+app.get('/api/trainer/dashboard-overview', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const trainerId = currentStaff._id;
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24*60*60*1000);
+    const sevenDaysFromNow = new Date(now.getTime() + 7*24*60*60*1000);
+
+    // Today's schedule
+    const todayEvents = await Event.find({
+      'trainers.trainerId': trainerId,
+      startDate: { $lte: endOfDay },
+      endDate: { $gte: startOfDay },
+      status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress'] }
+    }).lean();
+
+    // Upcoming events (next 7 days)
+    const upcomingEvents = await Event.find({
+      'trainers.trainerId': trainerId,
+      startDate: { $gte: startOfDay, $lte: sevenDaysFromNow },
+      status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress'] }
+    }).sort({ startDate: 1 }).lean();
+
+    // Pending reports
+    const pendingReports = await Event.find({
+      'trainers.trainerId': trainerId,
+      status: 'completed',
+      $or: [
+        { 'review.reportSubmittedAt': { $exists: false } },
+        { 'review.reportSubmittedAt': null }
+      ]
+    }).lean();
+
+    // Unread counts
+    const unreadMessagesCount = await Message.countDocuments({
+      'recipients.staffId': trainerId,
+      'recipients.status': 'sent',
+      'recipients.deleted': { $ne: true }
+    });
+
+    const unreadNotificationsCount = await Notification.countDocuments({
+      recipientId: trainerId,
+      isRead: false,
+      dismissed: false
+    });
+
+    // Build pending actions summary
+    const pendingActions = [];
+    if (pendingReports.length > 0) {
+      pendingActions.push({
+        type: 'report',
+        count: pendingReports.length,
+        message: `${pendingReports.length} pending report${pendingReports.length > 1 ? 's' : ''} require${pendingReports.length > 1 ? 's' : ''} submission`
+      });
+    }
+    if (unreadMessagesCount > 0) {
+      pendingActions.push({
+        type: 'message',
+        count: unreadMessagesCount,
+        message: `${unreadMessagesCount} unread message${unreadMessagesCount > 1 ? 's' : ''}`
+      });
+    }
+    if (unreadNotificationsCount > 0) {
+      pendingActions.push({
+        type: 'notification',
+        count: unreadNotificationsCount,
+        message: `${unreadNotificationsCount} notification${unreadNotificationsCount > 1 ? 's' : ''} require${unreadNotificationsCount > 1 ? '' : 's'} attention`
+      });
+    }
+
+    res.json({
+      success: true,
+      todaySchedule: todayEvents,
+      upcomingEvents: upcomingEvents,
+      pendingReports: pendingReports,
+      unreadMessagesCount,
+      unreadNotificationsCount,
+      pendingActions
+    });
+  } catch (err) {
+    console.error('Error fetching trainer overview:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch overview' });
+  }
+});
+
+// API: Trainer Personal Stats
+app.get('/api/trainer/stats', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const trainerId = currentStaff._id;
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Events completed this month
+    const eventsCompletedThisMonth = await Event.countDocuments({
+      'trainers.trainerId': trainerId,
+      status: 'completed',
+      startDate: { $gte: thisMonthStart }
+    });
+
+    // Total scouts reached
+    const scoutsPipeline = await Event.aggregate([
+      { $match: { 'trainers.trainerId': trainerId, status: 'completed' } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$review.actualAttendeeCount', 0] } } } }
+    ]);
+    const totalScoutsReached = scoutsPipeline[0]?.total || 0;
+
+    // Reports submitted
+    const reportsSubmitted = await Event.countDocuments({
+      'trainers.trainerId': trainerId,
+      'review.reportSubmittedAt': { $ne: null }
+    });
+
+    // Schools visited (distinct from events + visit logs)
+    const distinctSchoolsFromEvents = await Event.distinct('targetSchools.schoolId', {
+      'trainers.trainerId': trainerId,
+      status: 'completed'
+    });
+    const distinctSchoolsFromVisits = await VisitLog.distinct('schoolId', { trainerId });
+    const allSchoolIds = new Set([
+      ...distinctSchoolsFromEvents.map(id => id.toString()),
+      ...distinctSchoolsFromVisits.map(id => id.toString())
+    ]);
+    const schoolsVisited = allSchoolIds.size;
+
+    // Students managed (students added by this trainer)
+    const studentsManaged = await Student.countDocuments({
+      'addedBy.trainerId': trainerId
+    });
+
+    // Performance rating from admin (stored in Staff.performanceMetrics.averageFeedbackRating)
+    const performanceRating = currentStaff.performanceMetrics?.averageFeedbackRating || 0;
+
+    res.json({
+      success: true,
+      stats: {
+        eventsCompletedThisMonth,
+        totalScoutsReached,
+        reportsSubmitted,
+        schoolsVisited,
+        studentsManaged,
+        performanceRating,
+        ratingCount: 0
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching trainer stats:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch stats' });
+  }
+});
+
+// API: Trainer Profile Update
+app.post('/api/trainer/profile', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    const {
+      phone,
+      street, city, state, zipCode, country,
+      emergencyContactName, emergencyContactRelationship, emergencyContactPhone, emergencyContactEmail
+    } = req.body;
+
+    const updateData = {};
+
+    if (phone !== undefined && phone !== '') updateData.phone = phone.trim();
+
+    // Address fields - use dot notation for partial updates
+    if (street !== undefined && street !== '') updateData['address.street'] = street.trim();
+    if (city !== undefined && city !== '') updateData['address.city'] = city.trim();
+    if (state !== undefined && state !== '') updateData['address.state'] = state.trim();
+    if (zipCode !== undefined && zipCode !== '') updateData['address.zipCode'] = zipCode.trim();
+    if (country !== undefined && country !== '') updateData['address.country'] = country.trim();
+
+    // Emergency contact - dot notation
+    if (emergencyContactName !== undefined && emergencyContactName !== '') updateData['emergencyContact.name'] = emergencyContactName.trim();
+    if (emergencyContactRelationship !== undefined && emergencyContactRelationship !== '') updateData['emergencyContact.relationship'] = emergencyContactRelationship.trim();
+    if (emergencyContactPhone !== undefined && emergencyContactPhone !== '') updateData['emergencyContact.phone'] = emergencyContactPhone.trim();
+    if (emergencyContactEmail !== undefined && emergencyContactEmail !== '') updateData['emergencyContact.email'] = emergencyContactEmail.trim().toLowerCase();
+
+    if (Object.keys(updateData).length === 0) {
+      return res.json({ success: true, staff: currentStaff, message: 'No changes to update' });
+    }
+
+    const updatedStaff = await Staff.findByIdAndUpdate(
+      staffId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    res.json({ success: true, staff: updatedStaff });
+  } catch (err) {
+    console.error('Error updating trainer profile:', err);
+    res.status(500).json({ success: false, error: 'Failed to update profile' });
+  }
+});
+
+// API: Add Certification
+app.post('/api/trainer/certifications', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const { name, issuer, issueDate, expiryDate, status = 'active' } = req.body;
+
+    if (!name || !issuer || !issueDate) {
+      return res.status(400).json({ success: false, error: 'Name, issuer, and issue date are required' });
+    }
+
+    const staff = await Staff.findById(currentStaff._id);
+    staff.certifications.push({
+      name: name.trim(),
+      issuer: issuer.trim(),
+      issueDate: new Date(issueDate),
+      expiryDate: expiryDate ? new Date(expiryDate) : null,
+      status: status
+    });
+    await staff.save();
+
+    res.json({ success: true, certifications: staff.certifications });
+  } catch (err) {
+    console.error('Error adding certification:', err);
+    res.status(500).json({ success: false, error: 'Failed to add certification' });
+  }
+});
+
+// API: Delete Certification
+app.delete('/api/trainer/certifications/:index', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const index = parseInt(req.params.index);
+    const staff = await Staff.findById(currentStaff._id);
+    if (index < 0 || index >= staff.certifications.length) {
+      return res.status(400).json({ success: false, error: 'Invalid certification index' });
+    }
+    staff.certifications.splice(index, 1);
+    await staff.save();
+    res.json({ success: true, certifications: staff.certifications });
+  } catch (err) {
+    console.error('Error deleting certification:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete certification' });
+  }
+});
+
+// === TRAINER EVENT MANAGEMENT ===
+
+// GET trainer events page with calendar
+app.get('/trainer/events', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.redirect('/dashboard');
+  }
+  res.render('trainer_events', {
+    user: req.session.user,
+    page: 'trainer_events'
+  });
+});
+
+// GET single event detail for trainer
+app.get('/trainer/events/:eventId', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.redirect('/dashboard');
+  }
+   try {
+     const event = await Event.findById(req.params.eventId)
+       .populate('trainers.trainerId', 'name email idNumber role')
+       .populate('targetSchools.schoolId', 'name address city contactPerson')
+       .lean();
+
+     if (!event) {
+       return res.status(404).render('404', { user: req.session.user, error: 'Event not found' });
+     }
+
+     // Verify trainer is assigned to this event
+     const currentStaff = await getCurrentStaff(req);
+     if (!currentStaff) {
+       return res.status(403).render('404', { user: req.session.user, error: 'Staff profile not found' });
+     }
+     const isAssigned = event.trainers.some(t => t.trainerId.toString() === currentStaff._id.toString());
+     if (!isAssigned) {
+       return res.status(403).render('404', { user: req.session.user, error: 'Access denied. You are not assigned to this event.' });
+     }
+
+     res.render('trainer_event_detail', {
+       user: req.session.user,
+       event,
+       page: 'trainer_event_detail',
+       staffId: currentStaff._id.toString()
+     });
+  } catch (err) {
+    console.error('Error loading event detail:', err);
+    res.status(500).render('404', { user: req.session.user, error: 'Failed to load event' });
+  }
+});
+
+// POST: Trainer accepts event assignment
+app.post('/trainer/events/:eventId/accept', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const trainerId = currentStaff._id;
+    const eventId = req.params.eventId;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    const trainerAssignment = event.trainers.find(t => t.trainerId.toString() === trainerId.toString());
+    if (!trainerAssignment) {
+      return res.status(404).json({ success: false, error: 'Not assigned to this event' });
+    }
+
+    trainerAssignment.status = 'confirmed';
+    await event.save();
+
+    res.json({ success: true, message: 'Event accepted' });
+  } catch (err) {
+    console.error('Error accepting event:', err);
+    res.status(500).json({ success: false, error: 'Failed to accept event' });
+  }
+});
+
+// POST: Trainer declines event assignment
+app.post('/trainer/events/:eventId/decline', requireAuth, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const trainerId = currentStaff._id;
+    const eventId = req.params.eventId;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    const trainerAssignment = event.trainers.find(t => t.trainerId.toString() === trainerId.toString());
+    if (!trainerAssignment) {
+      return res.status(404).json({ success: false, error: 'Not assigned to this event' });
+    }
+
+    trainerAssignment.status = 'declined';
+    trainerAssignment.notes = reason || 'Declined';
+    await event.save();
+
+    // Notify admins about the decline
+    const admins = await Staff.find({ role: { $in: ['admin', 'founder', 'supervisor'] } }).select('_id');
+    for (const admin of admins) {
+      await Notification.create({
+        recipientId: admin._id,
+        type: 'assignment',
+        title: 'Trainer declined event',
+        message: `${currentStaff.name} declined assignment to ${event.name}. Reason: ${reason || 'Not provided'}`,
+        actionUrl: `/trainer/events/${eventId}`,
+        entityType: 'event',
+        entityId: eventId,
+        priority: 'high'
+      });
+    }
+
+    res.json({ success: true, message: 'Event declined' });
+  } catch (err) {
+    console.error('Error declining event:', err);
+    res.status(500).json({ success: false, error: 'Failed to decline event' });
+  }
+});
+
+// POST: Trainer submits event report
+app.post('/trainer/events/:eventId/submit-report', requireAuth, async (req, res) => {
+  try {
+    const { trainerReport, actualAttendeeCount } = req.body;
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const trainerId = currentStaff._id;
+    const eventId = req.params.eventId;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    // Verify trainer assignment
+    const trainerAssignment = event.trainers.find(t => t.trainerId.toString() === trainerId.toString());
+    if (!trainerAssignment) {
+      return res.status(403).json({ success: false, error: 'Not assigned to this event' });
+    }
+
+    // Update review fields
+    event.review.trainerReport = trainerReport;
+    event.review.reportSubmittedAt = new Date();
+    event.review.reportSubmittedBy = trainerId;
+    if (actualAttendeeCount) {
+      event.review.actualAttendeeCount = parseInt(actualAttendeeCount);
+    }
+    await event.save();
+
+    // Notify admins
+    const admins = await Staff.find({ role: { $in: ['admin', 'founder', 'supervisor'] } }).select('_id');
+    for (const admin of admins) {
+      await Notification.create({
+        recipientId: admin._id,
+        type: 'report_reminder',
+        title: 'Report submitted',
+        message: `${currentStaff.name} submitted a report for ${event.name}`,
+        actionUrl: `/dashboard/events/${eventId}`,
+        entityType: 'event',
+        entityId: eventId,
+        priority: 'normal'
+      });
+    }
+
+    res.json({ success: true, message: 'Report submitted successfully' });
+  } catch (err) {
+    console.error('Error submitting report:', err);
+    res.status(500).json({ success: false, error: 'Failed to submit report' });
+  }
+});
+
+// GET trainer's past events history
+app.get('/api/trainer/past-events', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const trainerId = currentStaff._id;
+    const { page = 1, limit = 20, search } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const query = {
+      'trainers.trainerId': trainerId,
+      status: 'completed'
+    };
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const events = await Event.find(query)
+      .sort({ startDate: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Event.countDocuments(query);
+
+    res.json({
+      success: true,
+      events,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching past events:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch past events' });
+  }
+});
+
+// API: Trainer Events data (for calendar)
+app.get('/api/trainer/events', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const trainerId = currentStaff._id;
+    const { start, end, view = 'month' } = req.query;
+
+    let query = { 'trainers.trainerId': trainerId };
+    if (start && end) {
+      query.startDate = { $lte: new Date(end) };
+      query.endDate = { $gte: new Date(start) };
+    }
+
+     const events = await Event.find(query)
+       .select('name startDate endDate eventType status location trainers.trainerId trainers.status trainers.role')
+       .sort({ startDate: 1 })
+       .lean();
+
+    // Transform for calendar
+    const calendarEvents = events.map(ev => {
+      const trainerAssignment = ev.trainers.find(t => t.trainerId.toString() === trainerId.toString());
+      return {
+        id: ev._id,
+        title: ev.name,
+        start: ev.startDate,
+        end: ev.endDate,
+        type: ev.eventType,
+        status: ev.status,
+        location: ev.location?.name || '',
+        trainerRoles: ev.trainers.filter(t => t.trainerId.toString() === trainerId.toString()).map(t => t.role),
+        trainerAssignmentStatus: trainerAssignment ? trainerAssignment.status : 'not_assigned'
+      };
+    });
+
+    res.json({ success: true, events: calendarEvents });
+  } catch (err) {
+    console.error('Error fetching trainer events:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch events' });
+  }
 });
 
 // Booking routes
@@ -1612,6 +2265,737 @@ app.get('/dashboard/trainer/:trainerId/details', requireAuth, async (req, res) =
   } catch (err) {
     console.error('Error fetching trainer details:', err);
     res.status(500).json({ success: false, error: 'Error fetching trainer details' });
+  }
+});
+
+// ============ TRAINER STUDENT MANAGEMENT ROUTES ============
+
+// GET trainer students page with filters
+app.get('/trainer/students', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.redirect('/dashboard');
+  }
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Trainer profile not found' });
+    }
+
+    // Get query params for filtering
+    const { schoolId, section, status, search, sortBy = 'createdAt', order = 'desc' } = req.query;
+
+    // Build query - students added by this trainer or from their assigned schools
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active')
+      .map(a => a.schoolId);
+
+    let query = {
+      $or: [
+        { addedBy: { trainerId: currentStaff._id } }, // Students added by this trainer
+        ...(trainerSchoolIds.length > 0 ? [{ school: { $in: trainerSchoolIds } }] : [])
+      ]
+    };
+
+    // Apply filters
+    if (schoolId) {
+      query.school = new mongoose.Types.ObjectId(schoolId);
+    }
+    if (section) {
+      query.scoutSection = section;
+    }
+    if (status) {
+      query.status = status;
+    }
+    if (search) {
+      query.$or = [
+        ...(query.$or || []),
+        { fullName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Sorting
+    const sortObj = {};
+    const sortFields = ['createdAt', 'fullName', 'dateOfBirth', 'scoutSection', 'school'];
+    if (sortFields.includes(sortBy)) {
+      sortObj[sortBy] = order === 'desc' ? -1 : 1;
+    } else {
+      sortObj.createdAt = -1;
+    }
+
+    const students = await Student.find(query)
+      .populate('school', 'name address.city contactPerson')
+      .populate('addedBy.trainerId', 'name email')
+      .sort(sortObj)
+      .lean();
+
+    // Get schools for filter dropdown
+    const schools = await School.find({
+      _id: { $in: trainerSchoolIds }
+    }).select('_id name').sort({ name: 1 }).lean();
+
+    // Calculate stats
+    const stats = {
+      total: students.length,
+      bySection: {
+        Sungura: students.filter(s => s.scoutSection === 'Sungura').length,
+        Chipukizi: students.filter(s => s.scoutSection === 'Chipukizi').length,
+        Mwamba: students.filter(s => s.scoutSection === 'Mwamba').length,
+        Rover: students.filter(s => s.scoutSection === 'Rover').length
+      }
+    };
+
+    res.render('trainer_students', {
+      user: req.session.user,
+      page: 'trainer_students',
+      students,
+      schools,
+      stats,
+      filters: { schoolId, section, status, search, sortBy, order }
+    });
+  } catch (err) {
+    console.error('Error loading trainer students:', err);
+    res.status(500).render('404', { user: req.session.user, error: 'Failed to load students' });
+  }
+});
+
+// GET student registration form
+app.get('/trainer/students/new', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.redirect('/dashboard');
+  }
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Trainer profile not found' });
+    }
+
+    // Get schools assigned to this trainer
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active')
+      .map(a => a.schoolId);
+
+    const schools = await School.find({
+      _id: { $in: trainerSchoolIds }
+    }).select('_id name').sort({ name: 1 }).lean();
+
+    res.render('trainer_student_form', {
+      user: req.session.user,
+      page: 'trainer_student_form',
+      schools,
+      student: null,
+      formTitle: 'Add New Student',
+      submitUrl: '/api/trainer/students'
+    });
+  } catch (err) {
+    console.error('Error loading student form:', err);
+    res.status(500).render('404', { user: req.session.user, error: 'Failed to load form' });
+  }
+});
+
+// GET student edit form
+app.get('/trainer/students/:studentId/edit', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.redirect('/dashboard');
+  }
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Trainer profile not found' });
+    }
+
+    const student = await Student.findById(req.params.studentId)
+      .populate('school', '_id name')
+      .lean();
+
+    if (!student) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Student not found' });
+    }
+
+    // Check if trainer has permission to edit this student
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active')
+      .map(a => a.schoolId);
+
+    const canEdit = student.addedBy?.trainerId?.toString() === currentStaff._id.toString() ||
+                    trainerSchoolIds.some(id => id.equals(student.school?._id));
+
+    if (!canEdit) {
+      return res.status(403).render('404', { user: req.session.user, error: 'Access denied. You can only edit students you added or from your assigned schools.' });
+    }
+
+    // Get schools for dropdown
+    const schools = await School.find({
+      _id: { $in: trainerSchoolIds }
+    }).select('_id name').sort({ name: 1 }).lean();
+
+    res.render('trainer_student_form', {
+      user: req.session.user,
+      page: 'trainer_student_form',
+      schools,
+      student,
+      formTitle: 'Edit Student',
+      submitUrl: `/api/trainer/students/${student._id}`
+    });
+  } catch (err) {
+    console.error('Error loading student edit form:', err);
+    res.status(500).render('404', { user: req.session.user, error: 'Failed to load form' });
+  }
+});
+
+// POST create student
+app.post('/api/trainer/students', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Trainer profile not found' });
+    }
+
+    const {
+      fullName,
+      dateOfBirth,
+      gender,
+      parentPhone,
+      parentEmail,
+      parentName,
+      schoolId,
+      scoutSection,
+      notes,
+      medicalNotes,
+      specialNeeds
+    } = req.body;
+
+    // Validation
+    if (!fullName || !dateOfBirth || !gender || !parentPhone || !parentEmail || !schoolId || !scoutSection) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    // Validate school belongs to trainer's assigned schools
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active' && a.schoolId)
+      .map(a => a.schoolId.toString());
+
+    const schoolIdStr = String(schoolId);
+    if (!trainerSchoolIds.includes(schoolIdStr)) {
+      return res.status(403).json({ success: false, error: 'You can only add students to your assigned schools' });
+    }
+
+    // Validate age range based on scout section
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+
+    const ageRanges = {
+      Sungura: { min: 6, max: 11 },
+      Chipukizi: { min: 12, max: 15 },
+      Mwamba: { min: 16, max: 18 },
+      Rover: { min: 18, max: 99 }
+    };
+
+    const range = ageRanges[scoutSection];
+    if (age < range.min || age > range.max) {
+      return res.status(400).json({
+        success: false,
+        error: `Age mismatch`,
+        message: `${scoutSection} section requires age between ${range.min}-${range.max} years. Student is ${age} years old.`
+      });
+    }
+
+    // Create student
+    const student = new Student({
+      fullName: fullName.trim(),
+      dateOfBirth: new Date(dateOfBirth),
+      gender,
+      parentContact: {
+        phone: parentPhone.trim(),
+        email: parentEmail.trim().toLowerCase(),
+        name: parentName?.trim(),
+        relationship: 'Parent'
+      },
+      school: schoolId,
+      scoutSection,
+      notes: notes?.trim(),
+      medicalNotes: medicalNotes?.trim(),
+      specialNeeds: specialNeeds?.trim(),
+      addedBy: {
+        trainerId: currentStaff._id,
+        addedDate: new Date()
+      }
+    });
+
+    await student.save();
+    await student.populate('school', 'name address.city');
+    await student.populate('addedBy.trainerId', 'name email');
+
+    // Log audit
+    await logAudit('student_created', 'student', student._id, student.fullName, { student }, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userRole: req.session.user.role,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, student, message: 'Student added successfully' });
+  } catch (err) {
+    console.error('Error creating student:', err);
+    res.status(500).json({ success: false, error: 'Failed to create student: ' + err.message });
+  }
+});
+
+// POST update student (using POST instead of PUT to avoid method override)
+app.post('/api/trainer/students/:studentId', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Trainer profile not found' });
+    }
+
+    const studentId = req.params.studentId;
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    // Check permissions
+    const canEdit = student.addedBy?.trainerId?.toString() === currentStaff._id.toString();
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active' && a.schoolId)
+      .map(a => a.schoolId.toString());
+    const isSchoolMember = trainerSchoolIds.includes(student.school?.toString());
+
+    if (!canEdit && !isSchoolMember) {
+      return res.status(403).json({ success: false, error: 'Access denied. You can only edit students you added or from your assigned schools.' });
+    }
+
+    const {
+      fullName,
+      dateOfBirth,
+      gender,
+      parentPhone,
+      parentEmail,
+      parentName,
+      schoolId,
+      scoutSection,
+      notes,
+      medicalNotes,
+      specialNeeds,
+      status
+    } = req.body;
+
+    // Validation for school
+    if (schoolId) {
+      const schoolIdStr = String(schoolId);
+      if (!trainerSchoolIds.includes(schoolIdStr)) {
+        return res.status(403).json({ success: false, error: 'You can only assign students to your assigned schools' });
+      }
+    }
+
+    // Age validation if DOB or section is being updated
+    if (dateOfBirth || scoutSection) {
+      const dob = dateOfBirth ? new Date(dateOfBirth) : student.dateOfBirth;
+      const targetSection = scoutSection || student.scoutSection;
+
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const monthDiff = today.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+
+      const ageRanges = {
+        Sungura: { min: 6, max: 11 },
+        Chipukizi: { min: 12, max: 15 },
+        Mwamba: { min: 16, max: 18 },
+        Rover: { min: 18, max: 99 }
+      };
+
+      const range = ageRanges[targetSection];
+      if (age < range.min || age > range.max) {
+        return res.status(400).json({
+          success: false,
+          error: `Age mismatch`,
+          message: `${targetSection} section requires age between ${range.min}-${range.max} years. Student is ${age} years old.`
+        });
+      }
+    }
+
+    // Update fields
+    if (fullName !== undefined) student.fullName = fullName.trim();
+    if (dateOfBirth) student.dateOfBirth = new Date(dateOfBirth);
+    if (gender) student.gender = gender;
+    if (parentPhone) student.parentContact.phone = parentPhone.trim();
+    if (parentEmail) student.parentContact.email = parentEmail.trim().toLowerCase();
+    if (parentName !== undefined) student.parentContact.name = parentName?.trim();
+    if (schoolId) student.school = schoolId;
+    if (scoutSection) student.scoutSection = scoutSection;
+    if (notes !== undefined) student.notes = notes?.trim();
+    if (medicalNotes !== undefined) student.medicalNotes = medicalNotes?.trim();
+    if (specialNeeds !== undefined) student.specialNeeds = specialNeeds?.trim();
+    if (status) student.status = status;
+
+    await student.save();
+    await student.populate('school', 'name address.city');
+    await student.populate('addedBy.trainerId', 'name email');
+
+    res.json({ success: true, student, message: 'Student updated successfully' });
+  } catch (err) {
+    console.error('Error updating student:', err);
+    res.status(500).json({ success: false, error: 'Failed to update student' });
+  }
+});
+
+// POST delete student
+app.post('/api/trainer/students/:studentId/delete', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Trainer profile not found' });
+    }
+
+    const student = await Student.findById(req.params.studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    // Only the trainer who added the student can delete
+    if (student.addedBy?.trainerId?.toString() !== currentStaff._id.toString()) {
+      return res.status(403).json({ success: false, error: 'You can only delete students you added' });
+    }
+
+    // Use remove() to trigger post('remove') hook which updates school count
+    await student.remove();
+
+    // Log audit
+    await logAudit('student_deleted', 'student', student._id, student.fullName, {}, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userRole: req.session.user.role,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      sessionId: req.sessionID
+    });
+
+    res.json({ success: true, message: 'Student deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting student:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete student' });
+  }
+});
+
+
+// GET student profile
+app.get('/trainer/students/:studentId', requireAuth, async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'trainer') {
+    return res.redirect('/dashboard');
+  }
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Trainer profile not found' });
+    }
+
+    const student = await Student.findById(req.params.studentId)
+      .populate('school', 'name address.city contactPerson contactPerson.name contactPerson.email')
+      .populate('addedBy.trainerId', 'name email idNumber')
+      .lean();
+
+    if (!student) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Student not found' });
+    }
+
+    // Check permissions
+    const canView = student.addedBy?.trainerId?.toString() === currentStaff._id.toString();
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active' && a.schoolId)
+      .map(a => a.schoolId.toString());
+    const isSchoolMember = trainerSchoolIds.includes(student.school?._id.toString());
+
+    if (!canView && !isSchoolMember) {
+      return res.status(403).render('404', { user: req.session.user, error: 'Access denied' });
+    }
+
+    // Get participation records (events student attended via school)
+    const participationRecords = await Event.aggregate([
+      { $match: { 'targetSchools.schoolId': student.school._id, status: { $in: ['completed', 'in_progress'] } } },
+      { $sort: { startDate: -1 } },
+      { $limit: 20 },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          startDate: 1,
+          endDate: 1,
+          eventType: 1,
+          status: 1,
+          schoolAttendance: {
+            $filter: {
+              input: '$targetSchools',
+              as: 'ts',
+              cond: { $eq: ['$$ts.schoolId', student.school._id] }
+            }
+          }
+        }
+      }
+    ]);
+
+    res.render('trainer_student_profile', {
+      user: req.session.user,
+      page: 'trainer_student_profile',
+      student,
+      participationRecords,
+      canEdit: canView || isSchoolMember
+    });
+  } catch (err) {
+    console.error('Error loading student profile:', err);
+    res.status(500).render('404', { user: req.session.user, error: 'Failed to load student profile' });
+  }
+});
+
+// API: Get students for dropdown/autocomplete
+app.get('/api/trainer/students', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Trainer profile not found' });
+    }
+
+    // Query parameters with defaults and validation
+    const { 
+      schoolId, 
+      section, 
+      status: statusFilter, 
+      search,
+      page = '1', 
+      limit = '20', 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc' 
+    } = req.query;
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.max(parseInt(limit, 10) || 20, 1);
+    const clampedLimit = Math.min(limitNum, 100); // enforce max limit
+
+    // Validate schoolId if provided
+    if (schoolId && !mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
+    // Validate section enum
+    const validSections = ['Sungura', 'Chipukizi', 'Mwamba', 'Rover'];
+    if (section && !validSections.includes(section)) {
+      return res.status(400).json({ success: false, error: 'Invalid scout section' });
+    }
+
+    // Validate status enum
+    const validStatuses = ['active', 'inactive', 'graduated', 'transferred'];
+    if (statusFilter && !validStatuses.includes(statusFilter)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
+    }
+
+    // Validate and build sort object
+    const validSortFields = ['createdAt', 'fullName', 'dateOfBirth', 'scoutSection', 'school', 'status', 'age', 'gender'];
+    const sortObj = {};
+    if (validSortFields.includes(sortBy)) {
+      sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    } else {
+      sortObj.createdAt = -1;
+    }
+
+    // Build base accessibility query (students added by this trainer OR from assigned schools)
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active')
+      .map(a => a.schoolId);
+
+    const andConditions = [
+      {
+        $or: [
+          { addedBy: { trainerId: currentStaff._id } },
+          ...(trainerSchoolIds.length > 0 ? [{ school: { $in: trainerSchoolIds } }] : [])
+        ]
+      }
+    ];
+
+    // Apply additional filters
+    if (schoolId) andConditions.push({ school: mongoose.Types.ObjectId(schoolId) });
+    if (section) andConditions.push({ scoutSection: section });
+    if (statusFilter) andConditions.push({ status: statusFilter });
+    if (search) {
+      // Escape regex special characters to prevent ReDoS
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      andConditions.push({
+        $or: [
+          { fullName: { $regex: escaped, $options: 'i' } },
+          { 'parentContact.name': { $regex: escaped, $options: 'i' } },
+          { 'parentContact.phone': { $regex: escaped, $options: 'i' } },
+          { 'parentContact.email': { $regex: escaped, $options: 'i' } }
+        ]
+      });
+    }
+
+    const query = { $and: andConditions };
+
+    // Get total count for pagination
+    const total = await Student.countDocuments(query);
+
+    // Fetch students with pagination, sorting, and population
+    const students = await Student.find(query)
+      .populate('school', 'name')
+      .populate('addedBy.trainerId', 'name email')
+      .select('fullName dateOfBirth age gender scoutSection school status addedBy parentContact.name parentContact.phone parentContact.email')
+      .sort(sortObj)
+      .skip((pageNum - 1) * clampedLimit)
+      .limit(clampedLimit)
+      .lean();
+
+    res.json({
+      success: true,
+      students,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: clampedLimit,
+        pages: Math.ceil(total / clampedLimit)
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching students:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch students' });
+  }
+});
+
+// API: Export students (CSV/PDF)
+app.get('/api/trainer/students/export', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Trainer profile not found' });
+    }
+
+    const { format = 'csv', schoolId, section, status } = req.query;
+
+    // Build same query as list
+    const trainerSchoolIds = (currentStaff.assignedSchools || [])
+      .filter(a => a.status === 'active')
+      .map(a => a.schoolId);
+
+    let query = {
+      $or: [
+        { addedBy: { trainerId: currentStaff._id } },
+        ...(trainerSchoolIds.length > 0 ? [{ school: { $in: trainerSchoolIds } }] : [])
+      ]
+    };
+
+    if (schoolId) query.school = new mongoose.Types.ObjectId(schoolId);
+    if (section) query.scoutSection = section;
+    if (status) query.status = status;
+
+    const students = await Student.find(query)
+      .populate('school', 'name')
+      .populate('addedBy.trainerId', 'name')
+      .sort({ fullName: 1 })
+      .lean();
+
+    if (format === 'csv') {
+      const { Parser } = require('json2csv');
+      const fields = [
+        'fullName',
+        'dateOfBirth',
+        'age',
+        'gender',
+        'scoutSection',
+        'school.name',
+        { label: 'parentName', value: 'parentContact.name' },
+        { label: 'parentPhone', value: 'parentContact.phone' },
+        { label: 'parentEmail', value: 'parentContact.email' },
+        { label: 'addedBy', value: row => row.addedBy?.trainerId?.name || 'System' },
+        'status',
+        'createdAt'
+      ];
+
+      const parser = new Parser({ fields });
+      const csv = parser.parse(students);
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="students-${new Date().toISOString().split('T')[0]}.csv"`);
+
+      return res.send(csv);
+    } else if (format === 'pdf') {
+      // PDF generation
+      const PDFDocument = require('pdfkit');
+      const doc = new PDFDocument({ margin: 50 });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="students-${new Date().toISOString().split('T')[0]}.pdf"`);
+
+      doc.pipe(res);
+
+      // Title
+      doc.fontSize(20).text('Student List', { align: 'center' });
+      doc.moveDown();
+
+      // Filter info
+      doc.fontSize(12);
+      if (schoolId) {
+        const school = await School.findById(schoolId);
+        if (school) doc.text(`School: ${school.name}`);
+      }
+      if (section) doc.text(`Section: ${section}`);
+      doc.moveDown();
+
+      // Table headers
+      const tableTop = doc.y;
+      const col1 = 50;
+      const col2 = 150;
+      const col3 = 250;
+      const col4 = 350;
+      const col5 = 450;
+
+      doc.font('Helvetica-Bold');
+      doc.text('Name', col1, tableTop);
+      doc.text('Age', col2, tableTop);
+      doc.text('Section', col3, tableTop);
+      doc.text('School', col4, tableTop);
+      doc.text('Status', col5, tableTop);
+
+      doc.moveTo(50, tableTop + 20).lineTo(550, tableTop + 20).stroke();
+
+      // Table rows
+      doc.font('Helvetica');
+      let y = tableTop + 30;
+      for (const s of students) {
+        if (y > 700) {
+          doc.addPage();
+          y = 50;
+        }
+        doc.text(s.fullName, col1, y);
+        doc.text(s.age.toString(), col2, y);
+        doc.text(s.scoutSection, col3, y);
+        doc.text(s.school?.name || '-', col4, y);
+        doc.text(s.status, col5, y);
+        y += 20;
+      }
+
+      doc.end();
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid export format' });
+    }
+  } catch (err) {
+    console.error('Error exporting students:', err);
+    res.status(500).json({ success: false, error: 'Failed to export students' });
   }
 });
 
@@ -3540,6 +4924,12 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
       return res.status(400).json({ success: false, error: 'trainerId is required' });
     }
 
+    // Get current admin staff (the one performing the assignment)
+    const currentAdmin = await getCurrentStaff(req);
+    if (!currentAdmin) {
+      return res.status(403).json({ success: false, error: 'Admin staff record not found' });
+    }
+
     const event = await Event.findById(eventId);
     if (!event) {
       return res.status(404).json({ success: false, error: 'Event not found' });
@@ -3573,70 +4963,118 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
       });
     }
 
-    // Assign trainer
-    event.trainers.push({
-      trainerId,
-      role: role || 'assistant_trainer',
-      assignedAt: new Date(),
-      status: 'assigned'
-    });
+     // Assign trainer
+     event.trainers.push({
+       trainerId,
+       role: role || 'assistant_trainer',
+       assignedAt: new Date(),
+       status: 'assigned'
+     });
 
-    await event.save();
+     await event.save();
 
-    // Notify trainer via email and in-app notification
-    try {
-      const trainer = await Staff.findById(trainerId);
-      if (trainer && trainer.email) {
-        const emailHtml = `
-          <h2>You've been assigned to an event</h2>
-          <p>Hello ${trainer.name},</p>
-          <p>You have been assigned to <strong>${event.name}</strong>.</p>
-          <p><strong>Event Details:</strong></p>
-          <ul>
-            <li>Date: ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</li>
-            <li>Location: ${event.location?.name}</li>
-            <li>Type: ${event.eventType.replace('_', ' ')}</li>
-          </ul>
-          <p>Please confirm your availability in your trainer dashboard.</p>
-        `;
+     // Get the assigned trainer object for the response
+     const assignedTrainer = event.trainers.find(t => t.trainerId.toString() === trainerId);
 
-        const eventUrl = `${req.protocol}://${req.get('host')}/dashboard/events/${eventId}`;
-        await emailService.sendEmail({
-          to: trainer.email,
-          subject: 'Event Assignment Notification',
-          html: emailHtml,
-          templateId: 'event_assignment',
-          templateData: {
-            trainerName: trainer.name,
-            eventName: event.name,
-            eventDate: `${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}`,
-            location: event.location?.name,
-            role: role || 'assistant_trainer',
-            eventUrl: eventUrl
-          },
-          triggeredBy: req.session.user.id,
-          entityType: 'event',
-          entityId: eventId,
-          triggerReason: 'trainer_assigned',
-          priority: 'normal'
-        });
+     // Notify trainer via email and in-app message
+     try {
+       const trainer = await Staff.findById(trainerId);
+       if (trainer && trainer.email && currentAdmin) {
+         // Build event details for email/message
+         const eventDetails = `
+           <strong>Event:</strong> ${event.name}<br>
+           <strong>Date:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}<br>
+           <strong>Location:</strong> ${event.location?.name || 'TBD'}<br>
+           <strong>Type:</strong> ${event.eventType.replace('_', ' ')}<br>
+           <strong>Your Role:</strong> ${role || 'assistant_trainer'}
+         `;
 
-        // Send in-app notification
-        await Notification.create({
-          recipientId: trainerId,
-          type: 'assignment',
-          title: 'New Event Assignment',
-          message: `You have been assigned to "${event.name}"`,
-          actionUrl: `/dashboard/events/${eventId}`,
-          entityType: 'event',
-          entityId: eventId,
-          priority: 'normal',
-          metadata: { relatedNames: [event.name] }
-        });
-      }
-    } catch (emailErr) {
-      console.error('Error sending assignment email:', emailErr);
-    }
+          // Get list of other trainers assigned (for message only)
+          const otherTrainers = await Promise.all(
+            event.trainers
+              .filter(t => t.trainerId.toString() !== trainerId)
+              .map(async t => {
+                const staff = await Staff.findById(t.trainerId).select('name role');
+                return staff ? `${staff.name} (${staff.role.replace('_', ' ')})` : null;
+              })
+          );
+          const otherTrainersList = otherTrainers.filter(Boolean);
+          const otherTrainersText = otherTrainersList.length > 0
+            ? `<br><strong>Other Trainers:</strong><br>${otherTrainersList.map(t => `• ${t}`).join('<br>')}`
+            : '';
+
+          // Accept/Decline action buttons (links to event page where they can take action)
+          const acceptUrl = `${req.protocol}://${req.get('host')}/trainer/events/${eventId}`;
+          const declineUrl = `${req.protocol}://${req.get('host')}/trainer/events/${eventId}`;
+
+          const emailHtml = `
+            <h2>New Event Assignment</h2>
+            <p>Hello ${trainer.name},</p>
+            <p>You have been assigned to the following event. Please <strong>accept or decline</strong> this assignment:</p>
+            <div style="background: #f5f5f5; padding: 1.5rem; border-radius: 8px; margin: 1rem 0;">
+              ${eventDetails}
+              ${otherTrainersText}
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
+              <a href="${acceptUrl}" style="background: #22c55e; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 6px; font-weight: bold;">✅ Accept Assignment</a>
+              <a href="${declineUrl}" style="background: #ef4444; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 6px; font-weight: bold;">❌ Decline Assignment</a>
+            </div>
+            <p style="margin-top: 1rem; font-size: 0.875rem; color: #666;">
+              Or log into your trainer portal: <a href="${req.protocol}://${req.get('host')}/trainer/events">${req.protocol}://${req.get('host')}/trainer/events</a>
+            </p>
+          `;
+
+          await emailService.sendEmail({
+            to: trainer.email,
+            subject: `Action Required: Event Assignment - ${event.name}`,
+            html: emailHtml,
+            templateId: 'event_assignment',
+            templateData: {
+              trainerName: trainer.name,
+              eventName: event.name,
+              eventDate: `${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}`,
+              location: event.location?.name,
+              role: role || 'assistant_trainer',
+              otherTrainers: otherTrainersList.join(', '),
+              acceptUrl: acceptUrl,
+              declineUrl: declineUrl,
+              eventUrl: `${req.protocol}://${req.get('host')}/trainer/events/${eventId}`
+            },
+            triggeredBy: currentAdmin._id,
+            entityType: 'event',
+            entityId: eventId,
+            triggerReason: 'trainer_assigned',
+            priority: 'high'
+          });
+
+          // Send IN-APP MESSAGE with action buttons
+          const message = new Message({
+            senderId: currentAdmin._id,
+            senderName: currentAdmin.name,
+            senderRole: currentAdmin.role,
+            recipients: [{
+              staffId: trainer._id,
+              status: 'sent'
+            }],
+            subject: `Event Assignment: ${event.name} - Action Required`,
+            body: `You have been assigned to <strong>${event.name}</strong> as a <strong>${role || 'assistant_trainer'}</strong>.<br><br>
+                   <strong>Event Details:</strong><br>
+                   📅 ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}<br>
+                   📍 ${event.location?.name || 'TBD'}<br>
+                   🏷️ ${event.eventType.replace('_', ' ')}<br>
+                   ${otherTrainersList.length ? `<br><strong>Other Trainers:</strong><br>${otherTrainersList.map(t => `• ${t}`).join('<br>')}<br><br>` : ''}
+                   <strong>Please respond to this assignment:</strong><br>
+                   <a href="/trainer/events/${eventId}" style="background: #22c55e; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block; margin-right: 0.5rem;">✅ Accept Assignment</a>
+                   <a href="/trainer/events/${eventId}?action=decline" style="background: #ef4444; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block;">❌ Decline Assignment</a>`,
+            messageType: 'direct',
+            priority: 'high',
+            createdBy: currentAdmin._id
+          });
+          await message.save();
+       }
+     } catch (emailErr) {
+       console.error('Error sending assignment email/message:', emailErr);
+     }
 
     const populatedEvent = await Event.findById(eventId)
       .populate('trainers.trainerId', 'name email idNumber role')
@@ -4433,19 +5871,19 @@ app.post('/api/messages/send', requireAuth, async (req, res) => {
 
     await message.save();
 
-    // Create in-app notifications for recipients
-    for (const recipientId of recipientIds) {
-      await Notification.create({
-        recipientId,
-        type: 'new_message',
-        title: subject || 'New Message',
-        message: body.substring(0, 100) + (body.length > 100 ? '...' : ''),
-        actionUrl: '/messages?thread=' + message._id,
-        entityType: 'message',
-        entityId: message._id,
-        priority: priority === 'urgent' ? 'high' : 'normal'
-      });
-    }
+     // Create in-app notifications for recipients
+     for (const recipientId of recipientIds) {
+       await Notification.create({
+         recipientId,
+         type: 'new_message',
+         title: subject || 'New Message',
+         message: body.substring(0, 100) + (body.length > 100 ? '...' : ''),
+         actionUrl: '/dashboard/messages?thread=' + message._id,
+         entityType: 'message',
+         entityId: message._id,
+         priority: priority === 'urgent' ? 'high' : 'normal'
+       });
+     }
 
     res.json({ success: true, messageId: message._id, message });
   } catch (err) {
@@ -4642,6 +6080,26 @@ app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
   }
 });
 
+// Mark all messages as read
+app.post('/api/messages/mark-all-read', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    await Message.updateMany(
+      { 'recipients.staffId': staffId, 'recipients.status': 'sent' },
+      { $set: { 'recipients.$.status': 'read', 'recipients.$.readAt': new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking all messages as read:', err);
+    res.status(500).json({ success: false, error: 'Failed to mark messages as read' });
+  }
+});
+
 // --- Notification Routes ---
 
 // Get user notifications
@@ -4674,7 +6132,7 @@ app.get('/api/notifications', requireAuth, async (req, res) => {
       dismissed: false
     });
 
-    res.json({ notifications, unreadCount, page: parseInt(page) });
+    res.json({ success: true, notifications, unreadCount, page: parseInt(page) });
   } catch (err) {
     console.error('Error fetching notifications:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
@@ -5416,3 +6874,15 @@ const startServer = async () => {
 };
 
 startServer();
+
+
+
+
+
+
+
+
+
+
+
+

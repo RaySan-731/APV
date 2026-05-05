@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - Trainer Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <span>APV Trainer Portal</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="/trainer/dashboard" class="nav-link">Home</a></li>
+                        <li class="nav-item"><a href="/dashboard/schools" class="nav-link">My Schools</a></li>
+                        <li class="nav-item"><a href="/dashboard/events" class="nav-link">Events</a></li>
+                        <li class="nav-item"><a href="/dashboard/programs" class="nav-link">Programs</a></li>
+                        <li class="nav-item"><a href="/trainer/profile" class="nav-link active">My Profile</a></li>
+                        <li class="nav-item"><a href="/trainer/notifications" class="nav-link">Notifications</a></li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <h1>My Profile</h1>
+                <div class="user-info">Welcome, <%= user.name %></div>
+            </header>
+
+            <section class="dashboard-content">
+                <div class="content-card">
+                    <h2>Personal Information</h2>
+                    <form id="profileForm" class="form-grid">
+                        <input type="hidden" name="staffId" value="<%= trainer._id %>">
+                        <label>Name <input type="text" name="name" value="<%= trainer.name %>" disabled></label>
+                        <label>Email <input type="email" name="email" value="<%= trainer.email %>" disabled></label>
+                        <label>Phone <input type="tel" name="phone" value="<%= trainer.phone || '' %>"></label>
+                        <label>ID Number <input type="text" name="idNumber" value="<%= trainer.idNumber || '' %>"></label>
+                        <label>Role <input type="text" value="<%= trainer.role %>" disabled></label>
+                        <label>Status <input type="text" value="<%= trainer.status %>" disabled></label>
+                        <label>Department <input type="text" value="<%= trainer.department || 'Training' %>" disabled></label>
+                        <h3>Address</h3>
+                        <label>Street <input type="text" name="street" value="<%= trainer.address?.street || '' %>"></label>
+                        <label>City <input type="text" name="city" value="<%= trainer.address?.city || '' %>"></label>
+                        <label>State <input type="text" name="state" value="<%= trainer.address?.state || '' %>"></label>
+                        <label>Zip Code <input type="text" name="zipCode" value="<%= trainer.address?.zipCode || '' %>"></label>
+                        <label>Country <input type="text" name="country" value="<%= trainer.address?.country || 'Kenya' %>"></label>
+                        <h3>Emergency Contact</h3>
+                        <label>Name <input type="text" name="emergencyContactName" value="<%= trainer.emergencyContact?.name || '' %>"></label>
+                        <label>Relationship <input type="text" name="emergencyContactRelationship" value="<%= trainer.emergencyContact?.relationship || '' %>"></label>
+                        <label>Phone <input type="tel" name="emergencyContactPhone" value="<%= trainer.emergencyContact?.phone || '' %>"></label>
+                        <label>Email <input type="email" name="emergencyContactEmail" value="<%= trainer.emergencyContact?.email || '' %>"></label>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="content-card">
+                    <h2>Certifications</h2>
+                    <div id="certificationsList">
+                        <% if (trainer.certifications && trainer.certifications.length > 0) { %>
+                            <table class="data-table">
+                                <thead><tr><th>Name</th><th>Issuer</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th>Actions</th></tr></thead>
+                                <tbody>
+                                <% trainer.certifications.forEach((cert, idx) => { %>
+                                    <tr>
+                                        <td><%= cert.name %></td>
+                                        <td><%= cert.issuer %></td>
+                                        <td><%= cert.issueDate ? new Date(cert.issueDate).toLocaleDateString() : '—' %></td>
+                                        <td><%= cert.expiryDate ? new Date(cert.expiryDate).toLocaleDateString() : 'No expiry' %></td>
+                                        <td><span class="badge badge-<%= cert.status === 'active' ? 'success' : cert.status === 'expired' ? 'danger' : 'warning' %>"><%= cert.status %></span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline" onclick="deleteCert(<%= idx %>)">Delete</button>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                                </tbody>
+                            </table>
+                        <% } else { %>
+                            <p class="placeholder-text">No certifications added yet.</p>
+                        <% } %>
+                    </div>
+                    <h3>Add New Certification</h3>
+                    <form id="addCertForm" class="form-grid">
+                        <label>Certification Name <input type="text" name="name" required></label>
+                        <label>Issuer <input type="text" name="issuer" required></label>
+                        <label>Issue Date <input type="date" name="issueDate" required></label>
+                        <label>Expiry Date <input type="date" name="expiryDate"></label>
+                        <label>Status <select name="status">
+                            <option value="active">Active</option>
+                            <option value="pending">Pending</option>
+                            <option value="expired">Expired</option>
+                        </select></label>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Add Certification</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        function showToast(message, type = 'info', duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            toast.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 1rem 1.5rem; border-radius: 8px; color: white; font-weight: 500; z-index: 10000; opacity: 0; transform: translateY(-20px); transition: all 0.3s ease;';
+            if (type === 'success') toast.style.backgroundColor = '#28a745';
+            else if (type === 'error') toast.style.backgroundColor = '#dc3545';
+            else if (type === 'warning') toast.style.backgroundColor = '#ffc107';
+            else toast.style.backgroundColor = '#6c757d';
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; }, 10);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(-20px)'; setTimeout(() => document.body.removeChild(toast), 300); }, duration);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Profile update
+            document.getElementById('profileForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const payload = {
+                    phone: formData.get('phone').trim(),
+                    street: formData.get('street').trim(),
+                    city: formData.get('city').trim(),
+                    state: formData.get('state').trim(),
+                    zipCode: formData.get('zipCode').trim(),
+                    country: formData.get('country').trim(),
+                    emergencyContactName: formData.get('emergencyContactName').trim(),
+                    emergencyContactRelationship: formData.get('emergencyContactRelationship').trim(),
+                    emergencyContactPhone: formData.get('emergencyContactPhone').trim(),
+                    emergencyContactEmail: formData.get('emergencyContactEmail').trim()
+                };
+                try {
+                    const res = await fetch('/api/trainer/profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        showToast('Profile updated successfully', 'success');
+                    } else {
+                        showToast('Error: ' + (result.error || 'Update failed'), 'error');
+                    }
+                } catch (err) {
+                    console.error('Error:', err);
+                    showToast('Network error', 'error');
+                }
+            });
+
+            // Add certification
+            document.getElementById('addCertForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const payload = {
+                    name: formData.get('name').trim(),
+                    issuer: formData.get('issuer').trim(),
+                    issueDate: formData.get('issueDate'),
+                    expiryDate: formData.get('expiryDate') || null,
+                    status: formData.get('status')
+                };
+                try {
+                    const res = await fetch('/api/trainer/certifications', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        showToast('Certification added', 'success');
+                        window.location.reload();
+                    } else {
+                        showToast('Error: ' + (result.error || 'Failed to add'), 'error');
+                    }
+                } catch (err) {
+                    console.error('Error:', err);
+                    showToast('Network error', 'error');
+                }
+            });
+        });
+
+        async function deleteCert(index) {
+            if (!confirm('Delete this certification?')) return;
+            try {
+                const res = await fetch(`/api/trainer/certifications/${index}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('Certification deleted', 'success');
+                    window.location.reload();
+                } else {
+                    showToast('Error: ' + (result.error || 'Delete failed'), 'error');
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                showToast('Network error', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

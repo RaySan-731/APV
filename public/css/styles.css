@@ -157,6 +157,146 @@ body {
     border: 1px solid #bee5eb;
 }
 
+.badge-secondary {
+    background-color: var(--muted);
+    color: var(--muted-foreground);
+    border: 1px solid var(--border);
+}
+
+/* Notification Bell & Dropdown */
+.notification-bell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border-radius: var(--radius);
+    transition: var(--transition-base);
+    position: relative;
+}
+.notification-bell:hover {
+    background: var(--muted);
+}
+.notification-bell svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: var(--foreground);
+}
+#notificationBadge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(25%, -25%);
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.notification-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 320px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    z-index: 1000;
+    margin-top: 0.5rem;
+    animation: slideDown 0.2s ease-out;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.notification-dropdown .dropdown-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--card);
+}
+.notification-dropdown-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.notification-dropdown-item:hover {
+    background: var(--muted);
+}
+.notification-dropdown-item.unread {
+    background: var(--muted);
+}
+.notification-dropdown-empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--muted-foreground);
+}
+
+/* Notification Panel (Dashboard) */
+.notification-panel {
+    display: none;
+    position: fixed;
+    top: 4rem;
+    right: 2rem;
+    width: 400px;
+    max-height: calc(100vh - 5rem);
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    z-index: 999;
+    overflow: hidden;
+    animation: slideInRight 0.3s ease-out;
+}
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+.notification-panel .card-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+#notificationPanelList .notification-item {
+    margin-bottom: 0;
+    border-radius: 0;
+}
+#notificationPanelList .notification-item:last-child {
+    border-bottom: none;
+}
+
+/* Panel Tabs */
+#notificationPanel .panel-tab {
+    background: none;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: var(--transition-base);
+}
+#notificationPanel .panel-tab:hover {
+    color: var(--foreground);
+    border-bottom-color: var(--border);
+}
+#notificationPanel .panel-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+
+
+
 .trainer-list {
     margin-top: 0.5rem;
     display: grid;
@@ -179,6 +319,135 @@ body {
 .card-content {
     padding: 1.5rem;
 }
+
+/* Trainer-Specific Styles (Scoped) */
+#trainerStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+#trainerStats .stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+#trainerStats .stat-icon svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+#trainerStats .stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+#trainerStats .stat-label {
+  font-size: 0.95rem;
+  color: var(--muted-foreground);
+}
+
+/* Leave item styling */
+.leave-item {
+  padding: 1rem;
+  border-left: 4px solid var(--accent);
+  background: var(--card);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+}
+
+/* Notification item styling */
+.notification-item {
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.notification-item.unread {
+  border-left: 4px solid var(--primary);
+  background-color: var(--muted);
+}
+
+/* Alerts grid for pending actions */
+.alerts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+/* Notification Bell & Dropdown */
+.notification-bell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  transition: var(--transition-base);
+}
+.notification-bell:hover {
+  background: var(--muted);
+}
+.notification-bell svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--foreground);
+}
+#notificationBadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(25%, -25%);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.notification-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  z-index: 1000;
+  margin-top: 0.5rem;
+  animation: slideDown 0.2s ease-out;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.notification-dropdown .dropdown-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  background: var(--card);
+}
+.notification-dropdown-item:hover {
+  background: var(--muted);
+}
+.notification-dropdown-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
 
 /* Navigation Styles */
 .navbar {
@@ -863,6 +1132,25 @@ body {
     color: var(--accent);
     font-size: 0.75rem;
     font-weight: 500;
+}
+
+/* Trainer Dashboard Stats Override */
+#trainerStats .stat-card {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+#trainerStats .stat-icon svg {
+  width: 2rem;
+  height: 2rem;
+  margin-bottom: 0.5rem;
+}
+#trainerStats .stat-number {
+  font-size: 2rem;
+  line-height: 1.2;
+}
+#trainerStats .stat-label {
+  font-size: 0.9rem;
 }
 
 .content-card {

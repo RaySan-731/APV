@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Students Management - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="icon" href="/favicon.ico" />
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-500: #6b7280;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .page-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .page-title svg {
+            width: 2rem;
+            height: 2rem;
+            color: var(--primary);
+        }
+
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-50);
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-info {
+            background: #0ea5e9;
+            color: white;
+        }
+
+        .btn svg {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.25rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--gray-200);
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0.5rem 0;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .filter-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--gray-700);
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 0.625rem 0.875rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
+            background: white;
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: end;
+        }
+
+        .export-dropdown {
+            position: relative;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 140px;
+            z-index: 100;
+            display: none;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--gray-700);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: background 0.2s;
+        }
+
+        .dropdown-menu a:hover {
+            background: var(--gray-50);
+        }
+
+        .dropdown-menu a:first-child {
+            border-radius: 0.5rem 0.5rem 0 0;
+        }
+
+        .dropdown-menu a:last-child {
+            border-radius: 0 0 0.5rem 0.5rem;
+        }
+
+        .content-card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin: 0;
+        }
+
+        .card-content {
+            padding: 1.5rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: var(--gray-50);
+            padding: 0.875rem 1.5rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .data-table td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--gray-100);
+            vertical-align: middle;
+        }
+
+        .data-table tbody tr {
+            transition: background 0.15s ease;
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-primary {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+            color: var(--gray-500);
+        }
+
+        .empty-state p {
+            font-size: 1.125rem;
+        }
+
+        .empty-state a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .empty-state a:hover {
+            text-decoration: underline;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        .student-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .student-card:last-child {
+            border-bottom: none;
+        }
+
+        .student-avatar {
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .student-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .student-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+
+        .student-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.875rem;
+            color: var(--gray-500);
+            margin-bottom: 0.5rem;
+        }
+
+        .student-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .student-contact {
+            font-size: 0.875rem;
+            color: var(--gray-700);
+        }
+
+        .student-contact a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .student-contact a:hover {
+            text-decoration: underline;
+        }
+
+        .mobile-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .mobile-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .section-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <span>APV Trainer Portal</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="/trainer/dashboard" class="nav-link">Home</a></li>
+                        <li class="nav-item"><a href="/trainer/schools" class="nav-link">My Schools</a></li>
+                        <li class="nav-item"><a href="/trainer/students" class="nav-link active">Students</a></li>
+                        <li class="nav-item"><a href="/trainer/events" class="nav-link">Events</a></li>
+                        <li class="nav-item"><a href="/trainer/profile" class="nav-link">My Profile</a></li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="page-header">
+                <h1 class="page-title">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 012.37-5.823M15 21H9v-1a3 3 0 00-6 0v1M15 21h3v-1a6 6 0 01-6-6"></path>
+                    </svg>
+                    Students
+                </h1>
+                <a href="/trainer/students/new" class="btn btn-primary">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Student
+                </a>
+            </header>
+
+            <section class="dashboard-content">
+                <!-- Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value"><%= stats.total %></div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: #16a34a;"><%= stats.bySection.Sungura %></div>
+                        <div class="stat-label">Sungura</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: #2563eb;"><%= stats.bySection.Chipukizi %></div>
+                        <div class="stat-label">Chipukizi</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: #ea580c;"><%= stats.bySection.Mwamba %></div>
+                        <div class="stat-label">Mwamba</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: #7c3aed;"><%= stats.bySection.Rover %></div>
+                        <div class="stat-label">Rover</div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filter-card">
+                    <form id="filterForm" class="filter-form">
+                        <div class="filter-group">
+                            <label for="search">Search students</label>
+                            <input type="text" id="search" name="search" placeholder="Name..." value="<%= filters.search || '' %>">
+                        </div>
+                        <div class="filter-group">
+                            <label for="schoolId">School</label>
+                            <select id="schoolId" name="schoolId">
+                                <option value="">All Schools</option>
+                                <% schools.forEach(school => { %>
+                                    <option value="<%= school._id %>" <%= filters.schoolId === school._id.toString() ? 'selected' : '' %>>
+                                        <%= school.name %>
+                                    </option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="section">Section</label>
+                            <select id="section" name="section">
+                                <option value="">All Sections</option>
+                                <option value="Sungura" <%= filters.section === 'Sungura' ? 'selected' : '' %>>Sungura</option>
+                                <option value="Chipukizi" <%= filters.section === 'Chipukizi' ? 'selected' : '' %>>Chipukizi</option>
+                                <option value="Mwamba" <%= filters.section === 'Mwamba' ? 'selected' : '' %>>Mwamba</option>
+                                <option value="Rover" <%= filters.section === 'Rover' ? 'selected' : '' %>>Rover</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="status">Status</label>
+                            <select id="status" name="status">
+                                <option value="">All Status</option>
+                                <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+                                <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+                                <option value="graduated" <%= filters.status === 'graduated' ? 'selected' : '' %>>Graduated</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                                </svg>
+                                Filter
+                            </button>
+                            <a href="/trainer/students" class="btn btn-secondary">Clear</a>
+                            <div class="export-dropdown">
+                                <button type="button" class="btn btn-secondary" onclick="toggleExportMenu()">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    Export ▾
+                                </button>
+                                <div id="exportMenu" class="dropdown-menu">
+                                    <a href="#" id="exportCsvLink">Export CSV</a>
+                                    <a href="#" id="exportPdfLink">Export PDF</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Student List -->
+                <div class="content-card">
+                    <% if (students && students.length > 0) { %>
+                        <div class="card-header">
+                            <h3>Students (<%= students.length %>)</h3>
+                        </div>
+                        <div class="student-list">
+                            <% students.forEach(student => { %>
+                                <div class="student-card">
+                                    <div class="student-avatar">
+                                        <%= student.fullName.charAt(0).toUpperCase() %>
+                                    </div>
+                                    <div class="student-info">
+                                        <div class="student-name">
+                                            <%= student.fullName %>
+                                            <span class="section-badge badge-<%= student.scoutSection === 'Sungura' ? 'success' : student.scoutSection === 'Chipukizi' ? 'primary' : student.scoutSection === 'Mwamba' ? 'warning' : 'danger' %>">
+                                                <%= student.scoutSection %>
+                                            </span>
+                                        </div>
+                                        <div class="student-meta">
+                                            <span>
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                </svg>
+                                                <%= student.age %> years
+                                            </span>
+                                            <span>
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                </svg>
+                                                <%= student.school?.name || 'No school' %>
+                                            </span>
+                                            <span>
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                                                </svg>
+                                                <a href="tel:<%= student.parentContact.phone %>"><%= student.parentContact.phone %></a>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="action-buttons">
+                                        <a href="/trainer/students/<%= student._id %>" class="btn btn-sm btn-info">View</a>
+                                        <a href="/trainer/students/<%= student._id %>/edit" class="btn btn-sm btn-secondary">Edit</a>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <div class="empty-state">
+                            <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto 1.5rem; color: var(--gray-300);">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 012.37-5.823M15 21H9v-1a3 3 0 00-6 0v1M15 21h3v-1a6 6 0 01-6-6"></path>
+                            </svg>
+                            <p>No students found.</p>
+                            <p style="font-size: 0.875rem; margin-top: 0.5rem;">Get started by <a href="/trainer/students/new">adding your first student</a></p>
+                        </div>
+                    <% } %>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        function toggleExportMenu() {
+            const menu = document.getElementById('exportMenu');
+            menu.classList.toggle('show');
+        }
+
+        function buildExportUrl(format) {
+            const form = document.getElementById('filterForm');
+            const params = new URLSearchParams(new FormData(form));
+            params.set('format', format);
+            return '/api/trainer/students/export?' + params.toString();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const csvLink = document.getElementById('exportCsvLink');
+            const pdfLink = document.getElementById('exportPdfLink');
+            if (csvLink) csvLink.href = buildExportUrl('csv');
+            if (pdfLink) pdfLink.href = buildExportUrl('pdf');
+
+            // Maintain filter values in form
+            const urlParams = new URLSearchParams(window.location.search);
+            ['search', 'schoolId', 'section', 'status'].forEach(key => {
+                const value = urlParams.get(key);
+                if (value) {
+                    const el = document.getElementById(key);
+                    if (el) el.value = value;
+                }
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('exportMenu');
+            if (!e.target.closest('.export-dropdown')) {
+                menu.classList.remove('show');
+            }
+        });
+
+        // Optional: Auto-submit on filter change (uncomment if desired)
+        // document.getElementById('filterForm').addEventListener('change', () => {
+        //     document.getElementById('filterForm').submit();
+        // });
+    </script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= formTitle %> - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="icon" href="/favicon.ico" />
+    <style>
+        .form-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-section h3 {
+            color: #2563eb;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #2563eb;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .radio-group {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .section-info {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <span>APV Trainer Portal</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="/trainer/dashboard" class="nav-link">Home</a></li>
+                        <li class="nav-item"><a href="/trainer/schools" class="nav-link">My Schools</a></li>
+                        <li class="nav-item"><a href="/trainer/students" class="nav-link active">Students</a></li>
+                        <li class="nav-item"><a href="/trainer/events" class="nav-link">Events</a></li>
+                        <li class="nav-item"><a href="/trainer/profile" class="nav-link">My Profile</a></li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <h1><%= formTitle %></h1>
+                <div class="header-actions">
+                    <a href="/trainer/students" class="btn btn-secondary">Back to List</a>
+                </div>
+            </header>
+
+            <section class="dashboard-content">
+                <% if (schools.length === 0) { %>
+                    <div class="content-card">
+                        <div class="alert alert-error">
+                            <p>You must be assigned to at least one school before you can add students.</p>
+                            <p>Please contact an administrator to assign schools to your account.</p>
+                        </div>
+                    </div>
+                <% } else { %>
+                <div class="content-card">
+                    <form id="studentForm" class="student-form" action="<%= submitUrl %>" method="POST">
+                        <% if (student && student._id) { %>
+                            <input type="hidden" name="_method" value="PUT">
+                        <% } %>
+
+                        <!-- Personal Information -->
+                        <div class="form-section">
+                            <h3>Personal Information</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="fullName">Full Name *</label>
+                                    <input type="text" id="fullName" name="fullName" required
+                                           value="<%= student ? student.fullName : '' %>">
+                                </div>
+                                <div class="form-group">
+                                    <label for="dateOfBirth">Date of Birth *</label>
+                                    <input type="date" id="dateOfBirth" name="dateOfBirth" required
+                                           value="<%= student && student.dateOfBirth ? student.dateOfBirth.toISOString().split('T')[0] : '' %>"
+                                           onchange="calculateAge()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Age</label>
+                                    <input type="text" id="ageDisplay" readonly
+                                           value="<%= student ? student.age + ' years' : 'Calculated automatically' %>">
+                                </div>
+                                <div class="form-group">
+                                    <label>Gender *</label>
+                                    <div class="radio-group">
+                                        <label class="radio-option">
+                                            <input type="radio" name="gender" value="Male"
+                                                   <%= student && student.gender === 'Male' ? 'checked' : '' %> required>
+                                            Male
+                                        </label>
+                                        <label class="radio-option">
+                                            <input type="radio" name="gender" value="Female"
+                                                   <%= student && student.gender === 'Female' ? 'checked' : '' %>>
+                                            Female
+                                        </label>
+                                        <label class="radio-option">
+                                            <input type="radio" name="gender" value="Other"
+                                                   <%= student && student.gender === 'Other' ? 'checked' : '' %>>
+                                            Other
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Parent Contact -->
+                        <div class="form-section">
+                            <h3>Parent / Guardian Contact</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="parentName">Parent/Guardian Name</label>
+                                    <input type="text" id="parentName" name="parentName"
+                                           value="<%= student && student.parentContact ? student.parentContact.name || '' : '' %>">
+                                </div>
+                                <div class="form-group">
+                                    <label for="parentPhone">Phone Number *</label>
+                                    <input type="tel" id="parentPhone" name="parentPhone" required
+                                           value="<%= student && student.parentContact ? student.parentContact.phone || '' : '' %>">
+                                </div>
+                                <div class="form-group">
+                                    <label for="parentEmail">Email Address *</label>
+                                    <input type="email" id="parentEmail" name="parentEmail" required
+                                           value="<%= student && student.parentContact ? student.parentContact.email || '' : '' %>">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- School & Section -->
+                        <div class="form-section">
+                            <h3>Scout Information</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="schoolId">School *</label>
+                                    <select id="schoolId" name="schoolId" required>
+                                        <option value="">Select a school...</option>
+                                        <% schools.forEach(school => { %>
+                                            <option value="<%= school._id %>"
+                                                    <%= student && student.school && student.school._id.toString() === school._id.toString() ? 'selected' : '' %>>
+                                                <%= school.name %>
+                                            </option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="scoutSection">Scout Section *</label>
+                                    <select id="scoutSection" name="scoutSection" required onchange="checkAgeValidity()">
+                                        <option value="">Select section...</option>
+                                        <option value="Sungura" <%= student && student.scoutSection === 'Sungura' ? 'selected' : '' %>>Sungura (6-11 yrs)</option>
+                                        <option value="Chipukizi" <%= student && student.scoutSection === 'Chipukizi' ? 'selected' : '' %>>Chipukizi (12-15 yrs)</option>
+                                        <option value="Mwamba" <%= student && student.scoutSection === 'Mwamba' ? 'selected' : '' %>>Mwamba (16-18 yrs)</option>
+                                        <option value="Rover" <%= student && student.scoutSection === 'Rover' ? 'selected' : '' %>>Rover (18+ yrs)</option>
+                                    </select>
+                                    <div id="sectionAgeWarning" class="form-error" style="display:none; color: #dc2626; font-size: 0.9rem; margin-top: 0.5rem;"></div>
+                                </div>
+                            </div>
+                            <div class="section-info">
+                                <strong>Note:</strong> Age ranges are enforced based on date of birth. Ensure the date of birth and section selection are compatible.
+                            </div>
+                        </div>
+
+                        <!-- Additional Information -->
+                        <div class="form-section">
+                            <h3>Additional Information</h3>
+                            <div class="form-grid">
+                                <div class="form-group full-width">
+                                    <label for="notes">General Notes</label>
+                                    <textarea id="notes" name="notes" rows="3"><%= student && student.notes ? student.notes : '' %></textarea>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label for="medicalNotes">Medical / Allergy Information</label>
+                                    <textarea id="medicalNotes" name="medicalNotes" rows="2"
+                                              placeholder="Any medical conditions, allergies, or special care requirements..."><%= student && student.medicalNotes ? student.medicalNotes : '' %></textarea>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label for="specialNeeds">Special Needs / Accommodations</label>
+                                    <textarea id="specialNeeds" name="specialNeeds" rows="2"
+                                              placeholder="Any special needs, accessibility requirements, or accommodations..."><%= student && student.specialNeeds ? student.specialNeeds : '' %></textarea>
+                                </div>
+                                <% if (student && student._id) { %>
+                                    <div class="form-group">
+                                        <label for="status">Status</label>
+                                        <select id="status" name="status">
+                                            <option value="active" <%= student.status === 'active' ? 'selected' : '' %>>Active</option>
+                                            <option value="inactive" <%= student.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+                                            <option value="graduated" <%= student.status === 'graduated' ? 'selected' : '' %>>Graduated</option>
+                                            <option value="transferred" <%= student.status === 'transferred' ? 'selected' : '' %>>Transferred</option>
+                                        </select>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <!-- Submit -->
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-large">Save Student</button>
+                            <a href="/trainer/students" class="btn btn-secondary btn-large">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+                <% } %>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        function calculateAge() {
+            const dob = document.getElementById('dateOfBirth').value;
+            if (!dob) return;
+
+            const birthDate = new Date(dob);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            document.getElementById('ageDisplay').value = age + ' years';
+            checkAgeValidity();
+        }
+
+        function checkAgeValidity() {
+            const dob = document.getElementById('dateOfBirth').value;
+            const section = document.getElementById('scoutSection').value;
+            const warning = document.getElementById('sectionAgeWarning');
+
+            if (!dob || !section) {
+                warning.style.display = 'none';
+                return true;
+            }
+
+            const birthDate = new Date(dob);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+
+            const ranges = {
+                Sungura: { min: 6, max: 11 },
+                Chipukizi: { min: 12, max: 15 },
+                Mwamba: { min: 16, max: 18 },
+                Rover: { min: 18, max: 99 }
+            };
+
+            const range = ranges[section];
+            if (age < range.min || age > range.max) {
+                warning.textContent = `Warning: ${section} section expects ages ${range.min}-${range.max}. Current age: ${age}.`;
+                warning.style.display = 'block';
+                return false;
+            } else {
+                warning.style.display = 'none';
+                return true;
+            }
+        }
+
+        // Form validation
+        document.getElementById('studentForm').addEventListener('submit', function(e) {
+            if (!checkAgeValidity()) {
+                e.preventDefault();
+                alert('Please correct the age/section mismatch before submitting.');
+            }
+        });
+    </script>
+</body>
+</html>

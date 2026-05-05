@@ -19,11 +19,11 @@
                 <div class="nav-section">
                     <ul class="nav-list">
                         <li class="nav-item"><a href="/trainer/dashboard" class="nav-link active">Home</a></li>
-                        <li class="nav-item"><a href="/dashboard/schools" class="nav-link">My Schools</a></li>
-                        <li class="nav-item"><a href="/dashboard/events" class="nav-link">Events</a></li>
+                        <li class="nav-item"><a href="/trainer/schools" class="nav-link">My Schools</a></li>
+                        <li class="nav-item"><a href="/trainer/students" class="nav-link">Students</a></li>
+                        <li class="nav-item"><a href="/trainer/events" class="nav-link">Events</a></li>
                         <li class="nav-item"><a href="/dashboard/programs" class="nav-link">Programs</a></li>
                         <li class="nav-item"><a href="/trainer/profile" class="nav-link">My Profile</a></li>
-                        <li class="nav-item"><a href="/trainer/notifications" class="nav-link">Notifications</a></li>
                     </ul>
                 </div>
             </nav>
@@ -132,6 +132,16 @@
                         </div>
                         <div class="stat-number" id="schoolsVisited">0</div>
                         <div class="stat-label">Schools Visited</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 012.37-5.823M15 21H9v-1a3 3 0 00-6 0v1M15 21h3v-1a6 6 0 01-6-6"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-number" id="studentsManaged">0</div>
+                        <div class="stat-label">Students Managed</div>
                     </div>
 
                     <div class="stat-card">
@@ -313,6 +323,7 @@
                     document.getElementById('totalScoutsReached').textContent = data.stats.totalScoutsReached;
                     document.getElementById('reportsSubmitted').textContent = data.stats.reportsSubmitted;
                     document.getElementById('schoolsVisited').textContent = data.stats.schoolsVisited;
+                    document.getElementById('studentsManaged').textContent = data.stats.studentsManaged || 0;
                     document.getElementById('performanceRating').textContent = data.stats.performanceRating.toFixed(1);
                 }
             } catch (error) {

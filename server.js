@@ -38,25 +38,16 @@ const sessionConfig = {
   }
 };
 
-// Use MongoDB session store if MONGODB_URI is available, otherwise fallback to MemoryStore
-if (process.env.MONGODB_URI) {
-  try {
-    const MongoStore = require('connect-mongo');
-    if (MongoStore && typeof MongoStore.create === 'function') {
-      sessionConfig.store = MongoStore.create({
-        mongoUrl: process.env.MONGODB_URI,
-        collectionName: 'sessions',
-        ttl: 14 * 24 * 60 * 60,
-        autoRemove: 'native'
-      });
-      console.log('Using MongoDB session store');
-    } else {
-      console.log('connect-mongo loaded but .create() not available; using memory store');
-    }
-  } catch (e) {
-    console.error('Failed to initialize MongoDB session store:', e.message);
-    console.log('Falling back to in-memory session store');
-  }
+// Use MongoDB session store in production, default MemoryStore for dev
+if (process.env.MONGODB_URI && process.env.NODE_ENV === 'production') {
+  const MongoStore = require('connect-mongo');
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    collectionName: 'sessions',
+    ttl: 14 * 24 * 60 * 60, // 14 days (matches cookie maxAge)
+    autoRemove: 'native' // Let MongoDB handle expiration
+  });
+  console.log('Using MongoDB session store');
 } else {
   console.log('Using in-memory session store (development only)');
 }
@@ -733,11 +724,6 @@ app.get('/api/trainer/stats', requireAuth, async (req, res) => {
     ]);
     const schoolsVisited = allSchoolIds.size;
 
-    // Students managed (students added by this trainer)
-    const studentsManaged = await Student.countDocuments({
-      'addedBy.trainerId': trainerId
-    });
-
     // Performance rating from admin (stored in Staff.performanceMetrics.averageFeedbackRating)
     const performanceRating = currentStaff.performanceMetrics?.averageFeedbackRating || 0;
 
@@ -748,7 +734,6 @@ app.get('/api/trainer/stats', requireAuth, async (req, res) => {
         totalScoutsReached,
         reportsSubmitted,
         schoolsVisited,
-        studentsManaged,
         performanceRating,
         ratingCount: 0
       }
@@ -2417,7 +2402,7 @@ app.get('/trainer/students/:studentId/edit', requireAuth, async (req, res) => {
       .map(a => a.schoolId);
 
     const canEdit = student.addedBy?.trainerId?.toString() === currentStaff._id.toString() ||
-                    trainerSchoolIds.some(id => id.equals(student.school?._id));
+                    trainerSchoolIds.includes(student.school?._id);
 
     if (!canEdit) {
       return res.status(403).render('404', { user: req.session.user, error: 'Access denied. You can only edit students you added or from your assigned schools.' });
@@ -2477,8 +2462,7 @@ app.post('/api/trainer/students', requireAuth, async (req, res) => {
       .filter(a => a.status === 'active' && a.schoolId)
       .map(a => a.schoolId.toString());
 
-    const schoolIdStr = String(schoolId);
-    if (!trainerSchoolIds.includes(schoolIdStr)) {
+    if (!trainerSchoolIds.includes(schoolId)) {
       return res.status(403).json({ success: false, error: 'You can only add students to your assigned schools' });
     }
 
@@ -2572,7 +2556,7 @@ app.post('/api/trainer/students/:studentId', requireAuth, async (req, res) => {
     const trainerSchoolIds = (currentStaff.assignedSchools || [])
       .filter(a => a.status === 'active' && a.schoolId)
       .map(a => a.schoolId.toString());
-    const isSchoolMember = trainerSchoolIds.includes(student.school?.toString());
+    const isSchoolMember = trainerSchoolIds.includes(student.school?._id.toString());
 
     if (!canEdit && !isSchoolMember) {
       return res.status(403).json({ success: false, error: 'Access denied. You can only edit students you added or from your assigned schools.' });
@@ -2594,11 +2578,8 @@ app.post('/api/trainer/students/:studentId', requireAuth, async (req, res) => {
     } = req.body;
 
     // Validation for school
-    if (schoolId) {
-      const schoolIdStr = String(schoolId);
-      if (!trainerSchoolIds.includes(schoolIdStr)) {
-        return res.status(403).json({ success: false, error: 'You can only assign students to your assigned schools' });
-      }
+    if (schoolId && !trainerSchoolIds.includes(schoolId)) {
+      return res.status(403).json({ success: false, error: 'You can only assign students to your assigned schools' });
     }
 
     // Age validation if DOB or section is being updated
@@ -2676,8 +2657,7 @@ app.post('/api/trainer/students/:studentId/delete', requireAuth, async (req, res
       return res.status(403).json({ success: false, error: 'You can only delete students you added' });
     }
 
-    // Use remove() to trigger post('remove') hook which updates school count
-    await student.remove();
+    await Student.findByIdAndDelete(req.params.studentId);
 
     // Log audit
     await logAudit('student_deleted', 'student', student._id, student.fullName, {}, {
@@ -2773,104 +2753,30 @@ app.get('/api/trainer/students', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Trainer profile not found' });
     }
 
-    // Query parameters with defaults and validation
-    const { 
-      schoolId, 
-      section, 
-      status: statusFilter, 
-      search,
-      page = '1', 
-      limit = '20', 
-      sortBy = 'createdAt', 
-      sortOrder = 'desc' 
-    } = req.query;
+    const { schoolId, section, limit = 50 } = req.query;
 
-    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-    const limitNum = Math.max(parseInt(limit, 10) || 20, 1);
-    const clampedLimit = Math.min(limitNum, 100); // enforce max limit
-
-    // Validate schoolId if provided
-    if (schoolId && !mongoose.Types.ObjectId.isValid(schoolId)) {
-      return res.status(400).json({ success: false, error: 'Invalid school ID' });
-    }
-
-    // Validate section enum
-    const validSections = ['Sungura', 'Chipukizi', 'Mwamba', 'Rover'];
-    if (section && !validSections.includes(section)) {
-      return res.status(400).json({ success: false, error: 'Invalid scout section' });
-    }
-
-    // Validate status enum
-    const validStatuses = ['active', 'inactive', 'graduated', 'transferred'];
-    if (statusFilter && !validStatuses.includes(statusFilter)) {
-      return res.status(400).json({ success: false, error: 'Invalid status' });
-    }
-
-    // Validate and build sort object
-    const validSortFields = ['createdAt', 'fullName', 'dateOfBirth', 'scoutSection', 'school', 'status', 'age', 'gender'];
-    const sortObj = {};
-    if (validSortFields.includes(sortBy)) {
-      sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    } else {
-      sortObj.createdAt = -1;
-    }
-
-    // Build base accessibility query (students added by this trainer OR from assigned schools)
     const trainerSchoolIds = (currentStaff.assignedSchools || [])
       .filter(a => a.status === 'active')
       .map(a => a.schoolId);
 
-    const andConditions = [
-      {
-        $or: [
-          { addedBy: { trainerId: currentStaff._id } },
-          ...(trainerSchoolIds.length > 0 ? [{ school: { $in: trainerSchoolIds } }] : [])
-        ]
-      }
-    ];
+    let query = {
+      $or: [
+        { addedBy: { trainerId: currentStaff._id } },
+        ...(trainerSchoolIds.length > 0 ? [{ school: { $in: trainerSchoolIds } }] : [])
+      ]
+    };
 
-    // Apply additional filters
-    if (schoolId) andConditions.push({ school: mongoose.Types.ObjectId(schoolId) });
-    if (section) andConditions.push({ scoutSection: section });
-    if (statusFilter) andConditions.push({ status: statusFilter });
-    if (search) {
-      // Escape regex special characters to prevent ReDoS
-      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      andConditions.push({
-        $or: [
-          { fullName: { $regex: escaped, $options: 'i' } },
-          { 'parentContact.name': { $regex: escaped, $options: 'i' } },
-          { 'parentContact.phone': { $regex: escaped, $options: 'i' } },
-          { 'parentContact.email': { $regex: escaped, $options: 'i' } }
-        ]
-      });
-    }
+    if (schoolId) query.school = new mongoose.Types.ObjectId(schoolId);
+    if (section) query.scoutSection = section;
 
-    const query = { $and: andConditions };
-
-    // Get total count for pagination
-    const total = await Student.countDocuments(query);
-
-    // Fetch students with pagination, sorting, and population
     const students = await Student.find(query)
       .populate('school', 'name')
-      .populate('addedBy.trainerId', 'name email')
-      .select('fullName dateOfBirth age gender scoutSection school status addedBy parentContact.name parentContact.phone parentContact.email')
-      .sort(sortObj)
-      .skip((pageNum - 1) * clampedLimit)
-      .limit(clampedLimit)
+      .select('fullName dateOfBirth scoutSection school')
+      .sort({ fullName: 1 })
+      .limit(parseInt(limit))
       .lean();
 
-    res.json({
-      success: true,
-      students,
-      pagination: {
-        total,
-        page: pageNum,
-        limit: clampedLimit,
-        pages: Math.ceil(total / clampedLimit)
-      }
-    });
+    res.json({ success: true, students });
   } catch (err) {
     console.error('Error fetching students:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch students' });

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Student Profile - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="icon" href="/favicon.ico" />
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <span>APV Trainer Portal</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="/trainer/dashboard" class="nav-link">Home</a></li>
+                        <li class="nav-item"><a href="/trainer/schools" class="nav-link">My Schools</a></li>
+                        <li class="nav-item"><a href="/trainer/students" class="nav-link active">Students</a></li>
+                        <li class="nav-item"><a href="/trainer/events" class="nav-link">Events</a></li>
+                        <li class="nav-item"><a href="/trainer/profile" class="nav-link">My Profile</a></li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <h1>Student Profile</h1>
+                <div class="header-actions">
+                    <% if (canEdit) { %>
+                        <a href="/trainer/students/<%= student._id %>/edit" class="btn btn-secondary">Edit</a>
+                    <% } %>
+                    <a href="/trainer/students" class="btn btn-secondary">Back to List</a>
+                </div>
+            </header>
+
+            <section class="dashboard-content">
+                <!-- Personal Details -->
+                <div class="content-card">
+                    <h2><%= student.fullName %></h2>
+                    <div class="profile-grid">
+                        <div class="profile-section">
+                            <h3>Personal Information</h3>
+                            <div class="info-row">
+                                <span class="label">Full Name:</span>
+                                <span class="value"><%= student.fullName %></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Date of Birth:</span>
+                                <span class="value"><%= new Date(student.dateOfBirth).toLocaleDateString() %></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Age:</span>
+                                <span class="value"><%= student.age %> years</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Gender:</span>
+                                <span class="value"><%= student.gender %></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Scout Section:</span>
+                                <span class="value"><span class="badge badge-primary"><%= student.scoutSection %></span></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Status:</span>
+                                <span class="value"><span class="badge badge-<%= student.status === 'active' ? 'success' : student.status === 'inactive' ? 'danger' : 'warning' %>"><%= student.status %></span></span>
+                            </div>
+                        </div>
+
+                        <div class="profile-section">
+                            <h3>School Association</h3>
+                            <% if (student.school) { %>
+                                <div class="info-row">
+                                    <span class="label">School:</span>
+                                    <span class="value"><%= student.school.name %></span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="label">Address:</span>
+                                    <span class="value">
+                                        <%= student.school.address?.street || '' %><br>
+                                        <%= student.school.address?.city || '' %> <%= student.school.address?.state || '' %> <%= student.school.address?.zipCode || '' %>
+                                    </span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="label">School Contact:</span>
+                                    <span class="value">
+                                        <%= student.school.contactPerson?.name || 'N/A' %><br>
+                                        <a href="tel:<%= student.school.contactPerson?.phone %>"><%= student.school.contactPerson?.phone || '' %></a><br>
+                                        <a href="mailto:<%= student.school.contactPerson?.email %>"><%= student.school.contactPerson?.email || '' %></a>
+                                    </span>
+                                </div>
+                            <% } else { %>
+                                <p>No school assigned</p>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Parent Contact -->
+                <div class="content-card">
+                    <h2>Parent / Guardian Contact</h2>
+                    <div class="profile-grid">
+                        <div class="profile-section">
+                            <div class="info-row">
+                                <span class="label">Name:</span>
+                                <span class="value"><%= student.parentContact.name || 'Not provided' %></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Relationship:</span>
+                                <span class="value"><%= student.parentContact.relationship || 'Parent' %></span>
+                            </div>
+                        </div>
+                        <div class="profile-section">
+                            <div class="info-row">
+                                <span class="label">Phone:</span>
+                                <span class="value">
+                                    <a href="tel:<%= student.parentContact.phone %>"><%= student.parentContact.phone %></a>
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Email:</span>
+                                <span class="value">
+                                    <a href="mailto:<%= student.parentContact.email %>"><%= student.parentContact.email %></a>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quick-contact" style="margin-top: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                        <h4>Quick Communication</h4>
+                        <p>
+                            <a href="https://wa.me/<%= student.parentContact.phone.replace(/\D/g, '') %>" target="_blank" class="btn btn-success">Send WhatsApp</a>
+                            <a href="sms:<%= student.parentContact.phone %>" class="btn btn-info">Send SMS</a>
+                            <a href="mailto:<%= student.parentContact.email %>?subject=Scout Program Update" class="btn btn-secondary">Send Email</a>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section History -->
+                <% if (student.sectionHistory && student.sectionHistory.length > 0) { %>
+                    <div class="content-card">
+                        <h2>Section History</h2>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Section</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% student.sectionHistory.forEach(entry => { %>
+                                    <tr>
+                                        <td><%= entry.section %></td>
+                                        <td><%= new Date(entry.startDate).toLocaleDateString() %></td>
+                                        <td><%= entry.endDate ? new Date(entry.endDate).toLocaleDateString() : 'Current' %></td>
+                                        <td><%= entry.notes || '-' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+
+                <!-- Participation Records -->
+                <div class="content-card">
+                    <h2>Participation Records</h2>
+                    <% if (participationRecords && participationRecords.length > 0) { %>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% participationRecords.forEach(event => { %>
+                                    <tr>
+                                        <td><%= event.name %></td>
+                                        <td><%= new Date(event.startDate).toLocaleDateString() %></td>
+                                        <td><%= event.eventType %></td>
+                                        <td><span class="badge badge-<%= event.status === 'completed' ? 'success' : event.status === 'in_progress' ? 'warning' : 'info' %>"><%= event.status %></span></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    <% } else { %>
+                        <p>No participation records yet.</p>
+                    <% } %>
+                </div>
+
+                <!-- Audit Information -->
+                <div class="content-card">
+                    <h2>Record Information</h2>
+                    <div class="profile-grid">
+                        <div class="profile-section">
+                            <div class="info-row">
+                                <span class="label">Added By:</span>
+                                <span class="value"><%= student.addedBy?.trainerId?.name || 'System' %></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Added On:</span>
+                                <span class="value"><%= new Date(student.createdAt).toLocaleString() %></span>
+                            </div>
+                        </div>
+                        <div class="profile-section">
+                            <div class="info-row">
+                                <span class="label">Last Updated:</span>
+                                <span class="value"><%= new Date(student.updatedAt).toLocaleString() %></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

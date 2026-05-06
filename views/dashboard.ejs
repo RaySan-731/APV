@@ -6,6 +6,48 @@
     <title>Dashboard - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
+    <style>
+      /* Notifications Dropdown Compose Form Styles */
+      .notification-dropdown .form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+      .notification-dropdown label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+      .notification-dropdown input[type="text"],
+      .notification-dropdown input[type="email"],
+      .notification-dropdown textarea,
+      .notification-dropdown select {
+        padding: 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 0.9rem;
+        width: 100%;
+      }
+      .notification-dropdown textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+      .notification-dropdown select[multiple] {
+        min-height: 100px;
+      }
+      .notification-dropdown small {
+        color: var(--muted-foreground);
+        font-size: 0.8rem;
+      }
+      .notification-dropdown .tab-btn.active {
+        border-bottom: 2px solid var(--primary);
+      }
+      .notification-dropdown .notification-dropdown-item {
+        position: relative;
+      }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -44,7 +86,7 @@
                 <div class="header-actions" style="display: flex; align-items: center; gap: 1rem;">
                     <!-- Notifications Bell -->
                     <div class="notification-container" style="position: relative;">
-                        <button class="notification-bell" id="notificationBell" aria-label="Toggle notifications">
+                        <button type="button" class="notification-bell" id="notificationBell" aria-label="Toggle notifications">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -58,16 +100,96 @@
                                 <button class="btn btn-sm btn-outline" id="markAllReadBtn" style="display: none;">Mark all read</button>
                             </div>
                             <div id="notificationTabs" style="display: flex; border-bottom: 1px solid var(--border);">
-                                <button class="tab-btn active" data-tab="all" style="flex: 1; padding: 0.75rem; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--primary);">All</button>
-                                <button class="tab-btn" data-tab="announcements" style="flex: 1; padding: 0.75rem; border: none; background: none; cursor: pointer;">Announcements</button>
-                                <button class="tab-btn" data-tab="messages" style="flex: 1; padding: 0.75rem; border: none; background: none; cursor: pointer;">Messages</button>
+                                <button class="tab-btn active" data-tab="notifications" style="flex: 1; padding: 0.75rem; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--primary);">Notifications</button>
+                                <button class="tab-btn" data-tab="compose" style="flex: 1; padding: 0.75rem; border: none; background: none; cursor: pointer;">Compose</button>
                             </div>
-                            <div id="notificationList" style="max-height: 300px; overflow-y: auto;">
-                                <div class="placeholder-text" style="padding: 1rem; text-align: center;">Loading notifications...</div>
+                            
+                            <!-- Notifications Tab Content -->
+                            <div id="notificationsTabContent" style="max-height: 400px; overflow-y: auto;">
+                                <div id="notificationList" style="padding: 0.5rem;">
+                                    <div class="placeholder-text" style="padding: 1rem; text-align: center;">Loading notifications...</div>
+                                </div>
                             </div>
-                            <div style="padding: 0.5rem; border-top: 1px solid var(--border); text-align: center;">
-                                <a href="/dashboard/announcements" class="btn btn-sm btn-outline" style="margin-right: 0.5rem;">View Announcements</a>
-                                <a href="/dashboard/messages" class="btn btn-sm btn-outline">View Messages</a>
+                            
+                            <!-- Compose Tab Content -->
+                            <div id="composeTabContent" style="max-height: 400px; overflow-y: auto; padding: 0.5rem; display: none;">
+                                <!-- Message Compose Form -->
+                                <form id="dropdownComposeForm" class="form-grid" style="gap: 0.75rem;">
+                                    <label style="grid-column: 1 / -1;">
+                                        To
+                                        <select id="composeRecipientSelect" name="recipientIds" multiple required style="width: 100%; min-height: 80px;">
+                                            <% if (staffList && staffList.length > 0) { %>
+                                                <% staffList.forEach(staff => { %>
+                                                    <option value="<%= staff._id %>"><%= staff.name %> (<%= staff.role %>)</option>
+                                                <% }) %>
+                                            <% } else { %>
+                                                <option value="" disabled>No staff available</option>
+                                            <% } %>
+                                        </select>
+                                        <small>Hold Ctrl/Cmd to select multiple</small>
+                                    </label>
+                                    
+                                    <label style="grid-column: 1 / -1;">
+                                        Subject
+                                        <input type="text" id="composeSubject" name="subject" placeholder="Enter subject" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                    </label>
+                                    
+                                    <label style="grid-column: 1 / -1;">
+                                        Message
+                                        <textarea id="composeBody" name="body" rows="4" placeholder="Type your message..." required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); resize: vertical;"></textarea>
+                                    </label>
+                                    
+                                    <div id="composeMessage" class="message" style="grid-column: 1 / -1; display: none;"></div>
+                                    
+                                    <div style="grid-column: 1 / -1; display: flex; gap: 0.5rem; align-items: center;">
+                                        <select id="composePriority" name="priority" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <option value="normal">Normal</option>
+                                            <option value="low">Low</option>
+                                            <option value="high">High</option>
+                                            <option value="urgent">Urgent</option>
+                                        </select>
+                                        <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                            <input type="checkbox" id="composeImportant" name="isImportant"> Important
+                                        </label>
+                                    </div>
+                                    
+                                    <div style="grid-column: 1 / -1; text-align: right;">
+                                        <button type="button" class="btn btn-sm btn-secondary" onclick="closeCompose()" style="margin-right: 0.5rem;">Cancel</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Send Message</button>
+                                    </div>
+                                </form>
+                                
+                                <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+                                <!-- Announcement Form (for admins/founders) -->
+                                <div id="announcementFormSection" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: none;">
+                                    <h4 style="margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em;">Create Announcement</h4>
+                                    <form id="dropdownAnnouncementForm" class="form-grid" style="gap: 0.75rem;">
+                                        <label style="grid-column: 1 / -1;">
+                                            Title
+                                            <input type="text" id="announcementTitle" name="title" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                        </label>
+                                        <label style="grid-column: 1 / -1;">
+                                            Content
+                                            <textarea id="announcementContent" name="content" rows="4" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); resize: vertical;"></textarea>
+                                        </label>
+                                        <label style="grid-column: 1 / -1; display: flex; gap: 0.5rem; align-items: center;">
+                                            <select id="announcementPriority" name="priority" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                                <option value="normal">Normal</option>
+                                                <option value="low">Low</option>
+                                                <option value="high">High</option>
+                                                <option value="urgent">Urgent</option>
+                                            </select>
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" id="announcementRequiresAck" name="requiresAcknowledgment"> Requires acknowledgment
+                                            </label>
+                                        </label>
+                                        <div id="announcementFormMessage" class="message" style="grid-column: 1 / -1; display: none;"></div>
+                                        <div style="grid-column: 1 / -1; text-align: right;">
+                                            <button type="submit" class="btn btn-sm btn-primary">Post Announcement</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <% } %>
                             </div>
                         </div>
                     </div>
@@ -1654,13 +1776,13 @@
                                   </div>
 
       <script>
-        // Expose current user to client-side scripts
-        window.currentUser = {
-          id: '<%= user.id %>',
-          role: '<%= user.role %>',
-          name: '<%= user.name %>',
-          email: '<%= user.email %>'
-        };
+        // Expose current user to client-side scripts (JSON serialized for safety)
+        window.currentUser = <%- JSON.stringify({
+          id: user.id,
+          role: user.role,
+          name: user.name,
+          email: user.email
+        }) %>;
       </script>
 
       <!-- Notifications Dropdown JavaScript -->
@@ -1670,12 +1792,18 @@
 
           const notificationBell = document.getElementById('notificationBell');
           const notificationDropdown = document.getElementById('notificationDropdown');
+          if (!notificationBell || !notificationDropdown) {
+            console.warn('Notification bell elements not found');
+            return;
+          }
           const notificationList = document.getElementById('notificationList');
           const notificationBadge = document.getElementById('notificationBadge');
           const markAllReadBtn = document.getElementById('markAllReadBtn');
           const tabButtons = document.querySelectorAll('.tab-btn');
+          const notificationsTabContent = document.getElementById('notificationsTabContent');
+          const composeTabContent = document.getElementById('composeTabContent');
           
-          let currentTab = 'all';
+          let currentTab = 'notifications';
           let notificationsData = { announcements: [], messages: [] };
           let unreadCounts = { announcements: 0, messages: 0 };
 
@@ -1702,11 +1830,19 @@
               tabButtons.forEach(b => b.classList.remove('active'));
               this.classList.add('active');
               currentTab = this.dataset.tab;
-              renderNotifications();
+              
+              if (currentTab === 'notifications') {
+                if (notificationsTabContent) notificationsTabContent.style.display = 'block';
+                if (composeTabContent) composeTabContent.style.display = 'none';
+                renderNotifications();
+              } else if (currentTab === 'compose') {
+                if (notificationsTabContent) notificationsTabContent.style.display = 'none';
+                if (composeTabContent) composeTabContent.style.display = 'block';
+              }
             });
           });
 
-          // Fetch notifications data (announcements + messages unread count)
+          // Fetch notifications data (announcements + messages)
           async function loadNotificationsData() {
             try {
               // Fetch recent announcements (limit 5)
@@ -1714,7 +1850,7 @@
               const annData = await annRes.json();
               notificationsData.announcements = annData.announcements || [];
 
-              // Fetch unread messages count and recent messages
+              // Fetch recent messages (inbox, limit 5)
               const msgRes = await fetch('/api/messages?folder=inbox&limit=5');
               const msgData = await msgRes.json();
               notificationsData.messages = msgData.messages || [];
@@ -1722,7 +1858,9 @@
               unreadCounts.announcements = notificationsData.announcements.filter(a => !isAnnouncementAcknowledged(a)).length;
 
               updateBadge();
-              renderNotifications();
+              if (currentTab === 'notifications') {
+                renderNotifications();
+              }
             } catch (err) {
               console.error('Error loading notifications:', err);
               notificationList.innerHTML = '<div class="notification-dropdown-empty">Failed to load notifications</div>';
@@ -1732,63 +1870,46 @@
           // Update badge count
           function updateBadge() {
             const totalUnread = unreadCounts.announcements + unreadCounts.messages;
-            if (totalUnread > 0) {
-              notificationBadge.textContent = totalUnread > 99 ? '99+' : totalUnread;
-              notificationBadge.style.display = 'flex';
-            } else {
-              notificationBadge.style.display = 'none';
+            if (notificationBadge) {
+              if (totalUnread > 0) {
+                notificationBadge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+                notificationBadge.style.display = 'flex';
+              } else {
+                notificationBadge.style.display = 'none';
+              }
             }
 
             // Show/hide mark all read button
-            markAllReadBtn.style.display = totalUnread > 0 ? 'block' : 'none';
+            if (markAllReadBtn) {
+              markAllReadBtn.style.display = totalUnread > 0 ? 'block' : 'none';
+            }
           }
 
-          // Render notifications based on current tab
+          // Render notifications list
           function renderNotifications() {
+            if (!notificationList) return;
             let items = [];
 
-            if (currentTab === 'all') {
-              // Combine and sort by date
-              const annItems = notificationsData.announcements.map(a => ({
-                type: 'announcement',
-                title: a.title,
-                subtitle: `Announcement • ${new Date(a.createdAt).toLocaleDateString()}`,
-                date: new Date(a.createdAt),
-                unread: !isAnnouncementAcknowledged(a),
-                priority: a.priority,
-                link: `/dashboard/announcements?id=${a._id}`
-              }));
-              const msgItems = (notificationsData.messages || []).map(m => ({
-                type: 'message',
-                title: m.subject || '(No subject)',
-                subtitle: `From: ${m.senderId?.name || 'Unknown'}`,
-                date: new Date(m.sentAt),
-                unread: !isMessageRead(m),
-                priority: m.priority,
-                link: `/dashboard/messages?thread=${m._id}`
-              }));
-              items = [...annItems, ...msgItems].sort((a, b) => b.date - a.date);
-            } else if (currentTab === 'announcements') {
-              items = notificationsData.announcements.map(a => ({
-                type: 'announcement',
-                title: a.title,
-                subtitle: `Posted: ${new Date(a.createdAt).toLocaleDateString()}`,
-                date: new Date(a.createdAt),
-                unread: !isAnnouncementAcknowledged(a),
-                priority: a.priority,
-                link: `/dashboard/announcements?id=${a._id}`
-              }));
-            } else if (currentTab === 'messages') {
-              items = (notificationsData.messages || []).map(m => ({
-                type: 'message',
-                title: m.subject || '(No subject)',
-                subtitle: `From: ${m.senderId?.name || 'Unknown'} • ${new Date(m.sentAt).toLocaleDateString()}`,
-                date: new Date(m.sentAt),
-                unread: !isMessageRead(m),
-                priority: m.priority,
-                link: `/dashboard/messages?thread=${m._id}`
-              }));
-            }
+            // Combine announcements and messages
+            const annItems = notificationsData.announcements.map(a => ({
+              type: 'announcement',
+              title: a.title,
+              subtitle: `Announcement • ${new Date(a.createdAt).toLocaleDateString()}`,
+              date: new Date(a.createdAt),
+              unread: !isAnnouncementAcknowledged(a),
+              priority: a.priority,
+              _id: a._id
+            }));
+            const msgItems = (notificationsData.messages || []).map(m => ({
+              type: 'message',
+              title: m.subject || '(No subject)',
+              subtitle: `From: ${m.senderId?.name || 'Unknown'}`,
+              date: new Date(m.sentAt),
+              unread: !isMessageRead(m),
+              priority: m.priority,
+              _id: m._id
+            }));
+            items = [...annItems, ...msgItems].sort((a, b) => b.date - a.date);
 
             // Render items
             if (items.length === 0) {
@@ -1797,7 +1918,7 @@
             }
 
             notificationList.innerHTML = items.map(item => `
-              <div class="notification-dropdown-item ${item.unread ? 'unread' : ''}" onclick="window.location.href='${item.link}'">
+              <div class="notification-dropdown-item ${item.unread ? 'unread' : ''}" data-id="${item._id}" data-type="${item.type}">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                   <div style="flex: 1;">
                     <div style="font-weight: 500; margin-bottom: 0.25rem;">${escapeHtml(item.title)}</div>
@@ -1808,18 +1929,32 @@
                 ${item.unread ? '<div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);"></div>' : ''}
               </div>
             `).join('');
+
+             // Add click handlers for notification items
+             document.querySelectorAll('.notification-dropdown-item').forEach(item => {
+               item.addEventListener('click', function() {
+                 const type = this.dataset.type;
+                 const id = this.dataset.id;
+                 notificationDropdown.style.display = 'none';
+                 if (type === 'announcement') {
+                   viewAnnouncementModal(id);
+                 } else if (type === 'message') {
+                   viewMessageModal(id);
+                 }
+               });
+             });
           }
 
           // Helper: Check if announcement is acknowledged by current user
           function isAnnouncementAcknowledged(ann) {
-            return ann.acknowledgments?.some(a => a.staffId === window.currentUser.id);
+            return ann.acknowledgments?.some(a => a.staffId === (window.currentUser?.id));
           }
 
           // Helper: Check if message is read
           function isMessageRead(msg) {
             return msg.recipients?.some(r => {
-              const staffId = r.staffId ? (r.staffId._id ? r.staffId._id.toString() : r.staffId) : null;
-              return staffId === window.currentUser.id && r.status === 'read';
+              const staffId = r.staffId ? (r.staffId._id ? r.staffId._id.toString() : r.staffId.toString()) : null;
+              return staffId === (window.currentUser?.id) && r.status === 'read';
             });
           }
 
@@ -1831,7 +1966,7 @@
           }
 
           // Mark all as read (acknowledge announcements + mark messages as read)
-          markAllReadBtn?.addEventListener('click', async function() {
+          async function markAllRead() {
             try {
               // Mark all unread announcements as acknowledged
               for (const ann of notificationsData.announcements) {
@@ -1854,9 +1989,420 @@
             } catch (err) {
               console.error('Error marking all as read:', err);
             }
+          }
+
+          markAllReadBtn?.addEventListener('click', markAllRead);
+
+          // Individual actions
+          async function acknowledgeAnnouncement(annId) {
+            try {
+              await fetch(`/api/announcements/${annId}/acknowledge`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: '' })
+              });
+            } catch (err) {
+              console.error('Error acknowledging:', err);
+            }
+          }
+
+          async function markMessageAsRead(msgId) {
+            try {
+              await fetch(`/api/messages/${msgId}/read`, { method: 'POST' });
+            } catch (err) {
+              console.error('Error marking read:', err);
+            }
+          }
+
+          // ============ COMPOSE FUNCTIONALITY ============
+          const composeForm = document.getElementById('dropdownComposeForm');
+          const composeMessageEl = document.getElementById('composeMessage');
+          
+          composeForm?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const recipientIds = Array.from(document.getElementById('composeRecipientSelect').selectedOptions).map(o => o.value);
+            const subject = document.getElementById('composeSubject').value.trim();
+            const body = document.getElementById('composeBody').value.trim();
+            const priority = document.getElementById('composePriority').value;
+            const isImportant = document.getElementById('composeImportant').checked;
+
+            if (!recipientIds.length || !body) {
+              showComposeError('Please fill in required fields');
+              return;
+            }
+
+            try {
+              const res = await fetch('/api/messages/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recipientIds, subject, body, priority, isImportant })
+              });
+              const data = await res.json();
+              if (data.success) {
+                composeForm.reset();
+                showComposeSuccess('Message sent!');
+                // Refresh notifications data
+                loadNotificationsData();
+                // Switch to notifications tab after short delay
+                setTimeout(() => {
+                  document.querySelector('[data-tab="notifications"]').click();
+                }, 1000);
+              } else {
+                showComposeError(data.error || 'Failed to send');
+              }
+            } catch (err) {
+              console.error('Error sending message:', err);
+              showComposeError('Network error');
+            }
           });
+
+          function showComposeError(msg) {
+            composeMessageEl.textContent = msg;
+            composeMessageEl.style.display = 'block';
+            composeMessageEl.className = 'message error';
+            setTimeout(() => { composeMessageEl.style.display = 'none'; }, 3000);
+          }
+
+          function showComposeSuccess(msg) {
+            composeMessageEl.textContent = msg;
+            composeMessageEl.style.display = 'block';
+            composeMessageEl.className = 'message success';
+            setTimeout(() => { composeMessageEl.style.display = 'none'; }, 3000);
+          }
+
+          function closeCompose() {
+            composeForm.reset();
+            document.querySelector('[data-tab="notifications"]').click();
+          }
+          window.closeCompose = closeCompose;
+
+          // Announcement form (admin/founder only)
+          <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+          const announcementForm = document.getElementById('dropdownAnnouncementForm');
+          const announcementFormSection = document.getElementById('announcementFormSection');
+          const announcementFormMessage = document.getElementById('announcementFormMessage');
+
+          // Add toggle to show announcement form
+          const composeTab = document.querySelector('[data-tab="compose"]');
+          const announcementToggle = document.createElement('div');
+          announcementToggle.innerHTML = '<p style="font-size: 0.85rem; color: var(--muted-foreground); margin-bottom: 0.5rem;"><a href="#" id="showAnnouncementForm" style="color: var(--primary);">+ Create Announcement</a></p>';
+          composeTabContent.insertBefore(announcementToggle.firstChild, composeTabContent.firstChild);
+
+          document.getElementById('showAnnouncementForm')?.addEventListener('click', function(e) {
+            e.preventDefault();
+            announcementFormSection.style.display = announcementFormSection.style.display === 'none' ? 'block' : 'none';
+          });
+
+          announcementForm?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const title = document.getElementById('announcementTitle').value.trim();
+            const content = document.getElementById('announcementContent').value.trim();
+            const priority = document.getElementById('announcementPriority').value;
+            const requiresAcknowledgment = document.getElementById('announcementRequiresAck').checked;
+
+            if (!title || !content) {
+              announcementFormMessage.textContent = 'Title and content are required';
+              announcementFormMessage.style.display = 'block';
+              announcementFormMessage.className = 'message error';
+              return;
+            }
+
+            try {
+              const res = await fetch('/api/announcements', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title,
+                  content,
+                  targetType: 'all_staff',
+                  priority,
+                  requiresAcknowledgment,
+                  sendEmail: true,
+                  sendAsNotification: true,
+                  deliveryType: 'immediate'
+                })
+              });
+              const data = await res.json();
+              if (data.success) {
+                announcementForm.reset();
+                announcementFormMessage.textContent = 'Announcement posted!';
+                announcementFormMessage.style.display = 'block';
+                announcementFormMessage.className = 'message success';
+                announcementFormSection.style.display = 'none';
+                // Refresh notifications
+                loadNotificationsData();
+                setTimeout(() => {
+                  document.querySelector('[data-tab="notifications"]').click();
+                }, 1000);
+              } else {
+                announcementFormMessage.textContent = data.error || 'Failed to post';
+                announcementFormMessage.style.display = 'block';
+                announcementFormMessage.className = 'message error';
+              }
+            } catch (err) {
+              console.error('Error posting announcement:', err);
+              announcementFormMessage.textContent = 'Network error';
+              announcementFormMessage.style.display = 'block';
+              announcementFormMessage.className = 'message error';
+            }
+          });
+          <% } %>
+
+          // ============ VIEW MODALS ============
+          let currentAnnouncement = null;
+          let currentMessage = null;
+
+          function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+          }
+
+          function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+          }
+
+          function closeAnnouncementModal() {
+            closeModal('announcementModal');
+            currentAnnouncement = null;
+            // Refresh notifications list to reflect acknowledgment
+            loadNotificationsData();
+          }
+          window.closeAnnouncementModal = closeAnnouncementModal;
+
+          function closeMessageModal() {
+            closeModal('messageDetailModal');
+            currentMessage = null;
+          }
+          window.closeMessageModal = closeMessageModal;
+
+          async function acknowledgeAnnouncement() {
+            if (!currentAnnouncement) return;
+            try {
+              await fetch(`/api/announcements/${currentAnnouncement._id}/acknowledge`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: '' })
+              });
+              closeAnnouncementModal();
+            } catch (err) {
+              console.error('Error acknowledging:', err);
+            }
+          }
+          window.acknowledgeAnnouncement = acknowledgeAnnouncement;
+
+          function replyFromModal() {
+            if (!currentMessage) return;
+            closeMessageModal();
+            // Switch to compose tab and pre-fill
+            document.querySelector('[data-tab="compose"]').click();
+            document.getElementById('composeSubject').value = 'Re: ' + (currentMessage.subject || '(No subject)');
+          }
+           window.replyFromModal = replyFromModal;
+
+           // View announcement in modal
+           async function viewAnnouncementModal(id) {
+            try {
+              const res = await fetch(`/api/announcements/${id}`);
+              const data = await res.json();
+              if (data.announcement || data.success) {
+                const ann = data.announcement || data;
+                currentAnnouncement = ann;
+                document.getElementById('modalAnnouncementTitle').textContent = ann.title;
+                document.getElementById('announcementMeta').innerHTML = `
+                  <strong>Posted:</strong> ${new Date(ann.createdAt).toLocaleString()}
+                  ${ann.acknowledgmentDeadline ? ` | <strong>Acknowledge by:</strong> ${new Date(ann.acknowledgmentDeadline).toLocaleDateString()}` : ''}
+                `;
+                document.getElementById('announcementContent').innerHTML = ann.content.replace(/\n/g, '<br>');
+
+                // Show/hide acknowledge button for non-admins
+                const ackBtn = document.getElementById('acknowledgeBtn');
+                if (ackBtn) {
+                  const alreadyAcked = ann.acknowledgments?.some(a => a.staffId === window.currentUser?.id);
+                  ackBtn.style.display = alreadyAcked ? 'none' : 'block';
+                }
+
+                // Show metrics for admins
+                const metricsEl = document.getElementById('announcementMetrics');
+                if (metricsEl) {
+                  if (ann.metrics) {
+                    document.getElementById('metricRecipients').textContent = ann.metrics.recipientCount || ann.metrics.sentCount || '—';
+                    document.getElementById('metricAcknowledged').textContent = ann.metrics.acknowledgedCount || 0;
+                    metricsEl.style.display = 'block';
+                  } else {
+                    metricsEl.style.display = 'none';
+                  }
+                }
+
+                openModal('announcementModal');
+              }
+            } catch (err) {
+              console.error('Error loading announcement:', err);
+              alert('Failed to load announcement');
+            }
+          }
+
+          // View message in modal
+          async function viewMessageModal(id) {
+            try {
+              const res = await fetch(`/api/messages/${id}`);
+              const data = await res.json();
+              if (data.message) {
+                const msg = data.message;
+                currentMessage = msg;
+                document.getElementById('modalMessageSubject').textContent = msg.subject || '(No subject)';
+                
+                let messageHtml = `
+                  <div style="margin-bottom: 1rem; color: var(--muted-foreground);">
+                    <strong>From:</strong> ${msg.senderId?.name || 'Unknown'} (${msg.senderId?.role || ''})<br>
+                    <strong>Date:</strong> ${new Date(msg.sentAt).toLocaleString()}
+                    ${msg.priority ? `<br><strong>Priority:</strong> ${msg.priority}` : ''}
+                  </div>
+                  <div style="line-height: 1.6; white-space: pre-wrap;">${escapeHtml(msg.body)}</div>
+                `;
+                document.getElementById('messageDetailContent').innerHTML = messageHtml;
+                
+                // Load thread replies
+                loadThreadReplies(id);
+                
+                 // Mark as read if not sender
+                 if (msg.senderId?._id !== window.currentUser?.id) {
+                  await fetch(`/api/messages/${id}/read`, { method: 'POST' });
+                  // Update unread counts
+                  unreadCounts.messages = Math.max(0, unreadCounts.messages - 1);
+                  updateBadge();
+                }
+                
+                openModal('messageDetailModal');
+              }
+            } catch (err) {
+              console.error('Error loading message:', err);
+              alert('Failed to load message');
+            }
+          }
+
+          async function loadThreadReplies(parentMessageId) {
+            try {
+              const res = await fetch(`/api/messages/thread/${parentMessageId}`);
+              const data = await res.json();
+              const threadContainer = document.getElementById('threadReplies');
+              if (data.success && data.replies && data.replies.length > 0) {
+                const repliesHtml = data.replies.map(reply => `
+                  <div style="padding: 1rem; background: var(--muted); border-radius: var(--radius); margin-bottom: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                      <strong>${reply.senderId?.name || 'Unknown'}</strong>
+                      <small>${new Date(reply.sentAt).toLocaleString()}</small>
+                    </div>
+                    <div style="white-space: pre-wrap;">${escapeHtml(reply.body)}</div>
+                  </div>
+                `).join('');
+                threadContainer.innerHTML = '<h5>Replies</h5>' + repliesHtml;
+              } else {
+                threadContainer.innerHTML = '';
+              }
+            } catch (err) {
+              console.error('Error loading thread:', err);
+            }
+          }
+
+          function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+          }
+
+          function closeAnnouncementModal() {
+            closeModal('announcementModal');
+            currentAnnouncement = null;
+            // Refresh notifications list to reflect acknowledgment
+            loadNotificationsData();
+          }
+
+          function closeMessageModal() {
+            closeModal('messageDetailModal');
+            currentMessage = null;
+          }
+
+          function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+          }
+
+          async function acknowledgeAnnouncement() {
+            if (!currentAnnouncement) return;
+            try {
+              await fetch(`/api/announcements/${currentAnnouncement._id}/acknowledge`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: '' })
+              });
+              closeAnnouncementModal();
+            } catch (err) {
+              console.error('Error acknowledging:', err);
+            }
+          }
+
+          function replyFromModal() {
+            if (!currentMessage) return;
+            closeMessageModal();
+            // Switch to compose tab and pre-fill
+            document.querySelector('[data-tab="compose"]').click();
+            document.getElementById('composeSubject').value = 'Re: ' + (currentMessage.subject || '(No subject)');
+            // Could also set hidden parentMessageId if needed
+          }
+
+          // Modify notification item click to open modals
+          // This overrides the previous onclick inline handler. We'll attach via JS
+          // In renderNotifications(), instead of inline onclick, we use event delegation:
+          // We'll modify renderNotifications to not include onclick and use the event listener added earlier.
+          // But we already added event listeners in renderNotifications after creating items. That code uses .addEventListener and will call viewAnnouncementModal and markMessageAsRead.
+
+          // I need to update renderNotifications to call viewAnnouncementModal and viewMessageModal instead of redirecting.
+
         })();
       </script>
       <script src="/js/dashboard.js"></script>
+
+      <!-- Announcement Detail Modal -->
+      <div id="announcementModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+          <div class="modal-header">
+            <h3 id="modalAnnouncementTitle"></h3>
+            <button type="button" class="close-btn" onclick="closeAnnouncementModal()">×</button>
+          </div>
+          <div class="modal-body">
+            <div id="announcementMeta" style="margin-bottom: 1rem; color: var(--muted-foreground);"></div>
+            <div id="announcementContent" style="line-height: 1.6;"></div>
+            <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+            <div id="announcementMetrics" style="margin-top: 1rem; padding: 1rem; background: var(--muted); border-radius: var(--radius); display: none;">
+              <h4>Delivery Metrics</h4>
+              <p><strong>Sent to:</strong> <span id="metricRecipients"></span> recipients</p>
+              <p><strong>Acknowledged:</strong> <span id="metricAcknowledged"></span></p>
+            </div>
+            <% } %>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeAnnouncementModal()">Close</button>
+            <% if (!['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+            <button type="button" class="btn btn-primary" id="acknowledgeBtn" onclick="acknowledgeAnnouncement()">Acknowledge</button>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message Detail Modal -->
+      <div id="messageDetailModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+          <div class="modal-header">
+            <h3 id="modalMessageSubject">Message</h3>
+            <button type="button" class="close-btn" onclick="closeMessageModal()">×</button>
+          </div>
+          <div class="modal-body">
+            <div id="messageDetailContent"></div>
+            <div id="threadReplies" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeMessageModal()">Close</button>
+            <button type="button" class="btn btn-outline" onclick="replyFromModal()">Reply</button>
+          </div>
+        </div>
+      </div>
+
   </body>
 </html>

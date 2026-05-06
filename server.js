@@ -94,6 +94,16 @@ app.use(session(sessionConfig));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Content Security Policy
+app.use((req, res, next) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const csp = isProduction
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self';"
+    : "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:3000 http://localhost:3000; font-src 'self';";
+  res.setHeader('Content-Security-Policy', csp);
+  next();
+});
+
 // Import models
 const User = require('./models/User');
 const Booking = require('./models/Booking');
@@ -111,6 +121,13 @@ const SchoolDocument = require('./models/SchoolDocument');
 const ReportTemplate = require('./models/ReportTemplate');
 const ScheduledReport = require('./models/ScheduledReport');
 const Student = require('./models/Student');
+
+// Finance models
+const Invoice = require('./models/Invoice');
+const Expense = require('./models/Expense');
+const ServicePackage = require('./models/ServicePackage');
+const Budget = require('./models/Budget');
+const Payroll = require('./models/Payroll');
 
 // Communication models
 const Message = require('./models/Message');
@@ -230,6 +247,11 @@ async function getCurrentStaff(req) {
         employmentStartDate: new Date(),
         permissions: isAdminRole ? {
           canViewFinancials: true,
+          canManageBudgets: true,
+          canManageInvoices: true,
+          canManagePayroll: true,
+          canManageExpenses: true,
+          canViewFinancialReports: true,
           canApproveReports: true,
           canScheduleEvents: true,
           canManageStaff: true,
@@ -395,6 +417,11 @@ app.post('/login', async (req, res) => {
           employmentStartDate: new Date(),
           permissions: isAdminRole ? {
             canViewFinancials: true,
+            canManageBudgets: true,
+            canManageInvoices: true,
+            canManagePayroll: true,
+            canManageExpenses: true,
+            canViewFinancialReports: true,
             canApproveReports: true,
             canScheduleEvents: true,
             canManageStaff: true,
@@ -490,6 +517,12 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     const totalStaff = await Staff.countDocuments();
     const activeStaff = await Staff.countDocuments({ status: 'Active' });
     const onLeaveStaff = await Staff.countDocuments({ status: 'On Leave' });
+    
+    // Fetch staff list for compose dropdown (active non-inactive staff)
+    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
+      .select('_id name email role')
+      .sort({ name: 1 })
+      .lean();
 
     // Calculate average performance metrics
     const performanceStats = await Staff.aggregate([
@@ -514,6 +547,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     res.render('dashboard', {
       user: req.session.user,
       page: 'dashboard',
+      staffList,
       stats: {
         totalStaff,
         activeStaff,
@@ -529,6 +563,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     res.render('dashboard', {
       user: req.session.user,
       page: 'dashboard',
+      staffList: [],
       stats: {
         totalStaff: 0,
         activeStaff: 0,
@@ -1855,20 +1890,26 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
    }
  });
 
- // Get school details
- app.get('/api/school/:schoolId', requireAuth, async (req, res) => {
-   try {
-     const school = await School.findById(req.params.schoolId).lean();
-     if (!school) {
-       return res.status(404).json({ error: 'School not found' });
-     }
+  // Get school details
+  app.get('/api/school/:schoolId', requireAuth, async (req, res) => {
+    try {
+      const { schoolId } = req.params;
 
-     res.json(school);
-   } catch (err) {
-     console.error('Error fetching school details:', err);
-     res.status(500).json({ error: 'Failed to fetch school details' });
-   }
- });
+      if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+        return res.status(404).json({ error: 'Invalid school identifier' });
+      }
+
+      const school = await School.findById(schoolId).lean();
+      if (!school) {
+        return res.status(404).json({ error: 'School not found' });
+      }
+
+      res.json(school);
+    } catch (err) {
+      console.error('Error fetching school details:', err);
+      res.status(500).json({ error: 'Failed to fetch school details' });
+    }
+  });
 
 // Get permissions for a role
 app.get('/api/permissions/:role', requireAuth, requirePermission('canManagePermissions'), async (req, res) => {
@@ -2270,9 +2311,16 @@ app.get('/dashboard/audit-logs', requireAuth, requirePermission('canViewAuditLog
     const totalLogs = await AuditLog.countDocuments(query);
     const totalPages = Math.ceil(totalLogs / limit);
 
+    // Fetch staff list for compose dropdown
+    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
+      .select('_id name email role')
+      .sort({ name: 1 })
+      .lean();
+
     res.render('dashboard', {
       user: req.session.user,
       page: 'audit-logs',
+      staffList,
       auditLogs: logs,
       currentPage: page,
       totalPages,
@@ -3566,62 +3614,91 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
 app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
   try {
     const { schoolId } = req.params;
+
+    // Validate schoolId format
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Invalid school identifier' });
+    }
+
     const school = await School.findById(schoolId).lean();
     if (!school) {
       return res.status(404).render('404', { user: req.session.user, error: 'School not found' });
     }
 
-    // Populate assigned staff
-    if (school.assignedStaff) {
-      const staffIds = school.assignedStaff.map(a => a?.staffId?.toString()).filter(Boolean);
-      const staffList = await Staff.find({ _id: { $in: staffIds } }).select('name email idNumber role').lean();
-      const staffMap = new Map(staffList.map(s => [s._id.toString(), s]));
-      school.assignedStaff = school.assignedStaff.map(a => {
-        const staffId = a?.staffId?.toString();
-        if (!staffId) return null;
-        const staff = staffMap.get(staffId);
-        return staff ? { ...staff, assignmentType: a.assignmentType, assignedDate: a.assignedDate } : null;
-      }).filter(Boolean);
+    // Populate assigned staff with validation of staff IDs
+    if (school.assignedStaff && Array.isArray(school.assignedStaff)) {
+      const staffIds = school.assignedStaff
+        .map(a => a?.staffId?.toString())
+        .filter(id => id && mongoose.Types.ObjectId.isValid(id));
+      let staffMap = new Map();
+      if (staffIds.length > 0) {
+        const staffList = await Staff.find({ _id: { $in: staffIds } })
+          .select('name email idNumber role')
+          .lean();
+        staffMap = new Map(staffList.map(s => [s._id.toString(), s]));
+      }
+      school.assignedStaff = school.assignedStaff
+        .map(a => {
+          const staffId = a?.staffId?.toString();
+          if (!staffId || !mongoose.Types.ObjectId.isValid(staffId)) return null;
+          const staff = staffMap.get(staffId);
+          return staff ? { ...staff, assignmentType: a.assignmentType, assignedDate: a.assignedDate } : null;
+        })
+        .filter(Boolean);
     }
 
     // Scout groups
-    const scoutGroups = await ScoutGroup.find({ schoolId: schoolId }).sort({ name: 1 }).lean();
+    const scoutGroups = await ScoutGroup.find({ schoolId: new mongoose.Types.ObjectId(schoolId) })
+      .sort({ name: 1 }).lean();
 
     // Event participation history
-    // Using Event model with targetSchools array to find events this school is invited to
     const schoolEvents = await Event.find(
-      { 'targetSchools.schoolId': schoolId },
+      { 'targetSchools.schoolId': new mongoose.Types.ObjectId(schoolId) },
       { name: 1, startDate: 1, location: 1, eventType: 1, 'targetSchools.$': 1 }
     )
       .sort({ startDate: -1 })
       .lean();
 
     // Payment history
-    const payments = await Payment.find({ schoolId: schoolId }).sort({ paymentDate: -1 }).limit(10).lean();
+    const payments = await Payment.find({ schoolId: new mongoose.Types.ObjectId(schoolId) })
+      .sort({ paymentDate: -1 }).limit(10).lean();
 
     // Documents
-    const documents = await SchoolDocument.find({ schoolId: schoolId, isActive: true }).sort({ uploadedAt: -1 }).lean();
+    const documents = await SchoolDocument.find({ schoolId: new mongoose.Types.ObjectId(schoolId), isActive: true })
+      .sort({ uploadedAt: -1 }).lean();
 
     // Visit logs
-    const visitLogs = await VisitLog.find({ schoolId: schoolId }).sort({ date: -1 }).limit(20).lean();
+    const visitLogs = await VisitLog.find({ schoolId: new mongoose.Types.ObjectId(schoolId) })
+      .sort({ date: -1 }).limit(20).lean();
 
-    // Program enrollments
-    const programs = await Program.find({ _id: { $in: school.programsEnrolled || [] } }).lean();
+    // Program enrollments - validate IDs before query
+    const programIds = (school.programsEnrolled || [])
+      .filter(id => mongoose.Types.ObjectId.isValid(id));
+    const programs = programIds.length > 0
+      ? await Program.find({ _id: { $in: programIds } }).lean()
+      : [];
 
     // Calculate participation analytics
     const totalEvents = schoolEvents.length;
     const totalAttended = schoolEvents.filter(se => se.targetSchools?.[0]?.status === 'attended').length;
-    const avgAttendance = schoolEvents.length ? 
-      Math.round(schoolEvents.reduce((sum, se) => sum + (se.targetSchools?.[0]?.attendancePercentage || 0), 0) / schoolEvents.length) : 0;
+    const avgAttendance = schoolEvents.length
+      ? Math.round(schoolEvents.reduce((sum, se) => sum + (se.targetSchools?.[0]?.attendancePercentage || 0), 0) / schoolEvents.length)
+      : 0;
+
+    // Fetch staff list for compose dropdown
+    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
+      .select('_id name email role')
+      .sort({ name: 1 })
+      .lean();
 
     res.render('dashboard', {
       user: req.session.user,
       page: 'school-profile',
       school,
       scoutGroups,
-      schoolEvents: schoolEvents.map(event => ({ 
-        ...event, 
-        eventName: event.name, 
+      schoolEvents: schoolEvents.map(event => ({
+        ...event,
+        eventName: event.name,
         eventDate: event.startDate,
         location: event.location,
         status: event.targetSchools?.[0]?.status || 'invited'
@@ -3630,6 +3707,7 @@ app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewS
       documents,
       visitLogs,
       programs,
+      staffList,
       participationAnalytics: {
         totalEvents,
         totalAttended,
@@ -3648,6 +3726,14 @@ app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewS
 app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents'), async (req, res) => {
   try {
     const { schoolId, eventId, participantsCount, primaryContact, assignedStaff, notes } = req.body;
+
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ success: false, error: 'Invalid event ID' });
+    }
 
     // Update Event document's targetSchools array for this school
     const event = await Event.findById(eventId);
@@ -3755,16 +3841,22 @@ app.post('/api/events/:eventId/attendance', requireAuth, requirePermission('canE
 app.get('/api/schools/:schoolId/payments', requireAuth, async (req, res) => {
   try {
     const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).json({ error: 'Invalid school identifier' });
+    }
+
     const { status, startDate, endDate } = req.query;
 
-    let query = { schoolId };
+    const schoolObjectId = new mongoose.Types.ObjectId(schoolId);
+    let query = { schoolId: schoolObjectId };
     if (status) query.status = status;
     if (startDate) query.paymentDate = { ...query.paymentDate, $gte: new Date(startDate) };
     if (endDate) query.paymentDate = { ...query.paymentDate, $lte: new Date(endDate) };
 
     const payments = await Payment.find(query).sort({ paymentDate: -1 }).lean();
     const summary = await Payment.aggregate([
-      { $match: { schoolId: new mongoose.Types.ObjectId(schoolId) } },
+      { $match: { schoolId: schoolObjectId } },
       {
         $group: {
           _id: null,
@@ -3793,6 +3885,14 @@ app.post('/api/payments', requireAuth, requirePermission('canViewFinancials'), a
       schoolId, invoiceNumber, amount, currency, paymentDate, dueDate,
       method, reference, programBooked, eventBooked, status, amountPaid, notes
     } = req.body;
+
+    // Validate required IDs
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+    if (eventBooked && !mongoose.Types.ObjectId.isValid(eventBooked)) {
+      return res.status(400).json({ success: false, error: 'Invalid event ID' });
+    }
 
     const payment = new Payment({
       schoolId,
@@ -3906,9 +4006,15 @@ app.post('/api/documents', requireAuth, requirePermission('canEditSchools'), asy
 app.get('/api/schools/:schoolId/documents', requireAuth, async (req, res) => {
   try {
     const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).json({ error: 'Invalid school identifier' });
+    }
+
     const { documentType } = req.query;
 
-    const query = { schoolId, isActive: true };
+    const schoolObjectId = new mongoose.Types.ObjectId(schoolId);
+    const query = { schoolId: schoolObjectId, isActive: true };
     if (documentType) query.documentType = documentType;
 
     const documents = await SchoolDocument.find(query).sort({ uploadedAt: -1 }).lean();
@@ -4035,6 +4141,11 @@ app.post('/api/visit-logs', requireAuth, async (req, res) => {
   }
   try {
     const { schoolId, date, purpose, metWith, discussed, actionItems } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
     const visitLog = new VisitLog({
       schoolId,
       trainerId: req.session.user.id,
@@ -4058,6 +4169,11 @@ app.post('/api/feedback', requireAuth, async (req, res) => {
   }
   try {
     const { schoolId, engagementLevel, concerns, suggestions } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
     const feedback = new Feedback({
       schoolId,
       trainerId: req.session.user.id,
@@ -4075,7 +4191,13 @@ app.post('/api/feedback', requireAuth, async (req, res) => {
 
 app.get('/api/schools/:schoolId/scout-groups', requireAuth, async (req, res) => {
   try {
-    const school = await School.findById(req.params.schoolId).select('scoutGroups').lean();
+    const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).json({ error: 'Invalid school identifier' });
+    }
+
+    const school = await School.findById(schoolId).select('scoutGroups').lean();
     if (!school) {
       return res.status(404).json({ error: 'School not found' });
     }
@@ -4091,8 +4213,14 @@ app.get('/api/schools/:schoolId/visit-logs', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Unauthorized' });
   }
   try {
+    const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).json({ error: 'Invalid school identifier' });
+    }
+
     const logs = await VisitLog.find({
-      schoolId: req.params.schoolId,
+      schoolId: new mongoose.Types.ObjectId(schoolId),
       trainerId: req.session.user.id
     }).sort({ date: -1 }).lean();
     res.json({ logs });
@@ -4183,28 +4311,13 @@ app.get('/dashboard/reports/builder', requireAuth, async (req, res) => {
  });
 
 // ============ COMMUNICATION PAGE ROUTES ============
-// These must be defined BEFORE the catch-all /dashboard/:page route
-
-app.get('/dashboard/messages', requireAuth, async (req, res) => {
-  try {
-    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
-      .select('_id name email role')
-      .sort({ name: 1 })
-      .lean();
-    res.render('messages', { user: req.session.user, page: 'messages', staffList });
-  } catch (err) {
-    console.error('Messages page error:', err);
-    res.status(500).render('404', { user: req.session.user });
-  }
+// Redirect old routes to dashboard - notifications are now in dropdown
+app.get('/dashboard/messages', requireAuth, (req, res) => {
+  res.redirect('/dashboard');
 });
 
-app.get('/dashboard/announcements', requireAuth, async (req, res) => {
-  try {
-    res.render('announcements', { user: req.session.user, page: 'announcements' });
-  } catch (err) {
-    console.error('Announcements page error:', err);
-    res.status(500).render('404', { user: req.session.user });
-  }
+app.get('/dashboard/announcements', requireAuth, (req, res) => {
+  res.redirect('/dashboard');
 });
 
 app.get('/dashboard/settings', requireAuth, async (req, res) => {
@@ -4265,24 +4378,20 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
     }
 
      // Existing allowed pages for standard dashboard
-     const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health', 'audit-logs', 'permissions', 'messages', 'announcements'];
+     const allowedPages = ['staff', 'schools', 'events', 'programs', 'analytics', 'settings', 'trainers', 'schedule', 'health', 'audit-logs', 'permissions'];
 
      if (!allowedPages.includes(page)) {
        return res.status(404).render('404', { user: req.session.user });
      }
 
-     // Handle special pages with dedicated handlers
-     if (page === 'messages') {
-       return res.render('messages', { user: req.session.user, page: 'messages' });
-     }
-     if (page === 'announcements') {
-       return res.render('announcements', { user: req.session.user, page: 'announcements' });
-     }
-
-    // ... rest of existing code stays the same (modelData and rendering dashboard for those pages)
+    // Fetch staff list for compose dropdown (active staff only)
+    const composeStaffList = await Staff.find({ status: { $ne: 'Inactive' } })
+      .select('_id name email role')
+      .sort({ name: 1 })
+      .lean();
 
     const modelData = {
-      staffList: [],
+      staffList: composeStaffList,
       trainersList: [],
       schoolList: [],
       eventList: [],
@@ -4334,27 +4443,25 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
       modelData.permissionsList = await Permission.find().sort({ role: 1 }).lean();
     }
 
-     if (page === 'schools') {
-       modelData.schoolList = await School.find().sort({ createdAt: -1 }).lean();
-       const assignedIds = [...new Set((modelData.schoolList || []).flatMap(school => (school.assignedStaff || []).map(a => a?.staffId?.toString()).filter(Boolean)))];
-       let trainerMap = new Map();
-       if (assignedIds.length > 0) {
-         const [staffList, userList] = await Promise.all([
-           Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber status').lean(),
-           User.find({ _id: { $in: assignedIds } }).select('name email role').lean()
-         ]);
-         staffList.forEach(t => trainerMap.set(t._id.toString(), { ...t, __entity: 'staff' }));
-         userList.forEach(u => trainerMap.set(u._id.toString(), { ...u, __entity: 'user' }));
-       }
-       modelData.schoolList.forEach(school => {
-         school.assignedStaff = (school.assignedStaff || []).map(a => {
-           const staffId = a?.staffId?.toString();
-           return staffId ? trainerMap.get(staffId) : null;
-         }).filter(Boolean);
-       });
-       // Also fetch all active trainers for onboarding
-       modelData.staffList = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor', 'coordinator'] } }).select('name email idNumber status role').sort({ name: 1 }).lean();
-     }
+      if (page === 'schools') {
+        modelData.schoolList = await School.find().sort({ createdAt: -1 }).lean();
+        const assignedIds = [...new Set((modelData.schoolList || []).flatMap(school => (school.assignedStaff || []).map(a => a?.staffId?.toString()).filter(Boolean)))];
+        let trainerMap = new Map();
+        if (assignedIds.length > 0) {
+          const [staffList, userList] = await Promise.all([
+            Staff.find({ _id: { $in: assignedIds } }).select('name email idNumber status').lean(),
+            User.find({ _id: { $in: assignedIds } }).select('name email role').lean()
+          ]);
+          staffList.forEach(t => trainerMap.set(t._id.toString(), { ...t, __entity: 'staff' }));
+          userList.forEach(u => trainerMap.set(u._id.toString(), { ...u, __entity: 'user' }));
+        }
+        modelData.schoolList.forEach(school => {
+          school.assignedStaff = (school.assignedStaff || []).map(a => {
+            const staffId = a?.staffId?.toString();
+            return staffId ? trainerMap.get(staffId) : null;
+          }).filter(Boolean);
+        });
+      }
 
     if (page === 'events') {
       modelData.eventList = await Event.find().sort({ startDate: 1 }).lean();
@@ -7068,11 +7175,27 @@ app.post('/api/announcements/:announcementId/acknowledge', requireAuth, async (r
   } catch (err) {
     console.error('Error acknowledging announcement:', err);
     res.status(500).json({ success: false, error: 'Failed to acknowledge announcement' });
+   }
+ });
+
+ // Get single announcement
+app.get('/api/announcements/:announcementId', requireAuth, async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.announcementId)
+      .populate('createdBy', 'name email role')
+      .lean();
+    if (!announcement) {
+      return res.status(404).json({ success: false, error: 'Announcement not found' });
+    }
+    res.json({ announcement });
+  } catch (err) {
+    console.error('Error fetching announcement:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch announcement' });
   }
 });
 
-// Bulk send announcement (for future scheduled delivery)
-async function deliverAnnouncement(announcement) {
+ // Bulk send announcement (for future scheduled delivery)
+ async function deliverAnnouncement(announcement) {
   try {
     const { targetType, targetDetails, sendEmail, emailSubject, emailTemplate } = announcement;
 
@@ -7229,6 +7352,16 @@ function requireFounder(req, res, next) {
   if (req.session && req.session.user && req.session.user.role === 'founder') return next();
   return res.status(403).send('Forbidden: founder role required');
 }
+
+// Import and use finance routes
+const financeRoutes = require('./backend/routes/finance');
+app.use('/finance', financeRoutes);
+app.use('/api/finance', financeRoutes);
+
+// Aliases for dashboard sub-pages (if needed)
+app.get('/dashboard/finance', (req, res) => {
+  res.redirect('/finance/dashboard');
+});
 
 // 404 handler
 app.use((req, res) => {
@@ -7399,6 +7532,11 @@ const ensureFounderPermissionsAndStaff = async () => {
           employmentStartDate: new Date(),
           permissions: {
             canViewFinancials: true,
+            canManageBudgets: true,
+            canManageInvoices: true,
+            canManagePayroll: true,
+            canManageExpenses: true,
+            canViewFinancialReports: true,
             canApproveReports: true,
             canScheduleEvents: true,
             canManageStaff: true,
@@ -7416,12 +7554,18 @@ const ensureFounderPermissionsAndStaff = async () => {
         }
         const permFlags = {
           canViewFinancials: true,
-          canApproveReports: true,
-          canScheduleEvents: true,
-          canManageStaff: true,
+          canManageBudgets: true,
+          canManageInvoices: true,
+          canManagePayroll: true,
+          canManageExpenses: true,
+          canViewFinancialReports: true,
           canViewAnalytics: true,
-          canManageSchools: true,
-          canSendInvitations: true
+          canGenerateReports: true,
+          canExportData: true,
+          canScheduleReports: true,
+          canApproveReports: true,
+          canSendInvitations: true,
+          canManageStaff: true
         };
         let changed = false;
         for (const [key, value] of Object.entries(permFlags)) {
@@ -7442,7 +7586,7 @@ const ensureFounderPermissionsAndStaff = async () => {
         'canViewEvents','canCreateEvents','canEditEvents','canDeleteEvents','canScheduleEvents',
         'canViewPrograms','canCreatePrograms','canEditPrograms','canDeletePrograms',
         'canViewBookings','canCreateBookings','canEditBookings','canDeleteBookings','canApproveBookings',
-        'canViewFinancials','canManageBudgets',
+        'canViewFinancials','canManageBudgets','canManageInvoices','canManagePayroll','canManageExpenses','canViewFinancialReports',
         'canViewAnalytics','canGenerateReports','canExportData','canScheduleReports','canApproveReports',
         'canSendMessages','canViewMessages','canCreateAnnouncements','canManageAnnouncements','canViewAllNotifications',
         'canManageSystem','canViewAuditLogs','canManagePermissions'
@@ -7478,6 +7622,8 @@ const ensureFounderPermissionsAndStaff = async () => {
     console.error('Error in ensureFounderPermissionsAndStaff:', err);
   }
 };
+
+
 
 const startServer = async () => {
   try {

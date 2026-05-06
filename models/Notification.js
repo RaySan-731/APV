@@ -13,25 +13,27 @@ const notificationSchema = new mongoose.Schema({
     required: true
   },
 
-  // Notification content
-  type: {
-    type: String,
-    enum: [
-      'assignment',          // New assignment
-      'overdue',             // Overdue item (report, payment)
-      'upcoming_event',      // Event within 48hrs
-      'payment_received',    // Payment received
-      'new_message',         // New internal message
-      'document_approval',   // Document approved/rejected
-      'event_reminder',      // General event reminder
-      'report_reminder',     // Report submission reminder
-      'announcement',        // Bulk announcement
-      'system',              // System maintenance, updates
-      'feedback',            // New feedback/rating
-      'approval_required'    // Action required
-    ],
-    required: true
-  },
+   // Notification content
+   type: {
+     type: String,
+     enum: [
+       'assignment',          // New assignment
+       'overdue',             // Overdue item (report, payment)
+       'upcoming_event',      // Event within 48hrs
+       'payment_received',    // Payment received
+       'new_message',         // New internal message
+       'document_approval',   // Document approved/rejected
+       'event_reminder',      // General event reminder
+       'report_reminder',     // Report submission reminder
+       'announcement',        // Bulk announcement
+       'system',              // System maintenance, updates
+       'feedback',            // New feedback/rating
+       'approval_required',   // Action required
+       'leave_request',       // Leave request submitted
+       'leave_status'         // Leave request approved/rejected/postponed
+     ],
+     required: true
+   },
 
   title: {
     type: String,

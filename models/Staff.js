@@ -77,15 +77,15 @@ const staffSchema = new mongoose.Schema({
     status: { type: String, enum: ['available', 'unavailable', 'leave', 'training'], default: 'available' },
     notes: String
   }],
-  leaveHistory: [{
-    startDate: Date,
-    endDate: Date,
-    type: { type: String, enum: ['annual', 'sick', 'maternity', 'emergency', 'training'] },
-    status: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'pending' },
-    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
-    approvedDate: Date,
-    notes: String
-  }],
+   leaveHistory: [{
+     startDate: Date,
+     endDate: Date,
+     type: { type: String, enum: ['annual', 'sick', 'maternity', 'emergency', 'training'] },
+     status: { type: String, enum: ['pending', 'approved', 'rejected', 'postponed'], default: 'pending' },
+     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
+     approvedDate: Date,
+     notes: String
+   }],
 
   // Performance Metrics
   performanceMetrics: {

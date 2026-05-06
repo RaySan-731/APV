@@ -10,6 +10,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
+const multer = require('multer');
 // connect-mongo is loaded only in production when MongoDB session persistence is enabled
 // const MongoStore = require('connect-mongo');
 // const bodyParser = require('body-parser');
@@ -24,6 +25,41 @@ const PORT = process.env.PORT || 3001;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, 'public', 'uploads', 'messages');
+    const fs = require('fs');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt|zip|rar/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // Session configuration
 const sessionConfig = {
@@ -520,15 +556,17 @@ app.get('/trainer/dashboard', requireAuth, (req, res) => {
 
  // Trainer Profile Page
  app.get('/trainer/profile', requireAuth, async (req, res) => {
-   if (!req.session.user || req.session.user.role !== 'trainer') {
-     return res.redirect('/dashboard');
-   }
-   const currentStaff = await Staff.findOne({ email: req.session.user.email });
-   res.render('trainer_profile', {
-     user: req.session.user,
-     trainer: currentStaff
-   });
- });
+    if (!req.session.user || req.session.user.role !== 'trainer') {
+      return res.redirect('/dashboard');
+    }
+    const currentStaff = await Staff.findOne({ email: req.session.user.email })
+      .populate('assignedSchools.schoolId', 'name')
+      .lean();
+    res.render('trainer_profile', {
+      user: req.session.user,
+      trainer: currentStaff
+    });
+  });
 
  // Trainer Schools Page (assigned schools only)
  app.get('/trainer/schools', requireAuth, async (req, res) => {
@@ -591,8 +629,8 @@ app.get('/trainer/dashboard', requireAuth, (req, res) => {
  });
 
 // Trainer Notification Center Page
-// API: Trainer Dashboard Overview (Home)
-app.get('/api/trainer/dashboard-overview', requireAuth, async (req, res) => {
+// API: Consolidated Trainer Dashboard (single call for all dashboard data)
+app.get('/api/trainer/dashboard', requireAuth, async (req, res) => {
   try {
     const currentStaff = await getCurrentStaff(req);
     if (!currentStaff) {
@@ -603,44 +641,99 @@ app.get('/api/trainer/dashboard-overview', requireAuth, async (req, res) => {
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfDay = new Date(startOfDay.getTime() + 24*60*60*1000);
     const sevenDaysFromNow = new Date(now.getTime() + 7*24*60*60*1000);
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Today's schedule
-    const todayEvents = await Event.find({
-      'trainers.trainerId': trainerId,
-      startDate: { $lte: endOfDay },
-      endDate: { $gte: startOfDay },
-      status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress'] }
-    }).lean();
+    // Parallel fetch all data
+    const [
+      todayEvents,
+      upcomingEvents,
+      pendingReports,
+      unreadMessagesCount,
+      unreadNotificationsCount,
+      eventsCompletedThisMonth,
+      scoutsPipeline,
+      reportsSubmitted,
+      distinctSchoolsFromEvents,
+      distinctSchoolsFromVisits,
+      studentsManaged,
+      announcements
+    ] = await Promise.all([
+      // Today's schedule
+      Event.find({
+        'trainers.trainerId': trainerId,
+        startDate: { $lte: endOfDay },
+        endDate: { $gte: startOfDay },
+        status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress'] }
+      }).lean(),
+      // Upcoming events (next 7 days)
+      Event.find({
+        'trainers.trainerId': trainerId,
+        startDate: { $gte: startOfDay, $lte: sevenDaysFromNow },
+        status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress'] }
+      }).sort({ startDate: 1 }).lean(),
+      // Pending reports
+      Event.find({
+        'trainers.trainerId': trainerId,
+        status: 'completed',
+        $or: [
+          { 'review.reportSubmittedAt': { $exists: false } },
+          { 'review.reportSubmittedAt': null }
+        ]
+      }).lean(),
+      // Unread messages count
+      Message.countDocuments({
+        'recipients.staffId': trainerId,
+        'recipients.status': 'sent',
+        'recipients.deleted': { $ne: true }
+      }),
+      // Unread notifications count
+      Notification.countDocuments({
+        recipientId: trainerId,
+        isRead: false,
+        dismissed: false
+      }),
+      // Events completed this month
+      Event.countDocuments({
+        'trainers.trainerId': trainerId,
+        status: 'completed',
+        startDate: { $gte: thisMonthStart }
+      }),
+      // Total scouts reached
+      Event.aggregate([
+        { $match: { 'trainers.trainerId': trainerId, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$review.actualAttendeeCount', 0] } } } }
+      ]),
+      // Reports submitted
+      Event.countDocuments({
+        'trainers.trainerId': trainerId,
+        'review.reportSubmittedAt': { $ne: null }
+      }),
+      // Distinct schools from events
+      Event.distinct('targetSchools.schoolId', {
+        'trainers.trainerId': trainerId,
+        status: 'completed'
+      }),
+      // Distinct schools from visit logs
+      VisitLog.distinct('schoolId', { trainerId }),
+      // Students managed
+      Student.countDocuments({
+        'addedBy.trainerId': trainerId,
+        status: 'active'
+      }),
+      // Recent announcements
+      Announcement.find({})
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean()
+    ]);
 
-    // Upcoming events (next 7 days)
-    const upcomingEvents = await Event.find({
-      'trainers.trainerId': trainerId,
-      startDate: { $gte: startOfDay, $lte: sevenDaysFromNow },
-      status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress'] }
-    }).sort({ startDate: 1 }).lean();
-
-    // Pending reports
-    const pendingReports = await Event.find({
-      'trainers.trainerId': trainerId,
-      status: 'completed',
-      $or: [
-        { 'review.reportSubmittedAt': { $exists: false } },
-        { 'review.reportSubmittedAt': null }
-      ]
-    }).lean();
-
-    // Unread counts
-    const unreadMessagesCount = await Message.countDocuments({
-      'recipients.staffId': trainerId,
-      'recipients.status': 'sent',
-      'recipients.deleted': { $ne: true }
-    });
-
-    const unreadNotificationsCount = await Notification.countDocuments({
-      recipientId: trainerId,
-      isRead: false,
-      dismissed: false
-    });
+    const totalScoutsReached = scoutsPipeline[0]?.total || 0;
+    const allSchoolIds = new Set([
+      ...distinctSchoolsFromEvents.map(id => id.toString()),
+      ...distinctSchoolsFromVisits.map(id => id.toString())
+    ]);
+    const schoolsVisited = allSchoolIds.size;
+    const performanceRating = currentStaff.performanceMetrics?.averageFeedbackRating || 0;
 
     // Build pending actions summary
     const pendingActions = [];
@@ -668,16 +761,32 @@ app.get('/api/trainer/dashboard-overview', requireAuth, async (req, res) => {
 
     res.json({
       success: true,
+      // Stats
+      stats: {
+        eventsCompletedThisMonth,
+        totalScoutsReached,
+        reportsSubmitted,
+        schoolsVisited,
+        studentsManaged,
+        performanceRating,
+        ratingCount: 0
+      },
+      // Schedule
       todaySchedule: todayEvents,
       upcomingEvents: upcomingEvents,
-      pendingReports: pendingReports,
+      pendingReports,
+      // Alerts
       unreadMessagesCount,
       unreadNotificationsCount,
-      pendingActions
+      pendingActions,
+      // Announcements
+      announcements,
+      // Performance rating
+      performanceRating
     });
   } catch (err) {
-    console.error('Error fetching trainer overview:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch overview' });
+    console.error('Error fetching trainer dashboard:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch dashboard data' });
   }
 });
 
@@ -724,6 +833,12 @@ app.get('/api/trainer/stats', requireAuth, async (req, res) => {
     ]);
     const schoolsVisited = allSchoolIds.size;
 
+    // Students managed (students added by this trainer)
+    const studentsManaged = await Student.countDocuments({
+      'addedBy.trainerId': trainerId,
+      status: 'active'
+    });
+
     // Performance rating from admin (stored in Staff.performanceMetrics.averageFeedbackRating)
     const performanceRating = currentStaff.performanceMetrics?.averageFeedbackRating || 0;
 
@@ -734,6 +849,7 @@ app.get('/api/trainer/stats', requireAuth, async (req, res) => {
         totalScoutsReached,
         reportsSubmitted,
         schoolsVisited,
+        studentsManaged,
         performanceRating,
         ratingCount: 0
       }
@@ -741,6 +857,50 @@ app.get('/api/trainer/stats', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error fetching trainer stats:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch stats' });
+  }
+});
+
+// API: Get trainer's zones/regions
+app.get('/api/trainer/zones', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    
+    const zones = currentStaff.zones || [];
+    res.json({ success: true, zones });
+  } catch (err) {
+    console.error('Error fetching zones:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch zones' });
+  }
+});
+
+// API: Get trainer's assigned schools (for team chat)
+app.get('/api/trainer/schools', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+
+    const assignments = currentStaff.assignedSchools || [];
+    const schoolIds = assignments
+      .filter(a => a.schoolId && a.status === 'active')
+      .map(a => a.schoolId);
+
+    let schools = [];
+    if (schoolIds.length > 0) {
+      schools = await School.find({ _id: { $in: schoolIds } })
+        .select('name address city')
+        .sort({ name: 1 })
+        .lean();
+    }
+
+    res.json({ success: true, schools });
+  } catch (err) {
+    console.error('Error fetching schools:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch schools' });
   }
 });
 
@@ -1513,45 +1673,202 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   }
 });
 
-// ============ STAFF MANAGEMENT ROUTES ============
+ // ============ STAFF MANAGEMENT ROUTES ============
 
-// Get staff details
-app.get('/api/staff/:staffId', requireAuth, async (req, res) => {
-  try {
-    const staff = await Staff.findById(req.params.staffId).lean();
-    if (!staff) {
-      return res.status(404).json({ error: 'Staff not found' });
-    }
+ // Get staff details
+ app.get('/api/staff/:staffId', requireAuth, async (req, res) => {
+   try {
+     const staff = await Staff.findById(req.params.staffId).lean();
+     if (!staff) {
+       return res.status(404).json({ error: 'Staff not found' });
+     }
 
-    // Check permissions - users can view their own details, admins can view all
-    if (req.session.user.id !== staff._id.toString() && req.session.user.role !== 'admin') {
-      const permissions = await Permission.findOne({ role: req.session.user.role });
-      if (!permissions?.permissions.canViewStaff) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-    }
+     // Check permissions - users can view their own details, admins can view all
+     if (req.session.user.id !== staff._id.toString() && req.session.user.role !== 'admin') {
+       const permissions = await Permission.findOne({ role: req.session.user.role });
+       if (!permissions?.permissions.canViewStaff) {
+         return res.status(403).json({ error: 'Access denied' });
+       }
+     }
 
-    res.json(staff);
-  } catch (err) {
-    console.error('Error fetching staff details:', err);
-    res.status(500).json({ error: 'Failed to fetch staff details' });
-  }
-});
+     res.json(staff);
+   } catch (err) {
+     console.error('Error fetching staff details:', err);
+     res.status(500).json({ error: 'Failed to fetch staff details' });
+   }
+ });
 
-// Get school details
-app.get('/api/school/:schoolId', requireAuth, async (req, res) => {
-  try {
-    const school = await School.findById(req.params.schoolId).lean();
-    if (!school) {
-      return res.status(404).json({ error: 'School not found' });
-    }
+ // ============ LEAVE MANAGEMENT ROUTES ============
 
-    res.json(school);
-  } catch (err) {
-    console.error('Error fetching school details:', err);
-    res.status(500).json({ error: 'Failed to fetch school details' });
-  }
-});
+ // Trainer submits leave request
+ app.post('/api/trainer/leave/request', requireAuth, async (req, res) => {
+   try {
+     if (req.session.user.role !== 'trainer') {
+       return res.status(403).json({ success: false, error: 'Only trainers can request leave' });
+     }
+
+     const { startDate, endDate, type, notes } = req.body;
+     
+     if (!startDate || !endDate || !type) {
+       return res.status(400).json({ success: false, error: 'Start date, end date, and leave type are required' });
+     }
+
+     const start = new Date(startDate);
+     const end = new Date(endDate);
+     if (start > end) {
+       return res.status(400).json({ success: false, error: 'End date cannot be before start date' });
+     }
+
+     const currentStaff = await Staff.findOne({ email: req.session.user.email });
+     if (!currentStaff) {
+       return res.status(404).json({ success: false, error: 'Staff profile not found' });
+     }
+
+     // Add leave request to leaveHistory with pending status
+     const newLeave = {
+       startDate: start,
+       endDate: end,
+       type: type.trim().toLowerCase(),
+       status: 'pending',
+       notes: notes?.trim() || ''
+     };
+
+     currentStaff.leaveHistory.unshift(newLeave);
+     await currentStaff.save();
+
+     // Notify admins about the leave request
+     const admins = await Staff.find({ role: { $in: ['admin', 'founder', 'supervisor'] } }).select('_id');
+     for (const admin of admins) {
+       await Notification.create({
+         recipientId: admin._id,
+         type: 'leave_request',
+         title: 'Leave Request Submitted',
+         message: `${currentStaff.name} requested ${type} leave from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}`,
+         actionUrl: `/dashboard/staff`,
+         entityType: 'staff',
+         entityId: currentStaff._id,
+         priority: 'medium'
+       });
+     }
+
+     res.json({ success: true, message: 'Leave request submitted successfully', leave: newLeave });
+   } catch (err) {
+     console.error('Error submitting leave request:', err);
+     res.status(500).json({ success: false, error: 'Failed to submit leave request' });
+   }
+ });
+
+ // Founder/Admin approves/declines/postpones leave request
+ app.post('/api/staff/leave/:staffId/action', requireAuth, async (req, res) => {
+   try {
+     // Check permissions - only admin/founder/supervisor/coordinator can approve leaves
+     if (!['admin', 'founder', 'supervisor', 'coordinator'].includes(req.session.user.role)) {
+       return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+     }
+
+     const { staffId } = req.params;
+     const { leaveId, action, notes } = req.body; // leaveId: _id of leave subdocument; action: 'approved', 'rejected', 'postponed'
+
+     if (!leaveId || !['approved', 'rejected', 'postponed'].includes(action)) {
+       return res.status(400).json({ success: false, error: 'Invalid request. leaveId and valid action required' });
+     }
+
+     const staff = await Staff.findById(staffId);
+     if (!staff) {
+       return res.status(404).json({ success: false, error: 'Staff not found' });
+     }
+
+     // Find leave by _id
+     const leaveIndex = staff.leaveHistory.findIndex(l => l._id.toString() === leaveId);
+     if (leaveIndex === -1) {
+       return res.status(404).json({ success: false, error: 'Leave request not found' });
+     }
+
+     const leave = staff.leaveHistory[leaveIndex];
+     // Only allow action on pending leaves
+     if (leave.status !== 'pending') {
+       return res.status(400).json({ success: false, error: `Leave request is already ${leave.status} and cannot be modified` });
+     }
+
+     leave.status = action;
+     if (notes) leave.notes = (leave.notes || '') + `\n\nAdmin note: ${notes}`;
+     leave.approvedBy = new mongoose.Types.ObjectId(req.session.user.id);
+     leave.approvedDate = new Date();
+
+     await staff.save();
+     if (notes) leave.notes = (leave.notes || '') + `\n\nAdmin note: ${notes}`;
+     leave.approvedBy = req.session.user.id;
+     leave.approvedDate = new Date();
+
+     await staff.save();
+
+     // Notify staff member about the decision
+     await Notification.create({
+       recipientId: staff._id,
+       type: 'leave_status',
+       title: `Leave Request ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+       message: `Your ${leave.type} leave request from ${new Date(leave.startDate).toLocaleDateString()} to ${new Date(leave.endDate).toLocaleDateString()} has been ${action} ${notes ? `with note: ${notes}` : ''}`,
+       actionUrl: '/trainer/profile',
+       entityType: 'leave',
+       entityId: staff._id,
+       priority: 'high'
+     });
+
+     // Log audit
+     await logAudit('leave_' + action, 'leave', staff._id, `${staff.name}'s leave`, { 
+       leaveType: leave.type,
+       startDate: leave.startDate,
+       endDate: leave.endDate,
+       action,
+       approvedBy: req.session.user.name
+     }, {
+       userId: req.session.user.id,
+       userName: req.session.user.name,
+       userEmail: req.session.user.email,
+       userRole: req.session.user.role
+     });
+
+     res.json({ success: true, message: `Leave request ${action}`, leave });
+   } catch (err) {
+     console.error('Error processing leave request:', err);
+     res.status(500).json({ success: false, error: 'Failed to process leave request' });
+   }
+ });
+
+ // Get trainer's own leave requests
+ app.get('/api/trainer/leave/requests', requireAuth, async (req, res) => {
+   try {
+     if (req.session.user.role !== 'trainer') {
+       return res.status(403).json({ success: false, error: 'Only trainers can access this endpoint' });
+     }
+
+     const currentStaff = await Staff.findOne({ email: req.session.user.email });
+     if (!currentStaff) {
+       return res.status(404).json({ success: false, error: 'Staff profile not found' });
+     }
+
+     const leaveRequests = currentStaff.leaveHistory || [];
+     res.json({ success: true, leaveRequests });
+   } catch (err) {
+     console.error('Error fetching leave requests:', err);
+     res.status(500).json({ success: false, error: 'Failed to fetch leave requests' });
+   }
+ });
+
+ // Get school details
+ app.get('/api/school/:schoolId', requireAuth, async (req, res) => {
+   try {
+     const school = await School.findById(req.params.schoolId).lean();
+     if (!school) {
+       return res.status(404).json({ error: 'School not found' });
+     }
+
+     res.json(school);
+   } catch (err) {
+     console.error('Error fetching school details:', err);
+     res.status(500).json({ error: 'Failed to fetch school details' });
+   }
+ });
 
 // Get permissions for a role
 app.get('/api/permissions/:role', requireAuth, requirePermission('canManagePermissions'), async (req, res) => {
@@ -6003,6 +6320,412 @@ app.post('/api/messages/mark-all-read', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error marking all messages as read:', err);
     res.status(500).json({ success: false, error: 'Failed to mark messages as read' });
+  }
+});
+
+// Upload attachment for message
+app.post('/api/messages/:messageId/upload', requireAuth, upload.single('file'), async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+
+    const message = await Message.findById(req.params.messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+
+    // Verify user is sender or recipient
+    const isSender = message.senderId.toString() === currentStaff._id.toString();
+    const isRecipient = message.recipients.some(r => r.staffId.toString() === currentStaff._id.toString());
+    if (!isSender && !isRecipient) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    const attachment = {
+      fileName: req.file.filename,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+      path: req.file.path,
+      uploadedAt: new Date()
+    };
+
+    message.attachments.push(attachment);
+    await message.save();
+
+    res.json({ success: true, attachment });
+  } catch (err) {
+    console.error('Error uploading attachment:', err);
+    res.status(500).json({ success: false, error: 'Failed to upload file' });
+  }
+});
+
+// Download attachment
+app.get('/api/messages/:messageId/attachment/:filename', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+
+    const message = await Message.findById(req.params.messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+
+    // Verify user is sender or recipient
+    const isSender = message.senderId.toString() === currentStaff._id.toString();
+    const isRecipient = message.recipients.some(r => r.staffId.toString() === currentStaff._id.toString());
+    if (!isSender && !isRecipient) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    const attachment = message.attachments.find(a => a.fileName === req.params.filename);
+    if (!attachment) {
+      return res.status(404).json({ success: false, error: 'Attachment not found' });
+    }
+
+    res.download(attachment.path, attachment.originalName);
+  } catch (err) {
+    console.error('Error downloading attachment:', err);
+    res.status(500).json({ success: false, error: 'Failed to download file' });
+  }
+});
+
+// Get conversation thread (replies)
+app.get('/api/messages/thread/:parentMessageId', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    const parentMessage = await Message.findById(req.params.parentMessageId);
+    if (!parentMessage) {
+      return res.status(404).json({ success: false, error: 'Parent message not found' });
+    }
+
+    // Verify access to parent message
+    const hasAccess = parentMessage.senderId.toString() === staffId.toString() ||
+      parentMessage.recipients.some(r => r.staffId.toString() === staffId.toString());
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    const replies = await Message.find({
+      parentMessageId: req.params.parentMessageId,
+      $or: [
+        { senderId: staffId },
+        { 'recipients.staffId': staffId }
+      ]
+    })
+      .sort({ sentAt: 1 })
+      .populate('senderId', 'name email role')
+      .populate('recipients.staffId', 'name email role')
+      .lean();
+
+    res.json({ success: true, parent: parentMessage, replies });
+  } catch (err) {
+    console.error('Error fetching thread:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch thread' });
+  }
+});
+
+// --- Team Chat Routes ---
+
+// Get team chats for current user (by event, region, school)
+app.get('/api/team-chats', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+
+    const { type, eventId, region } = req.query;
+
+    // Fetch staff's assignments
+    const staff = await Staff.findById(staffId)
+      .populate('assignedSchools.schoolId')
+      .lean();
+
+    if (!staff) {
+      return res.status(404).json({ success: false, error: 'Staff not found' });
+    }
+
+    let teamChats = [];
+
+    if (type === 'event' && eventId) {
+      // Get messages for specific event
+      const event = await Event.findById(eventId);
+      if (!event) {
+        return res.status(404).json({ success: false, error: 'Event not found' });
+      }
+      // Verify trainer is assigned to this event
+      const isAssigned = event.trainers.some(t => t.trainerId.toString() === staffId.toString());
+      if (!isAssigned && !['admin', 'founder', 'commissioner', 'supervisor'].includes(currentStaff.role)) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+
+      // Get event-specific messages where all recipients are event trainers
+      const eventTrainerIds = event.trainers.map(t => t.trainerId);
+      const eventMessages = await Message.find({
+        'context.eventId': eventId,
+        messageType: { $in: ['group', 'direct'] }
+      })
+        .sort({ sentAt: -1 })
+        .limit(50)
+        .populate('senderId', 'name role')
+        .lean();
+
+      teamChats = eventMessages.map(msg => ({
+        ...msg,
+        context: { type: 'event', eventId, eventName: event.name }
+      }));
+    } else if (type === 'region' && region) {
+      // Get messages for region/zone
+      const regionStaff = await Staff.find({ zones: region }).select('_id');
+      const regionStaffIds = regionStaff.map(s => s._id);
+
+      const regionMessages = await Message.find({
+        'context.region': region,
+        'recipients.staffId': { $in: regionStaffIds },
+        messageType: 'group'
+      })
+        .sort({ sentAt: -1 })
+        .limit(50)
+        .populate('senderId', 'name role')
+        .lean();
+
+      teamChats = regionMessages;
+    } else {
+      // Get all team chats for this staff member
+      // Messages with messageType='group' and context.type in ['event', 'region', 'school']
+      const assignedSchoolIds = staff.assignedSchools.map(a => a.schoolId._id.toString());
+
+      const personalMessages = await Message.find({
+        $or: [
+          { 'recipients.staffId': staffId, messageType: 'group', 'context.type': { $exists: true } },
+          { 'context.schoolId': { $in: assignedSchoolIds } }
+        ]
+      })
+        .sort({ sentAt: -1 })
+        .limit(50)
+        .populate('senderId', 'name role')
+        .lean();
+
+      teamChats = personalMessages;
+    }
+
+    res.json({ success: true, teamChats });
+  } catch (err) {
+    console.error('Error fetching team chats:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch team chats' });
+  }
+});
+
+// Get group chat by event ID
+app.get('/api/events/:eventId/chat', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+    const eventId = req.params.eventId;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    // Verify trainer is assigned to this event
+    const isAssigned = event.trainers.some(t => t.trainerId.toString() === staffId.toString());
+    if (!isAssigned && !['admin', 'founder', 'commissioner', 'supervisor'].includes(currentStaff.role)) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    // Find or create event team chat
+    let eventChat = await Message.findOne({
+      'context.eventId': eventId,
+      messageType: 'group',
+      'recipients.staffId': { $exists: true }
+    }).sort({ createdAt: 1 });
+
+    if (!eventChat) {
+      // First message - create the group chat
+      const eventTrainers = event.trainers.filter(t => t.status === 'confirmed').map(t => t.trainerId);
+      eventChat = new Message({
+        senderId: event.trainers[0]?.trainerId || staffId,
+        senderName: 'Event Chat',
+        senderRole: 'system',
+        recipients: eventTrainers.map(tid => ({ staffId: tid, status: 'sent' })),
+        subject: `Event Chat: ${event.name}`,
+        body: 'Welcome to the event team chat! Use this thread to coordinate logistics, share updates, and discuss event-related matters.',
+        messageType: 'group',
+        priority: 'normal',
+        context: {
+          type: 'event',
+          eventId: eventId,
+          eventName: event.name,
+          region: event.region
+        }
+      });
+      await eventChat.save();
+
+      // Mark as system message so it doesn't clutter inbox
+      eventChat.status = 'sent';
+      await eventChat.save();
+    }
+
+    // Get all messages for this event chat
+    const eventMessages = await Message.find({
+      $or: [
+        { _id: eventChat._id },
+        { parentMessageId: eventChat._id }
+      ]
+    })
+      .sort({ sentAt: 1 })
+      .populate('senderId', 'name role')
+      .populate('recipients.staffId', 'name role')
+      .lean();
+
+    res.json({ success: true, messages: eventMessages, event: { id: event._id, name: event.name, region: event.region } });
+  } catch (err) {
+    console.error('Error fetching event chat:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch event chat' });
+  }
+});
+
+// Get region/zone team chat
+app.get('/api/region-chat/:zone', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+    const staffId = currentStaff._id;
+    const zone = req.params.zone;
+
+    // Verify staff belongs to this zone
+    const staff = await Staff.findById(staffId);
+    if (!staff.zones.includes(zone) && !['admin', 'founder', 'commissioner', 'supervisor'].includes(staff.role)) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    // Get all staff in this zone
+    const zoneStaff = await Staff.find({ zones: zone }).select('_id');
+    const zoneStaffIds = zoneStaff.map(s => s._id);
+
+    // Get region chat messages
+    const messages = await Message.find({
+      'context.zone': zone,
+      'recipients.staffId': { $in: zoneStaffIds },
+      messageType: 'group'
+    })
+      .sort({ sentAt: 1 })
+      .limit(100)
+      .populate('senderId', 'name role')
+      .lean();
+
+    res.json({ success: true, messages, zone });
+  } catch (err) {
+    console.error('Error fetching region chat:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch region chat' });
+  }
+});
+
+// Send team message (to event, region, or school group)
+app.post('/api/team-messages/send', requireAuth, async (req, res) => {
+  try {
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+
+    const { contextType, eventId, zone, schoolId, body, priority = 'normal', subject } = req.body;
+    if (!body) {
+      return res.status(400).json({ success: false, error: 'Message body is required' });
+    }
+
+    let recipientIds = [];
+    let context = {};
+
+    if (contextType === 'event' && eventId) {
+      const event = await Event.findById(eventId);
+      if (!event) return res.status(404).json({ success: false, error: 'Event not found' });
+
+      const isAssigned = event.trainers.some(t => t.trainerId.toString() === currentStaff._id.toString());
+      if (!isAssigned && !['admin', 'founder', 'commissioner', 'supervisor'].includes(currentStaff.role)) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+
+      recipientIds = event.trainers.map(t => t.trainerId);
+      context = { type: 'event', eventId, eventName: event.name, region: event.region };
+    } else if (contextType === 'region' && zone) {
+      const zoneStaff = await Staff.find({ zones: zone }).select('_id');
+      recipientIds = zoneStaff.map(s => s._id);
+      context = { type: 'region', zone };
+
+      if (!recipientIds.includes(currentStaff._id)) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+    } else if (contextType === 'school' && schoolId) {
+      const schoolAssignments = await Staff.find({
+        'assignedSchools.schoolId': schoolId
+      }).select('_id');
+      recipientIds = schoolAssignments.map(s => s._id);
+      context = { type: 'school', schoolId };
+
+      if (!recipientIds.includes(currentStaff._id)) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid context type or missing ID' });
+    }
+
+    // Remove duplicates and exclude sender
+    recipientIds = [...new Set(recipientIds.filter(id => id.toString() !== currentStaff._id.toString()))];
+
+    const message = new Message({
+      senderId: currentStaff._id,
+      senderName: currentStaff.name,
+      senderRole: currentStaff.role,
+      recipients: recipientIds.map(rid => ({ staffId: rid, status: 'sent' })),
+      subject: subject || `[${contextType.toUpperCase()}] ${context.eventName || context.zone || 'Group Message'}`,
+      body,
+      messageType: 'group',
+      priority,
+      context
+    });
+
+    await message.save();
+
+    // Create notifications for recipients
+    for (const recipientId of recipientIds) {
+      await Notification.create({
+        recipientId,
+        type: 'new_message',
+        title: subject || `New ${contextType} message`,
+        message: body.substring(0, 100) + (body.length > 100 ? '...' : ''),
+        actionUrl: `/api/team-chats?type=${contextType}&${contextType}Id=${eventId || zone || schoolId}`,
+        entityType: 'message',
+        entityId: message._id,
+        priority: priority === 'urgent' ? 'high' : 'normal'
+      });
+    }
+
+    res.json({ success: true, message });
+  } catch (err) {
+    console.error('Error sending team message:', err);
+    res.status(500).json({ success: false, error: 'Failed to send team message' });
   }
 });
 

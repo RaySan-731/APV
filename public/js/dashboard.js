@@ -596,14 +596,39 @@ async function viewStaffProfile(staffId) {
         // Leave history
         const leaveContainer = document.getElementById('profileLeaveHistory');
         if (staff.leaveHistory && staff.leaveHistory.length > 0) {
-            leaveContainer.innerHTML = staff.leaveHistory.map(leave => `
-                <div class="leave-item">
-                    <strong>${leave.type ? leave.type.charAt(0).toUpperCase() + leave.type.slice(1) : 'Leave'}</strong> —
-                    ${leave.startDate ? new Date(leave.startDate).toLocaleDateString() : 'N/A'} to ${leave.endDate ? new Date(leave.endDate).toLocaleDateString() : 'N/A'}
-                    <br>Status: <span class="badge badge-${leave.status === 'approved' ? 'success' : leave.status === 'rejected' ? 'danger' : 'warning'}">${leave.status}</span>
-                    ${leave.notes ? `<br>Notes: ${leave.notes}` : ''}
-                </div>
-            `).join('');
+            const isAdmin = ['admin', 'founder', 'supervisor', 'coordinator'].includes(window.currentUser?.role);
+            const isOwnProfile = window.currentUser?.id === staff._id || window.currentUser?.id === staff.id;
+            
+            leaveContainer.innerHTML = staff.leaveHistory.map((leave) => {
+                const statusClass = leave.status === 'approved' ? 'success' : leave.status === 'rejected' ? 'danger' : leave.status === 'postponed' ? 'warning' : 'warning';
+                const statusText = leave.status.charAt(0).toUpperCase() + leave.status.slice(1);
+                
+                let actionButtons = '';
+                if (isAdmin && leave.status === 'pending' && !isOwnProfile) {
+                    actionButtons = `
+                        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="btn btn-sm btn-success" onclick="processLeaveRequest('${staff._id}', '${leave._id}', 'approved')">Approve</button>
+                            <button class="btn btn-sm btn-warning" onclick="processLeaveRequest('${staff._id}', '${leave._id}', 'postponed')">Postpone</button>
+                            <button class="btn btn-sm btn-danger" onclick="processLeaveRequest('${staff._id}', '${leave._id}', 'rejected')">Decline</button>
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div class="leave-item" style="padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; background: var(--muted);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <strong>${leave.type ? leave.type.charAt(0).toUpperCase() + leave.type.slice(1) : 'Leave'}</strong> —
+                                ${leave.startDate ? new Date(leave.startDate).toLocaleDateString() : 'N/A'} to ${leave.endDate ? new Date(leave.endDate).toLocaleDateString() : 'N/A'}
+                            </div>
+                            <span class="badge badge-${statusClass}">${statusText}</span>
+                        </div>
+                        ${leave.notes ? `<p style="margin: 0.5rem 0; color: var(--muted-foreground); font-size: 0.875rem;">Notes: ${leave.notes}</p>` : ''}
+                        ${leave.approvedBy ? `<p style="margin: 0; color: var(--muted-foreground); font-size: 0.75rem;">Reviewed by: ${leave.approvedBy} on ${leave.approvedDate ? new Date(leave.approvedDate).toLocaleDateString() : 'N/A'}</p>` : ''}
+                        ${actionButtons}
+                    </div>
+                `;
+            }).join('');
         } else {
             leaveContainer.innerHTML = '<p class="placeholder-text">No leave history found.</p>';
         }
@@ -631,15 +656,42 @@ function closeStaffProfileModal() {
     modal.style.display = 'none';
 }
 
-// Close modal when clicking outside of it
-document.addEventListener('click', function(event) {
-    const modal = document.getElementById('staffProfileModal');
-    if (event.target === modal) {
-        closeStaffProfileModal();
-    }
-});
+ // Close modal when clicking outside of it
+ document.addEventListener('click', function(event) {
+     const modal = document.getElementById('staffProfileModal');
+     if (event.target === modal) {
+         closeStaffProfileModal();
+     }
+ });
 
-// Edit permissions
+ // Process leave request (approve/reject/postpone)
+ async function processLeaveRequest(staffId, leaveId, action) {
+     if (!confirm(`Are you sure you want to ${action} this leave request?`)) return;
+     
+     const notes = prompt(`Optional: Add a note for the staff member (leave blank for none):`);
+     
+     try {
+         const response = await fetch(`/api/staff/leave/${staffId}/action`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ leaveId, action, notes })
+         });
+         const result = await response.json();
+         
+         if (response.ok && result.success) {
+             showToast(`Leave request ${action} successfully`, 'success');
+             // Reload the staff profile to reflect changes
+             viewStaffProfile(staffId);
+         } else {
+             showToast('Error: ' + (result.error || 'Action failed'), 'error');
+         }
+     } catch (err) {
+         console.error('Error processing leave:', err);
+         showToast('Network error', 'error');
+     }
+ }
+
+ // Staff editing functions
 async function editPermissions(role) {
     try {
         // Fetch current permissions

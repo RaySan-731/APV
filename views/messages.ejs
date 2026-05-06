@@ -36,6 +36,7 @@
                             <button class="btn btn-outline active" id="btnInbox" onclick="loadMessages('inbox')">Inbox</button>
                             <button class="btn btn-outline" id="btnSent" onclick="loadMessages('sent')">Sent</button>
                             <button class="btn btn-outline" id="btnImportant" onclick="loadMessages('important')">Important</button>
+                            <button class="btn btn-outline" onclick="window.location.href='/trainer/events'">Team Chats</button>
                         </div>
                     </div>
                     <div class="card-content">
@@ -59,8 +60,10 @@
                 <button type="button" class="close-btn" onclick="closeComposeModal()">×</button>
             </div>
             <div class="modal-body">
-                <form id="composeForm" class="form-grid">
+                <form id="composeForm" class="form-grid" enctype="multipart/form-data">
                     <input type="hidden" id="parentMessageId" name="parentMessageId">
+                    <input type="hidden" id="contextType" name="contextType">
+                    <input type="hidden" id="contextId" name="contextId">
 
                     <label style="grid-column: 1 / -1;">
                         To
@@ -68,7 +71,7 @@
                             <option value="">Select recipient(s)...</option>
                             <% if (staffList && staffList.length > 0) { %>
                                 <% staffList.forEach(staff => { %>
-                                    <option value="<%= staff._id %>"><%= staff.name %> (<%= staff.role %>)</option>
+                                    <option value="<%= staff._id %>"><%= staff.name %> (<%= staff.role %>, <%= staff.zones?.[0] || 'No zone' %>)</option>
                                 <% }) %>
                             <% } else { %>
                                 <option value="" disabled>No active staff available</option>
@@ -78,13 +81,43 @@
                     </label>
 
                     <label style="grid-column: 1 / -1;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="isTeamMessage" onchange="toggleTeamContext()">
+                            Send as Team Chat (Event/Region/School)
+                        </label>
+                    </label>
+
+                    <div id="teamContextFields" style="grid-column: 1 / -1; display: none; padding: 1rem; background: var(--muted); border-radius: var(--radius);">
+                        <label>
+                            Team Type
+                            <select id="teamContextType" name="teamContextType" onchange="loadTeamOptions()">
+                                <option value="">Select type</option>
+                                <option value="event">Event</option>
+                                <option value="region">Region/Zone</option>
+                                <option value="school">School</option>
+                            </select>
+                        </label>
+                        <label id="teamContextSelector" style="margin-top: 0.5rem;"></label>
+                        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">
+                            Team messages are automatically shared with all assigned participants.
+                        </p>
+                    </div>
+
+                    <label style="grid-column: 1 / -1;">
                         Subject
                         <input type="text" id="messageSubject" name="subject" placeholder="Enter subject (optional)">
                     </label>
 
                     <label style="grid-column: 1 / -1;">
                         Message
-                        <textarea id="messageBody" name="body" rows="8" placeholder="Type your message here..." required></textarea>
+                        <textarea id="messageBody" name="body" rows="6" placeholder="Type your message here..." required></textarea>
+                    </label>
+
+                    <label style="grid-column: 1 / -1;">
+                        Attachments
+                        <input type="file" id="fileInput" name="files" multiple style="padding: 0.5rem;">
+                        <small>Max file size: 10MB. Supported: images, PDF, docs, spreadsheets, text, archives</small>
+                        <div id="fileList" style="margin-top: 0.5rem;"></div>
                     </label>
 
                     <label style="grid-column: 1 / -1; display: flex; gap: 1rem; align-items: center;">
@@ -94,7 +127,6 @@
                             <option value="high">High Priority</option>
                             <option value="urgent">Urgent</option>
                         </select>
-
                         <label style="display: flex; align-items: center; gap: 0.25rem;">
                             <input type="checkbox" id="markImportant" name="isImportant"> Mark as Important
                         </label>
@@ -120,17 +152,124 @@
             <div class="modal-body">
                 <div id="messageDetailContent"></div>
                 <div id="messageAttachments" style="margin-top: 1rem;"></div>
+                <div id="threadReplies" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem;"></div>
                 <div style="margin-top: 1rem;">
                     <button class="btn btn-outline btn-sm" onclick="replyToMessage()">Reply</button>
                     <button class="btn btn-outline btn-sm" onclick="forwardMessage()">Forward</button>
+                    <% if (user.role === 'admin' || user.role === 'supervisor' || user.role === 'founder') { %>
+                    <button class="btn btn-outline btn-sm" onclick="addAttachment()">+ Add Attachment</button>
+                    <% } %>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Event Chat Modal (injected dynamically) -->
+
     <script>
+        // State
         let currentPage = 1;
         let currentFolder = 'inbox';
+        let selectedFiles = [];
+        let currentMessage = null;
+
+        // File handling
+        document.getElementById('fileInput')?.addEventListener('change', function(e) {
+            selectedFiles = Array.from(e.target.files);
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = selectedFiles.map(f => `
+                <div style="padding: 0.5rem; background: var(--muted); border-radius: 4px; margin-bottom: 0.25rem; display: flex; justify-content: space-between;">
+                    <span>${f.name} (${(f.size / 1024).toFixed(1)} KB)</span>
+                    <button type="button" onclick="removeFile('${f.name}')" style="border: none; background: none; color: var(--destructive); cursor: pointer;">×</button>
+                </div>
+            `).join('');
+        });
+
+        function removeFile(filename) {
+            selectedFiles = selectedFiles.filter(f => f.name !== filename);
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileList').innerHTML = selectedFiles.map(f => `
+                <div style="padding: 0.5rem; background: var(--muted); border-radius: 4px; margin-bottom: 0.25rem; display: flex; justify-content: space-between;">
+                    <span>${f.name} (${(f.size / 1024).toFixed(1)} KB)</span>
+                    <button type="button" onclick="removeFile('${f.name}')" style="border: none; background: none; color: var(--destructive); cursor: pointer;">×</button>
+                </div>
+            `).join('');
+        }
+
+        // Team context toggle
+        function toggleTeamContext() {
+            const checkbox = document.getElementById('isTeamMessage');
+            const teamFields = document.getElementById('teamContextFields');
+            const recipientSelect = document.getElementById('recipientSelect');
+            if (checkbox.checked) {
+                teamFields.style.display = 'block';
+                recipientSelect.disabled = true;
+                recipientSelect.required = false;
+            } else {
+                teamFields.style.display = 'none';
+                recipientSelect.disabled = false;
+                recipientSelect.required = true;
+                clearTeamContext();
+            }
+        }
+
+        async function loadTeamOptions() {
+            const type = document.getElementById('teamContextType').value;
+            const selector = document.getElementById('teamContextSelector');
+            if (!type) { selector.innerHTML = ''; return; }
+            let endpoint = '';
+            if (type === 'event') endpoint = '/api/trainer/events?status=scheduled,confirmed,in_progress';
+            else if (type === 'region') endpoint = '/api/trainer/zones';
+            else if (type === 'school') endpoint = '/api/trainer/schools';
+
+            try {
+                const res = await fetch(endpoint);
+                const data = await res.json();
+                let options = [];
+                if (type === 'event' && data.events) {
+                    options = data.events.map(e => `<option value="${e._id}">${e.name} (${new Date(e.startDate).toLocaleDateString()})</option>`).join('');
+                } else if (type === 'region' && data.zones) {
+                    options = data.zones.map(z => `<option value="${z}">${z}</option>`).join('');
+                } else if (type === 'school' && data.schools) {
+                    options = data.schools.map(s => `<option value="${s._id}">${s.name}</option>`).join('');
+                }
+                selector.innerHTML = `
+                    <label style="grid-column: 1 / -1;">
+                        Select ${type.charAt(0).toUpperCase() + type.slice(1)}
+                        <select id="team${type.charAt(0).toUpperCase() + type.slice(1)}Select" onchange="updateTeamContext()">
+                            <option value="">Select ${type}</option>
+                            ${options}
+                        </select>
+                    </label>
+                `;
+            } catch (err) {
+                console.error('Error loading team options:', err);
+                selector.innerHTML = '<p style="color: var(--destructive);">Error loading options</p>';
+            }
+        }
+
+        function updateTeamContext() {
+            const type = document.getElementById('teamContextType').value;
+            const selectEl = document.getElementById('team' + type.charAt(0).toUpperCase() + type.slice(1) + 'Select');
+            const value = selectEl?.value;
+            document.getElementById('contextType').value = type || '';
+            document.getElementById('contextId').value = value || '';
+        }
+
+        function clearTeamContext() {
+            document.getElementById('contextType').value = '';
+            document.getElementById('contextId').value = '';
+            document.getElementById('teamContextSelector').innerHTML = '';
+            document.getElementById('teamContextType').value = '';
+        }
+
+        function updateUnreadBadge(count) {
+            const badge = document.getElementById('unreadMessageBadge');
+            if (badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'inline' : 'none';
+            }
+        }
 
         async function loadMessages(folder, page = 1) {
             currentFolder = folder;
@@ -138,7 +277,6 @@
             const listEl = document.getElementById('messageList');
             listEl.innerHTML = '<div class="placeholder-text">Loading...</div>';
 
-            // Update button states
             ['inbox', 'sent', 'important'].forEach(f => {
                 const btn = document.getElementById('btn' + f.charAt(0).toUpperCase() + f.slice(1));
                 if (btn) btn.classList.toggle('active', f === folder);
@@ -147,7 +285,6 @@
             try {
                 const res = await fetch(`/api/messages?folder=${folder}&page=${page}&limit=20`);
                 const data = await res.json();
-
                 if (data.messages !== undefined) {
                     renderMessages(data.messages, folder);
                     updateUnreadBadge(data.unreadCount || 0);
@@ -164,24 +301,17 @@
                 listEl.innerHTML = '<div class="placeholder-text">No messages found</div>';
                 return;
             }
-
             listEl.innerHTML = messages.map(msg => {
                 const isRead = folder === 'sent' || msg.recipients?.some(r => r.staffId === '<%= user._id %>' && r.status === 'read');
                 const date = new Date(msg.sentAt).toLocaleDateString();
                 const sender = msg.senderId?.name || 'Unknown';
                 const subject = msg.subject || '(No subject)';
                 const preview = msg.body.substring(0, 80) + (msg.body.length > 80 ? '...' : '');
-
                 return `
                     <div class="message-item ${!isRead && folder === 'inbox' ? 'unread' : ''}" onclick="viewMessage('${msg._id}')">
-                        <div class="message-avatar">
-                            <strong>${sender.charAt(0).toUpperCase()}</strong>
-                        </div>
+                        <div class="message-avatar"><strong>${sender.charAt(0).toUpperCase()}</strong></div>
                         <div class="message-body">
-                            <div class="message-header">
-                                <strong>${sender}</strong>
-                                <span class="message-date">${date}</span>
-                            </div>
+                            <div class="message-header"><strong>${sender}</strong><span class="message-date">${date}</span></div>
                             <div class="message-subject">${subject}</div>
                             <div class="message-preview">${preview}</div>
                         </div>
@@ -196,19 +326,38 @@
             try {
                 const res = await fetch(`/api/messages/${messageId}`);
                 const data = await res.json();
-
                 if (data.message) {
                     const msg = data.message;
                     document.getElementById('modalMessageSubject').textContent = msg.subject || '(No subject)';
+                    document.getElementById('messageDetailModal').dataset.messageId = messageId;
+                    currentMessage = { id: messageId };
+
+                    let attachmentsHtml = '';
+                    if (msg.attachments && msg.attachments.length > 0) {
+                        attachmentsHtml = '<div style="margin-top: 1rem;"><h5>Attachments</h5>';
+                        attachmentsHtml += msg.attachments.map(a => `
+                            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: var(--muted); border-radius: 4px; margin-bottom: 0.5rem;">
+                                <span>📎 ${a.originalName}</span>
+                                <small>(${(a.size / 1024).toFixed(1)} KB)</small>
+                                <a href="/api/messages/${msg._id}/attachment/${a.fileName}" class="btn btn-sm btn-outline" target="_blank">Download</a>
+                            </div>
+                        `).join('');
+                        attachmentsHtml += '</div>';
+                    }
+
                     document.getElementById('messageDetailContent').innerHTML = `
                         <div style="margin-bottom: 1rem; color: var(--muted-foreground);">
                             <strong>From:</strong> ${msg.senderId?.name || 'Unknown'} (${msg.senderId?.role || ''})<br>
                             <strong>Date:</strong> ${new Date(msg.sentAt).toLocaleString()}
+                            ${msg.priority ? `<br><strong>Priority:</strong> ${msg.priority}` : ''}
+                            ${msg.messageType === 'group' ? `<br><strong>Type:</strong> Group Message` : ''}
                         </div>
                         <div style="line-height: 1.6; white-space: pre-wrap;">${msg.body}</div>
                     `;
 
-                    // Mark as read if recipient
+                    document.getElementById('messageAttachments').innerHTML = attachmentsHtml;
+                    loadThreadReplies(msg._id);
+
                     if (msg.senderId.toString() !== '<%= user._id %>') {
                         await fetch(`/api/messages/${messageId}/read`, { method: 'POST' });
                         loadMessages(currentFolder, currentPage);
@@ -222,42 +371,118 @@
             }
         }
 
+        async function loadThreadReplies(parentMessageId) {
+            try {
+                const res = await fetch(`/api/messages/thread/${parentMessageId}`);
+                const data = await res.json();
+                const threadContainer = document.getElementById('threadReplies');
+                if (data.success && data.replies && data.replies.length > 0) {
+                    const repliesHtml = data.replies.map(reply => `
+                        <div style="padding: 1rem; background: var(--muted); border-radius: var(--radius); margin-bottom: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <strong>${reply.senderId?.name || 'Unknown'}</strong>
+                                <small>${new Date(reply.sentAt).toLocaleString()}</small>
+                            </div>
+                            <div style="white-space: pre-wrap;">${reply.body}</div>
+                            ${reply.attachments?.length ? `
+                                <div style="margin-top: 0.5rem;">
+                                    ${reply.attachments.map(a => `
+                                        <a href="/api/messages/${reply._id}/attachment/${a.fileName}" target="_blank" class="btn btn-sm btn-outline">📎 ${a.originalName}</a>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('');
+                    threadContainer.innerHTML = '<h5>Replies</h5>' + repliesHtml;
+                } else {
+                    threadContainer.innerHTML = '';
+                }
+            } catch (err) {
+                console.error('Error loading thread:', err);
+            }
+        }
+
         async function sendMessage() {
             const recipientIds = Array.from(document.getElementById('recipientSelect').selectedOptions).map(o => o.value);
             const subject = document.getElementById('messageSubject').value;
             const body = document.getElementById('messageBody').value;
             const priority = document.getElementById('messagePriority').value;
             const isImportant = document.getElementById('markImportant').checked;
+            const parentMessageId = document.getElementById('parentMessageId').value;
+            const contextType = document.getElementById('contextType').value;
+            const contextId = document.getElementById('contextId').value;
+            const isTeamMessage = document.getElementById('isTeamMessage')?.checked;
 
-            if (!recipientIds.length || !body) {
-                alert('Please fill in required fields');
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/messages/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        recipientIds,
-                        subject,
-                        body,
-                        priority,
-                        isImportant
-                    })
-                });
-
-                const data = await res.json();
-                if (data.success) {
-                    closeComposeModal();
-                    loadMessages('inbox', 1);
-                    alert('Message sent!');
-                } else {
-                    alert('Failed: ' + (data.error || 'Unknown error'));
+            if (isTeamMessage) {
+                if (!contextType || !contextId) { alert('Please select a team context'); return; }
+                if (!body) { alert('Please enter a message'); return; }
+                try {
+                    const createRes = await fetch('/api/team-messages/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contextType,
+                            [contextType + 'Id']: contextId,
+                            body,
+                            subject: subject || '',
+                            priority
+                        })
+                    });
+                    const createData = await createRes.json();
+                    if (createData.success) {
+                        const messageId = createData.message._id;
+                        if (selectedFiles.length > 0 && messageId) {
+                            for (const file of selectedFiles) {
+                                const uploadFormData = new FormData();
+                                uploadFormData.append('file', file);
+                                await fetch(`/api/messages/${messageId}/upload`, { method: 'POST', body: uploadFormData });
+                            }
+                        }
+                        closeComposeModal();
+                        alert('Team message sent!');
+                        if (contextType === 'event') loadEventChat(contextId);
+                    } else {
+                        alert('Failed: ' + (createData.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    console.error('Error sending team message:', err);
+                    alert('Failed to send message');
                 }
-            } catch (err) {
-                console.error('Error sending message:', err);
-                alert('Failed to send message');
+            } else {
+                if (!recipientIds.length || !body) { alert('Please fill in required fields'); return; }
+                try {
+                    const createRes = await fetch('/api/messages/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            recipientIds,
+                            subject: subject || '',
+                            body,
+                            priority,
+                            isImportant,
+                            parentMessageId: parentMessageId || null
+                        })
+                    });
+                    const result = await createRes.json();
+                    if (result.success) {
+                        const messageId = result.messageId || result.message._id;
+                        if (selectedFiles.length > 0 && messageId) {
+                            for (const file of selectedFiles) {
+                                const uploadFormData = new FormData();
+                                uploadFormData.append('file', file);
+                                await fetch(`/api/messages/${messageId}/upload`, { method: 'POST', body: uploadFormData });
+                            }
+                        }
+                        closeComposeModal();
+                        loadMessages('inbox', 1);
+                        alert('Message sent!');
+                    } else {
+                        alert('Failed: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    console.error('Error sending message:', err);
+                    alert('Failed to send message');
+                }
             }
         }
 
@@ -271,37 +496,161 @@
         function closeComposeModal() {
             closeModal('composeModal');
             document.getElementById('composeForm').reset();
+            selectedFiles = [];
+            document.getElementById('fileList').innerHTML = '';
+            clearTeamContext();
         }
 
         function replyToMessage() {
             const subject = document.getElementById('modalMessageSubject').textContent;
+            const messageId = document.getElementById('messageDetailModal').dataset.messageId;
             closeMessageModal();
-            openComposeModal();
+            openComposeModal(messageId);
             document.getElementById('messageSubject').value = 'Re: ' + subject;
         }
 
         function forwardMessage() {
             const subject = document.getElementById('modalMessageSubject').textContent;
-            const body = document.querySelector('#messageDetailContent div[style*="white-space"]').textContent;
-            closeMessageModal();
-            openComposeModal();
-            document.getElementById('messageSubject').value = 'Fwd: ' + subject;
-            document.getElementById('messageBody').value = '--- Forwarded message ---\n\n' + body;
+            const messageId = document.getElementById('messageDetailModal').dataset.messageId;
+            fetch(`/api/messages/${messageId}`)
+                .then(r => r.json())
+                .then(data => {
+                    closeMessageModal();
+                    openComposeModal();
+                    document.getElementById('messageSubject').value = 'Fwd: ' + subject;
+                    document.getElementById('messageBody').value = '--- Forwarded message ---\n\n' + data.message.body;
+                });
         }
 
+        function addAttachment() {
+            const messageId = document.getElementById('messageDetailModal').dataset.messageId;
+            if (!messageId) return;
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    await fetch(`/api/messages/${messageId}/upload`, { method: 'POST', body: formData });
+                    viewMessage(messageId);
+                    alert('Attachment added');
+                }
+            };
+            input.click();
+        }
+
+        // Event chat
+        async function loadEventChat(eventId) {
+            try {
+                const res = await fetch(`/api/events/${eventId}/chat`);
+                const data = await res.json();
+                if (data.success) {
+                    openEventChatModal(data.event, data.messages);
+                }
+            } catch (err) {
+                console.error('Error loading event chat:', err);
+                alert('Failed to load event chat');
+            }
+        }
+
+        function openEventChatModal(event, messages) {
+            let modal = document.getElementById('eventChatModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'eventChatModal';
+                modal.className = 'modal';
+                modal.style.cssText = 'display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;';
+                modal.innerHTML = `
+                    <div class="modal-content large-modal" style="max-width: 800px; max-height: 90vh;">
+                        <div class="modal-header">
+                            <h3 id="eventChatTitle"></h3>
+                            <button type="button" class="close-btn" onclick="closeEventChatModal()">×</button>
+                        </div>
+                        <div class="modal-body" style="display: flex; flex-direction: column; height: 70vh;">
+                            <div id="eventChatMessages" style="overflow-y: auto; flex: 1; padding: 1rem; background: var(--muted); border-radius: var(--radius); margin-bottom: 1rem;"></div>
+                            <form id="eventChatForm" style="display: flex; gap: 0.5rem;">
+                                <textarea name="body" placeholder="Type your message..." required style="flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); resize: none; height: 60px;"></textarea>
+                                <button type="submit" class="btn btn-primary">Send</button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                document.getElementById('eventChatForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const body = e.target.body.value.trim();
+                    if (!body) return;
+                    const eventId = modal.dataset.eventId;
+                    if (!eventId) return;
+                    try {
+                        const createRes = await fetch('/api/team-messages/send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contextType: 'event', eventId, body, subject: '' })
+                        });
+                        const data = await createRes.json();
+                        if (data.success) {
+                            e.target.reset();
+                            const chatRes = await fetch(`/api/events/${eventId}/chat`);
+                            const chatData = await chatRes.json();
+                            if (chatData.success) renderEventMessages(chatData.messages);
+                        } else {
+                            alert('Failed: ' + data.error);
+                        }
+                    } catch (err) {
+                        console.error('Error sending event message:', err);
+                        alert('Failed to send');
+                    }
+                });
+            }
+            modal.dataset.eventId = event._id;
+            document.getElementById('eventChatTitle').textContent = `Event Chat: ${event.name}`;
+            renderEventMessages(messages);
+            modal.style.display = 'flex';
+        }
+
+        function renderEventMessages(messages) {
+            const container = document.getElementById('eventChatMessages');
+            if (!messages || messages.length === 0) {
+                container.innerHTML = '<p class="placeholder-text">No messages yet. Start the conversation!</p>';
+                return;
+            }
+            container.innerHTML = messages.map(msg => `
+                <div style="padding: 1rem; background: var(--card); border-radius: 8px; margin-bottom: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <strong>${msg.senderName}</strong>
+                        <small>${new Date(msg.sentAt).toLocaleTimeString()}</small>
+                    </div>
+                    <div style="white-space: pre-wrap;">${msg.body}</div>
+                    ${msg.attachments?.length ? `
+                        <div style="margin-top: 0.5rem;">
+                            ${msg.attachments.map(a => `
+                                <a href="/api/messages/${msg._id}/attachment/${a.fileName}" target="_blank" class="btn btn-sm btn-outline">📎 ${a.originalName}</a>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function closeEventChatModal() {
+            const modal = document.getElementById('eventChatModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        // Modal helpers
         function openModal(id) { document.getElementById(id).style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function closeMessageModal() { closeModal('messageDetailModal'); }
 
-        function updateUnreadBadge(count) {
-            const badge = document.getElementById('unreadMessageBadge');
-            badge.textContent = count;
-            badge.style.display = count > 0 ? 'inline' : 'none';
-        }
-
+        // Pagination
         function loadMoreMessages() {
             loadMessages(currentFolder, currentPage + 1);
         }
 
+        // Init
         document.addEventListener('DOMContentLoaded', () => {
             loadMessages('inbox', 1);
         });

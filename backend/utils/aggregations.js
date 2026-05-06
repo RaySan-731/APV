@@ -87,7 +87,7 @@ async function getTrainerPerformance(filters = {}) {
 
   const matchStage = { status: 'completed' };
   if (startDate) matchStage.startDate = { $gte: startDate };
-  if (trainerId) matchStage['trainers.trainerId'] = mongoose.Types.ObjectId(trainerId);
+   if (trainerId) matchStage['trainers.trainerId'] = new mongoose.Types.ObjectId(trainerId);
 
   // Pipeline 1: Event-based metrics (events, attendance, reports)
   const eventStatsPipeline = [
@@ -217,9 +217,9 @@ async function getTrainerPerformance(filters = {}) {
     return sortOrder === 'desc' ? valB - valA : valA - valB;
   });
 
-  // Populate trainer names
-  const trainerIds = merged.map(m => mongoose.Types.ObjectId(m.trainerId));
-  const staff = await Staff.find({ _id: { $in: trainerIds } }).select('name email role').lean();
+   // Populate trainer names
+   const trainerIds = merged.map(m => m.trainerId);
+   const staff = await Staff.find({ _id: { $in: trainerIds } }).select('name email role').lean();
   const staffMap = staff.reduce((acc, s) => acc.set(s._id.toString(), s), new Map());
 
   merged.forEach(item => {
@@ -295,7 +295,7 @@ async function getSchoolEngagement(filters = {}) {
 
   // Get schools list
   const schoolMatch = {};
-  if (schoolId) schoolMatch._id = mongoose.Types.ObjectId(schoolId);
+   if (schoolId) schoolMatch._id = new mongoose.Types.ObjectId(schoolId);
   const schools = await School.find(schoolMatch).lean();
 
   const results = [];
@@ -393,20 +393,14 @@ async function buildCustomReport(config) {
   const { dimensions = [], metrics = [], filters = {}, groupBy = null } = config;
 
   const now = new Date();
-  const matchStage = {};
-
-  // Apply filters
-  if (filters.dateRange) {
-    const daysAgo = filters.dateRange === '30d' ? 30 : filters.dateRange === '90d' ? 90 : 365;
-    matchStage.startDate = { $gte: new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000) };
-  }
-  if (filters.schoolIds?.length) {
-    matchStage['targetSchools.schoolId'] = { $in: filters.schoolIds.map(id => mongoose.Types.ObjectId(id)) };
-  }
-  if (filters.trainerIds?.length) {
-    matchStage['trainers.trainerId'] = { $in: filters.trainerIds.map(id => mongoose.Types.ObjectId(id)) };
-  }
-  if (filters.eventType) matchStage.eventType = filters.eventType;
+   const matchStage = {};
+   if (filters.schoolIds?.length) {
+     matchStage['targetSchools.schoolId'] = { $in: filters.schoolIds.map(id => new mongoose.Types.ObjectId(id)) };
+   }
+   if (filters.trainerIds?.length) {
+     matchStage['trainers.trainerId'] = { $in: filters.trainerIds.map(id => new mongoose.Types.ObjectId(id)) };
+   }
+   if (filters.eventType) matchStage.eventType = filters.eventType;
   if (filters.status) matchStage.status = filters.status;
 
   // Build group stage

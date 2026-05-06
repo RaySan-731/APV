@@ -90,7 +90,9 @@
                                 <path d="M18 12v8"></path>
                             </svg>
                         </div>
-                        <div class="stat-number" id="eventsCompletedThisMonth">0</div>
+                        <div class="stat-number" id="eventsCompletedThisMonth">
+                            <span class="skeleton-loader"></span>
+                        </div>
                         <div class="stat-label">Events Completed (This Month)</div>
                     </div>
 
@@ -103,7 +105,9 @@
                                 <circle cx="15.5" cy="7" r="4"></circle>
                             </svg>
                         </div>
-                        <div class="stat-number" id="totalScoutsReached">0</div>
+                        <div class="stat-number" id="totalScoutsReached">
+                            <span class="skeleton-loader"></span>
+                        </div>
                         <div class="stat-label">Scouts Reached</div>
                     </div>
 
@@ -117,7 +121,9 @@
                                 <polyline points="10,9 9,9 8,9"></polyline>
                             </svg>
                         </div>
-                        <div class="stat-number" id="reportsSubmitted">0</div>
+                        <div class="stat-number" id="reportsSubmitted">
+                            <span class="skeleton-loader"></span>
+                        </div>
                         <div class="stat-label">Reports Submitted</div>
                     </div>
 
@@ -130,7 +136,9 @@
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                             </svg>
                         </div>
-                        <div class="stat-number" id="schoolsVisited">0</div>
+                        <div class="stat-number" id="schoolsVisited">
+                            <span class="skeleton-loader"></span>
+                        </div>
                         <div class="stat-label">Schools Visited</div>
                     </div>
 
@@ -140,7 +148,9 @@
                                 <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 012.37-5.823M15 21H9v-1a3 3 0 00-6 0v1M15 21h3v-1a6 6 0 01-6-6"></path>
                             </svg>
                         </div>
-                        <div class="stat-number" id="studentsManaged">0</div>
+                        <div class="stat-number" id="studentsManaged">
+                            <span class="skeleton-loader"></span>
+                        </div>
                         <div class="stat-label">Students Managed</div>
                     </div>
 
@@ -150,7 +160,9 @@
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                             </svg>
                         </div>
-                        <div class="stat-number" id="performanceRating">0.0</div>
+                        <div class="stat-number" id="performanceRating">
+                            <span class="skeleton-loader"></span>
+                        </div>
                         <div class="stat-label">Performance Rating</div>
                     </div>
                 </div>
@@ -185,11 +197,90 @@
                     </div>
                 </div>
 
-                <!-- Alerts & Deadlines -->
+                <!-- Quick Actions -->
+                <div class="content-card" style="margin-bottom: 2rem;">
+                    <h2>Quick Actions</h2>
+                    <div class="quick-actions-grid">
+                        <a href="/trainer/events?status=completed" class="quick-action-card">
+                            <div class="quick-action-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                            </div>
+                            <div class="quick-action-label">Submit Report</div>
+                            <div class="quick-action-desc">Complete pending event reports</div>
+                        </a>
+
+                        <a href="/trainer/students/new" class="quick-action-card">
+                            <div class="quick-action-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="8.5" cy="7" r="4"></circle>
+                                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                                </svg>
+                            </div>
+                            <div class="quick-action-label">Add Student</div>
+                            <div class="quick-action-desc">Register a new student</div>
+                        </a>
+
+                        <a href="/trainer/events" class="quick-action-card">
+                            <div class="quick-action-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                            </div>
+                            <div class="quick-action-label">View Schedule</div>
+                            <div class="quick-action-desc">Check upcoming events</div>
+                        </a>
+
+                        <a href="#availability-section" class="quick-action-card" onclick="document.getElementById('availabilitySection').scrollIntoView({behavior: 'smooth'})">
+                            <div class="quick-action-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                            </div>
+                            <div class="quick-action-label">Request Leave</div>
+                            <div class="quick-action-desc">Submit time off request</div>
+                        </a>
+
+                        <a href="/trainer/profile" class="quick-action-card">
+                            <div class="quick-action-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                            </div>
+                            <div class="quick-action-label">My Profile</div>
+                            <div class="quick-action-desc">Update your information</div>
+                        </a>
+
+                        <a href="javascript:void(0)" onclick="openMessageCompose()" class="quick-action-card">
+                            <div class="quick-action-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="quick-action-label">Send Message</div>
+                            <div class="quick-action-desc">Contact admin or colleagues</div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Announcements Feed -->
                 <div class="content-card">
-                    <h2>Alerts & Deadlines</h2>
-                    <div id="alertsList">
-                        <p class="placeholder-text">Loading alerts...</p>
+                    <h2>Announcements</h2>
+                    <div id="announcementsFeed" style="max-height: 400px; overflow-y: auto;">
+                        <p class="placeholder-text">Loading announcements...</p>
                     </div>
                 </div>
 
@@ -244,9 +335,9 @@
         </main>
     </div>
 
-    <script>
+     <script>
         // Toast notification
-        function showToast(message, type = 'info', duration = 3000) {
+        function showToast(message, type = 'info', duration = 4000) {
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
             toast.textContent = message;
@@ -262,6 +353,7 @@
                 opacity: 0;
                 transform: translateY(-20px);
                 transition: all 0.3s ease;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             `;
             if (type === 'success') toast.style.backgroundColor = '#28a745';
             else if (type === 'error') toast.style.backgroundColor = '#dc3545';
@@ -272,18 +364,47 @@
             setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(-20px)'; setTimeout(() => document.body.removeChild(toast), 300); }, duration);
         }
 
+        // Loading state management
+        function setStatLoading(elementId, isLoading) {
+            const el = document.getElementById(elementId);
+            if (isLoading) {
+                el.classList.add('loading');
+                el.classList.remove('loaded', 'error');
+            } else {
+                el.classList.remove('loading');
+            }
+        }
+
+        function setStatLoaded(elementId, value, isFloat = false) {
+            const el = document.getElementById(elementId);
+            el.classList.add('loaded');
+            el.classList.remove('loading', 'error');
+            el.textContent = isFloat ? parseFloat(value).toFixed(1) : value;
+        }
+
+        function setStatError(elementId, errorMsg = 'Error') {
+            const el = document.getElementById(elementId);
+            el.classList.add('error');
+            el.classList.remove('loading', 'loaded');
+            el.textContent = errorMsg;
+        }
+
+        function showSectionLoading(sectionId, isLoading) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.innerHTML = isLoading
+                    ? '<p class="placeholder-text"><span class="skeleton-loader" style="width: 100%; height: 1.2rem; margin-bottom: 0.5rem;"></span><span class="skeleton-loader" style="width: 80%; height: 1.2rem;"></span></p>'
+                    : section.dataset.content || '';
+            }
+        }
+
         // Calendar & Leave functionality
         let currentDate = new Date();
         let availabilityData = {};
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Load dashboard data
-            loadStats();
-            loadDashboardOverview();
-            loadAvailability();
-            loadLeaveHistory();
-            renderCalendar();
-            loadNotificationBadge();
+            // Load dashboard data (consolidated endpoint)
+            loadDashboardData();
 
             // Calendar navigation
             document.getElementById('prevMonth').addEventListener('click', () => {
@@ -297,6 +418,110 @@
             document.getElementById('leaveRequestForm').addEventListener('submit', submitLeaveRequest);
         });
 
+        // Consolidated dashboard data loader
+        async function loadDashboardData() {
+            try {
+                // Show initial loading states
+                const statIds = [
+                    'eventsCompletedThisMonth',
+                    'totalScoutsReached',
+                    'reportsSubmitted',
+                    'schoolsVisited',
+                    'studentsManaged',
+                    'performanceRating'
+                ];
+                statIds.forEach(id => setStatLoading(id, true));
+
+                showSectionLoading('todaySchedule', true);
+                showSectionLoading('upcomingEvents', true);
+                showSectionLoading('pendingReports', true);
+                showSectionLoading('alertsList', true);
+                showSectionLoading('announcementsFeed', true);
+
+                const response = await fetch('/api/trainer/dashboard');
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load dashboard');
+                }
+
+                // Hide loading states and populate data
+                statIds.forEach(id => setStatLoading(id, false));
+                document.getElementById('eventsCompletedThisMonth').textContent = data.stats.eventsCompletedThisMonth;
+                setStatLoaded('eventsCompletedThisMonth', data.stats.eventsCompletedThisMonth);
+                setStatLoaded('totalScoutsReached', data.stats.totalScoutsReached);
+                setStatLoaded('reportsSubmitted', data.stats.reportsSubmitted);
+                setStatLoaded('schoolsVisited', data.stats.schoolsVisited);
+                setStatLoaded('studentsManaged', data.stats.studentsManaged);
+                setStatLoaded('performanceRating', data.stats.performanceRating, true);
+
+                renderTodaySchedule(data.todaySchedule);
+                renderUpcomingEvents(data.upcomingEvents);
+                renderPendingReports(data.pendingReports);
+                renderAlerts(data.pendingActions);
+                renderAnnouncementsFeed(data.announcements);
+
+                // Load other async data
+                loadNotificationBadge();
+                loadAvailability();
+                loadLeaveHistory();
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                showToast('Failed to load some dashboard data. Please refresh.', 'error');
+
+                // Show error states
+                const statIds = [
+                    'eventsCompletedThisMonth',
+                    'totalScoutsReached',
+                    'reportsSubmitted',
+                    'schoolsVisited',
+                    'studentsManaged',
+                    'performanceRating'
+                ];
+                statIds.forEach(id => setStatError(id, '—'));
+            }
+        }
+
+        async function loadAnnouncementsFeed(announcements) {
+            const container = document.getElementById('announcementsFeed');
+            if (announcements && announcements.length > 0) {
+                container.innerHTML = announcements.map(ann => `
+                    <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${ann.priority === 'urgent' ? 'var(--destructive)' : ann.priority === 'high' ? 'var(--accent)' : 'var(--primary)'};">
+                        <h4 style="margin: 0 0 0.5rem 0;">${ann.title}</h4>
+                        <p style="margin: 0; color: var(--muted-foreground); font-size: 0.9rem;">${ann.content?.substring(0, 120) || ''}${ann.content?.length > 120 ? '...' : ''}</p>
+                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground);">
+                            Posted ${new Date(ann.createdAt).toLocaleDateString()}
+                            ${ann.requiresAcknowledgment ? '<span class="badge badge-warning">Requires Acknowledgment</span>' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="placeholder-text">No announcements</p>';
+            }
+        }
+
+        // Calendar & Leave functionality
+        let currentDate = new Date();
+        let availabilityData = {};
+
+         document.addEventListener('DOMContentLoaded', function() {
+             // Load dashboard data (consolidated)
+             loadDashboardData();
+
+             // Calendar navigation
+             document.getElementById('prevMonth').addEventListener('click', () => {
+                 currentDate.setMonth(currentDate.getMonth() - 1);
+                 renderCalendar();
+             });
+             document.getElementById('nextMonth').addEventListener('click', () => {
+                 currentDate.setMonth(currentDate.getMonth() + 1);
+                 renderCalendar();
+             });
+             document.getElementById('leaveRequestForm').addEventListener('submit', submitLeaveRequest);
+         });
+
+        // Load notification badge count
         async function loadNotificationBadge() {
             try {
                 const res = await fetch('/api/notifications?limit=1&unreadOnly=true');
@@ -310,40 +535,6 @@
                 }
             } catch (err) {
                 console.error('Error loading notification count:', err);
-            }
-        }
-
-        // Load trainer's personal stats
-        async function loadStats() {
-            try {
-                const response = await fetch('/api/trainer/stats');
-                const data = await response.json();
-                if (data.success) {
-                    document.getElementById('eventsCompletedThisMonth').textContent = data.stats.eventsCompletedThisMonth;
-                    document.getElementById('totalScoutsReached').textContent = data.stats.totalScoutsReached;
-                    document.getElementById('reportsSubmitted').textContent = data.stats.reportsSubmitted;
-                    document.getElementById('schoolsVisited').textContent = data.stats.schoolsVisited;
-                    document.getElementById('studentsManaged').textContent = data.stats.studentsManaged || 0;
-                    document.getElementById('performanceRating').textContent = data.stats.performanceRating.toFixed(1);
-                }
-            } catch (error) {
-                console.error('Error loading stats:', error);
-            }
-        }
-
-        // Load dashboard overview
-        async function loadDashboardOverview() {
-            try {
-                const response = await fetch('/api/trainer/dashboard-overview');
-                const data = await response.json();
-                if (data.success) {
-                    renderTodaySchedule(data.todaySchedule);
-                    renderUpcomingEvents(data.upcomingEvents);
-                    renderPendingReports(data.pendingReports);
-                    renderAlerts(data.pendingActions);
-                }
-            } catch (error) {
-                console.error('Error loading overview:', error);
             }
         }
 
@@ -385,13 +576,11 @@
                 if (currentTab === 'notifications') {
                     await fetch('/api/notifications/read-all', { method: 'POST' });
                 } else if (currentTab === 'messages') {
-                    // Mark all messages as read (need to implement or use existing endpoint)
                     await fetch('/api/messages/mark-all-read', { method: 'POST' });
                 }
                 loadPanelContent(currentTab);
                 loadNotificationBadge();
-                loadStats();
-                loadDashboardOverview();
+                loadDashboardData(); // Refresh all dashboard data
                 showToast('All marked as read', 'success');
             } catch (err) {
                 console.error('Error:', err);
@@ -541,6 +730,25 @@
             }
         });
 
+        // Load announcements into feed
+        function renderAnnouncementsFeed(announcements) {
+            const container = document.getElementById('announcementsFeed');
+            if (announcements && announcements.length > 0) {
+                container.innerHTML = announcements.map(ann => `
+                    <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${ann.priority === 'urgent' ? 'var(--destructive)' : ann.priority === 'high' ? 'var(--accent)' : 'var(--primary)'};">
+                        <h4 style="margin: 0 0 0.5rem 0;">${ann.title}</h4>
+                        <p style="margin: 0; color: var(--muted-foreground); font-size: 0.9rem;">${ann.content?.substring(0, 120) || ''}${ann.content?.length > 120 ? '...' : ''}</p>
+                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground);">
+                            Posted ${new Date(ann.createdAt).toLocaleDateString()}
+                            ${ann.requiresAcknowledgment ? '<span class="badge badge-warning">Requires Acknowledgment</span>' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="placeholder-text">No announcements</p>';
+            }
+        }
+
         async function loadAnnouncementsPanel() {
             const container = document.getElementById('notificationPanelList');
             try {
@@ -557,10 +765,7 @@
                                             <h4 style="margin: 0; font-size: 1rem;">${ann.title}</h4>
                                             <small style="color: var(--muted-foreground); font-size: 0.75rem;">${new Date(ann.createdAt).toLocaleDateString()}</small>
                                         </div>
-                                        <p style="margin: 0; font-size: 0.9rem; color: var(--muted-foreground);">${ann.content.substring(0, 100)}${ann.content.length > 100 ? '...' : ''}</p>
-                                        <div style="margin-top: 0.5rem;">
-                                            <a href="/dashboard/announcements" class="btn btn-sm btn-outline">View All</a>
-                                        </div>
+                                        <p style="margin: 0; font-size: 0.9rem; color: var(--muted-foreground);">${ann.content?.substring(0, 100) || ''}${ann.content?.length > 100 ? '...' : ''}</p>
                                     </div>
                                 </div>
                             </div>
@@ -598,25 +803,23 @@
                 await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' });
                 loadNotificationBadge();
                 loadAllNotifications();
-                loadStats();
-                loadDashboardOverview();
+                loadDashboardData(); // Refresh all data
             } catch (err) {
                 console.error('Error:', err);
+                showToast('Failed to mark notification as read', 'error');
             }
         }
 
         async function dismissNotification(notificationId) {
             try {
-                // First mark as read, then dismiss
                 await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' });
                 await fetch(`/api/notifications/${notificationId}/dismiss`, { method: 'POST' });
                 loadAllNotifications();
                 loadNotificationBadge();
-                loadStats();
-                loadDashboardOverview();
+                loadDashboardData(); // Refresh all data
             } catch (err) {
                 console.error('Error:', err);
-                showToast('Failed to dismiss', 'error');
+                showToast('Failed to dismiss notification', 'error');
             }
         }
 
@@ -816,6 +1019,10 @@
                 showToast('Network error while submitting leave request', 'error');
             }
         }
-    </script>
+
+        // Quick action: Open message compose (placeholder)
+        function openMessageCompose() {
+            showToast('Message composer coming soon! For now, use the inbox.', 'info');
+        }
 </body>
 </html>

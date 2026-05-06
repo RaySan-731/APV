@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Packages - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/service-packages' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Service Packages</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/service-packages/create" class="btn btn-primary btn-sm">New Package</a>
+                    <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm ms-2">Dashboard</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="row g-4">
+                    <% packages.forEach(pkg => { %>
+                        <div class="col-md-4">
+                            <div class="card h-100 <%= !pkg.isActive ? 'opacity-50' : '' %>">
+                                <div class="card-header bg-<%= pkg.name === 'basic' ? 'success' : pkg.name === 'standard' ? 'primary' : pkg.name === 'premium' ? 'warning' : 'secondary' %> text-white">
+                                    <h5 class="card-title mb-0"><%= pkg.displayName %></h5>
+                                    <small><%= pkg.name %></small>
+                                </div>
+                                <div class="card-body">
+                                    <p><%= pkg.description || 'No description' %></p>
+                                    <ul class="list-unstyled">
+                                        <li><strong>Pricing:</strong> 
+                                            <% if (pkg.pricingModel === 'per_student') { %>
+                                                KES <%= pkg.ratePerStudent %> per student
+                                            <% } else if (pkg.pricingModel === 'monthly_retainer') { %>
+                                                KES <%= pkg.monthlyRetainer %> / month
+                                            <% } else if (pkg.pricingModel === 'per_event') { %>
+                                                KES <%= pkg.perEventFee %> per event
+                                            <% } %>
+                                        </li>
+                                        <li><strong>Billing:</strong> <%= pkg.defaultBillingCycle %></li>
+                                        <li><strong>Used by:</strong> <%= pkg.schoolCount || 0 %> schools</li>
+                                    </ul>
+                                    <h5 class="text-primary">KES <%= pkg.ratePerStudent || pkg.monthlyRetainer || pkg.perEventFee || 0 %></h5>
+                                </div>
+                                <div class="card-footer">
+                                    <div class="btn-group w-100">
+                                        <a href="/finance/service-packages/<%= pkg._id %>/edit" class="btn btn-outline-primary btn-sm">Edit</a>
+                                        <form action="/finance/service-packages/<%= pkg._id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('Delete this package?')">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

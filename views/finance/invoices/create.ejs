@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Invoice - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/invoices' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Create Invoice</h1>
+                <a href="/finance/invoices" class="btn btn-outline-secondary btn-sm">Back to List</a>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="card">
+                    <div class="card-body">
+                        <form action="/finance/invoices/create" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">School *</label>
+                                <select name="schoolId" class="form-select" required>
+                                    <option value="">Select school</option>
+                                    <% schools.forEach(s => { %>
+                                        <option value="<%= s._id %>"><%= s.name %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Invoice Type *</label>
+                                <select name="invoiceType" id="invoiceType" class="form-select" required onchange="toggleFields()">
+                                    <option value="custom">Custom</option>
+                                    <option value="event">From Events</option>
+                                    <option value="service_package">From Service Package</option>
+                                </select>
+                            </div>
+
+                            <div id="eventFields" style="display:none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Select Completed Events</label>
+                                    <select name="relatedEvents" class="form-select" multiple size="5">
+                                        <% events.filter(e => e.status === 'completed').forEach(ev => { %>
+                                            <option value="<%= ev._id %>"><%= ev.name %> - <%= new Date(ev.startDate).toLocaleDateString() %></option>
+                                        <% }); %>
+                                    </select>
+                                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                                </div>
+                            </div>
+
+                            <div id="packageFields" style="display:none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Service Package</label>
+                                    <select name="servicePackageId" class="form-select">
+                                        <option value="">Select package</option>
+                                        <% packages.forEach(p => { %>
+                                            <option value="<%= p._id %>"><%= p.displayName %> (<%= p.pricingModel %>)</option>
+                                        <% }); %>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="customFields">
+                                <div class="mb-3">
+                                    <label class="form-label">Custom Line Items (JSON)</label>
+                                    <textarea name="customItems" class="form-control" rows="4" placeholder='[{"description":"Item","quantity":1,"unitPrice":100}]'></textarea>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Issue Date</label>
+                                    <input type="date" name="issueDate" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Due Date</label>
+                                    <input type="date" name="dueDate" class="form-control" value="<%= new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] %>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Currency</label>
+                                    <select name="currency" class="form-select">
+                                        <option value="KES">KES</option>
+                                        <option value="USD">USD</option>
+                                        <option value="EUR">EUR</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Notes</label>
+                                <textarea name="notes" class="form-control" rows="2"></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Generate Invoice</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    function toggleFields() {
+        const type = document.getElementById('invoiceType').value;
+        document.getElementById('eventFields').style.display = type === 'event' ? 'block' : 'none';
+        document.getElementById('packageFields').style.display = type === 'service_package' ? 'block' : 'none';
+        document.getElementById('customFields').style.display = type === 'custom' ? 'block' : 'none';
+    }
+    // Initialize
+    toggleFields();
+    </script>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

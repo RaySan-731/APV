@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Reports - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/reports' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Financial Reports</h1>
+                <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm">Dashboard</a>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Profit & Loss Statement</h5>
+                                <p class="card-text">Revenue, expenses, and net income summary for any period.</p>
+                                <form action="/finance/reports" method="GET">
+                                    <input type="hidden" name="reportType" value="profit_loss">
+                                    <div class="mb-3">
+                                        <label class="form-label">Start Date</label>
+                                        <input type="date" name="startDate" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">End Date</label>
+                                        <input type="date" name="endDate" class="form-control" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Generate</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">School Revenue Report</h5>
+                                <p class="card-text">Revenue breakdown by school with outstanding balances.</p>
+                                <form action="/finance/reports" method="GET">
+                                    <input type="hidden" name="reportType" value="school_revenue">
+                                    <div class="mb-3">
+                                        <label class="form-label">Start Date</label>
+                                        <input type="date" name="startDate" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">End Date</label>
+                                        <input type="date" name="endDate" class="form-control" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Generate</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Trainer Cost Report</h5>
+                                <p class="card-text">Trainer payroll costs and event-based earnings breakdown.</p>
+                                <form action="/finance/reports" method="GET">
+                                    <input type="hidden" name="reportType" value="trainer_costs">
+                                    <div class="mb-3">
+                                        <label class="form-label">Start Date</label>
+                                        <input type="date" name="startDate" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">End Date</label>
+                                        <input type="date" name="endDate" class="form-control" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Generate</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice <%= invoice.invoiceNumber %> - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/invoices' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Invoice Details</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/invoices" class="btn btn-outline-secondary btn-sm">Back to List</a>
+                    <a href="/finance/invoices/<%= invoice._id %>/download" class="btn btn-primary btn-sm ms-2">Download PDF</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <!-- Invoice Header -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h3 class="text-primary"><%= invoice.invoiceNumber %></h3>
+                                <p class="mb-1"><strong>School:</strong> <%= invoice.schoolId?.name || 'Unknown' %></p>
+                                <p class="mb-1"><strong>Issue Date:</strong> <%= new Date(invoice.issueDate).toLocaleDateString() %></p>
+                                <p class="mb-1"><strong>Due Date:</strong> <%= new Date(invoice.dueDate).toLocaleDateString() %></p>
+                                <p class="mb-0"><strong>Status:</strong> 
+                                    <span class="badge bg-<%= 
+                                        invoice.status === 'paid' ? 'success' :
+                                        invoice.status === 'overdue' ? 'danger' :
+                                        invoice.status === 'partial' ? 'warning' :
+                                        invoice.status === 'cancelled' ? 'secondary' :
+                                        'primary'
+                                    %>">
+                                        <%= invoice.status %>
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <h4>KES <%= invoice.totalAmount.toLocaleString() %></h4>
+                                <p class="text-muted">Amount Paid: KES <%= invoice.amountPaid.toLocaleString() %></p>
+                                <p class="text-danger fw-bold">Balance: KES <%= invoice.balance.toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invoice Items -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0">Invoice Items</h5></div>
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% invoice.items.forEach(item => { %>
+                                    <tr>
+                                        <td>
+                                            <%= item.description %>
+                                            <% if (item.eventId) { %>
+                                                <br><small class="text-muted">Event: <%= item.eventId?.name %></small>
+                                            <% } %>
+                                        </td>
+                                        <td class="text-center"><%= item.quantity %></td>
+                                        <td class="text-end">KES <%= item.unitPrice.toLocaleString() %></td>
+                                        <td class="text-end">KES <%= item.total.toLocaleString() %></td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="3" class="text-end">Subtotal:</th>
+                                    <th class="text-end">KES <%= invoice.subtotal.toLocaleString() %></th>
+                                </tr>
+                                <tr>
+                                    <th colspan="3" class="text-end">Total:</th>
+                                    <th class="text-end">KES <%= invoice.totalAmount.toLocaleString() %></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Payment History -->
+                <% if (payments && payments.length > 0) { %>
+                    <div class="card mb-4">
+                        <div class="card-header"><h5 class="mb-0">Payment History</h5></div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Amount</th>
+                                        <th>Method</th>
+                                        <th>Reference</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% payments.forEach(payment => { %>
+                                        <tr>
+                                            <td><%= new Date(payment.paymentDate).toLocaleDateString() %></td>
+                                            <td class="text-success fw-bold">KES <%= payment.amount.toLocaleString() %></td>
+                                            <td><%= payment.method.replace('_', ' ') %></td>
+                                            <td><%= payment.reference || '-' %></td>
+                                            <td><%= payment.notes || '-' %></td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Payment Instructions -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0">Payment Instructions</h5></div>
+                    <div class="card-body">
+                        <p><strong>Bank:</strong> <%= invoice.bankDetails?.bankName || 'APV Ventures Ltd' %></p>
+                        <p><strong>Account Name:</strong> <%= invoice.bankDetails?.accountName || 'Arrow-Park Ventures' %></p>
+                        <p><strong>Account Number:</strong> <%= invoice.bankDetails?.accountNumber || '' %></p>
+                        <p><strong>Branch:</strong> <%= invoice.bankDetails?.branch || '' %></p>
+                        <p><strong>M-Pesa Till:</strong> <%= invoice.bankDetails?.mpesaTillNumber || '' %></p>
+                    </div>
+                </div>
+
+                <!-- Record Payment (if not fully paid) -->
+                <% if (invoice.status !== 'paid' && invoice.status !== 'cancelled') { %>
+                    <div class="card">
+                        <div class="card-body">
+                            <form action="/finance/invoices/<%= invoice._id %>/payments" method="POST" class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Payment Amount</label>
+                                    <input type="number" name="amount" class="form-control" max="<%= invoice.balance %>" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Payment Date</label>
+                                    <input type="date" name="paymentDate" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Payment Method</label>
+                                    <select name="method" class="form-select">
+                                        <option value="mpesa">M-Pesa</option>
+                                        <option value="bank_transfer">Bank Transfer</option>
+                                        <option value="cheque">Cheque</option>
+                                        <option value="cash">Cash</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-success w-100">Record Payment</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                <% } %>
+
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

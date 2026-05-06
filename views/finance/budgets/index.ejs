@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Management - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/budgets' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Budget Management</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/budgets/create" class="btn btn-primary btn-sm">Create Budget</a>
+                    <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm ms-2">Dashboard</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <% if (alertBudgets > 0 || criticalAlertBudgets > 0) { %>
+                    <div class="alert alert-warning">
+                        <strong>Budget Alerts:</strong> 
+                        <%= alertBudgets %> approaching limit, 
+                        <%= criticalAlertBudgets %> exceeded critical threshold.
+                        <a href="/finance/budgets?alert=true" class="btn btn-sm btn-warning ms-2">View Alerts</a>
+                    </div>
+                <% } %>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name/Code</th>
+                                        <th>Type</th>
+                                        <th>Period</th>
+                                        <th>Allocated</th>
+                                        <th>Spent</th>
+                                        <th>Remaining</th>
+                                        <th>Progress</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% budgets.forEach(budget => { 
+                                        const spentPercent = budget.totalAllocated > 0 
+                                            ? (budget.totalSpent / budget.totalAllocated * 100).toFixed(1) 
+                                            : 0;
+                                        const progressClass = spentPercent >= 90 ? 'bg-danger' : spentPercent >= 75 ? 'bg-warning' : 'bg-success';
+                                    %>
+                                        <tr class="<%= budget.criticalAlertTriggered ? 'table-danger' : budget.alertTriggered ? 'table-warning' : '' %>">
+                                            <td>
+                                                <strong><%= budget.name %></strong><br>
+                                                <small class="text-muted"><%= budget.code %></small>
+                                            </td>
+                                            <td><%= budget.type %></td>
+                                            <td><%= budget.period %></td>
+                                            <td>KES <%= budget.totalAllocated.toLocaleString() %></td>
+                                            <td>KES <%= budget.totalSpent.toLocaleString() %></td>
+                                            <td class="<%= budget.totalRemaining < 0 ? 'text-danger' : '' %>">
+                                                KES <%= budget.totalRemaining.toLocaleString() %>
+                                            </td>
+                                            <td style="width: 150px;">
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar <%= progressClass %>" style="width: <%= Math.min(spentPercent, 100) %>%">
+                                                        <%= spentPercent %>%
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<%= 
+                                                    budget.status === 'active' ? 'success' :
+                                                    budget.status === 'closed' ? 'secondary' :
+                                                    budget.status === 'cancelled' ? 'dark' : 'warning'
+                                                %>">
+                                                    <%= budget.status %>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="/finance/budgets/<%= budget._id %>" class="btn btn-sm btn-outline-primary">View</a>
+                                                <% if (budget.status === 'active') { %>
+                                                    <form action="/finance/budgets/<%= budget._id %>/status" method="POST" class="d-inline">
+                                                        <input type="hidden" name="status" value="closed">
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Close this budget?')">Close</button>
+                                                    </form>
+                                                <% } %>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

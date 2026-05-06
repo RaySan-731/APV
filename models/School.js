@@ -53,11 +53,34 @@ const schoolSchema = new mongoose.Schema({
   },
   // Payment terms configuration
   paymentTerms: {
-    method: { type: String, enum: ['bank_transfer', 'mpesa', ' cheque', 'cash'], default: 'bank_transfer' },
+    method: { type: String, enum: ['bank_transfer', 'mpesa', 'cheque', 'cash'], default: 'bank_transfer' },
     billingCycle: { type: String, enum: ['monthly', 'quarterly', 'per_event', 'annual'], default: 'per_event' },
     currency: { type: String, default: 'KES' },
     ratePerStudent: Number,
     notes: String
+  },
+  // Invoice settings
+  invoiceSettings: {
+    prefix: { type: String, default: 'INV' },
+    paymentTermsDays: { type: Number, default: 30 },
+    autoGenerate: { type: Boolean, default: true }
+  },
+  // Billing address for invoices
+  billingAddress: {
+    name: { type: String, trim: true },
+    address: { type: String, trim: true },
+    city: { type: String, trim: true },
+    country: { type: String, default: 'Kenya' },
+    taxId: { type: String, trim: true }
+  },
+  // APV Bank details for this school (custom overrides)
+  bankDetails: {
+    bankName: String,
+    accountName: String,
+    accountNumber: String,
+    branch: String,
+    swiftCode: String,
+    mpesaTillNumber: String
   },
   partnershipDate: {
     type: Date,
@@ -77,21 +100,29 @@ const schoolSchema = new mongoose.Schema({
     enum: ['active', 'on_hold', 'churned'],
     default: 'active'
   },
-  assignedStaff: [{
-    staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
-    assignmentType: { type: String, enum: ['primary', 'secondary', 'consultant'], default: 'primary' },
-    assignedDate: { type: Date, default: Date.now },
-    status: { type: String, enum: ['active', 'transferred', 'completed'], default: 'active' }
-  }],
-  // Scout groups (will be migrated to separate ScoutGroup model)
-  scoutGroups: [{
-    name: String,
-    leader: String,
-    size: Number,
-    patrol: String,
-    advancementLevel: String,
-    notes: String
-  }],
+   assignedStaff: [{
+     staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
+     assignmentType: { type: String, enum: ['primary', 'secondary', 'consultant'], default: 'primary' },
+     assignedDate: { type: Date, default: Date.now },
+     status: { type: String, enum: ['active', 'transferred', 'completed'], default: 'active' }
+   }],
+   // Scout groups (will be migrated to separate ScoutGroup model)
+   scoutGroups: [{
+     name: String,
+     leader: String,
+     size: Number,
+     patrol: String,
+     advancementLevel: String,
+     notes: String
+   }],
+   // Partner bank account (school's bank for payments TO them if needed)
+   bankAccount: {
+     bankName: String,
+     accountName: String,
+     accountNumber: String,
+     branch: String,
+     swiftCode: String
+   },
   // Participation tracking
   participationMetrics: {
     totalEventsAttended: { type: Number, default: 0 },

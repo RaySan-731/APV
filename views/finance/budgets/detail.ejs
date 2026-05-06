@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Details - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/budgets' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Budget Details</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/budgets" class="btn btn-outline-secondary btn-sm">Back to List</a>
+                    <% if (budget.status === 'active') { %>
+                        <form action="/finance/budgets/<%= budget._id %>/status" method="POST" class="d-inline">
+                            <input type="hidden" name="status" value="closed">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm ms-2" onclick="return confirm('Close this budget?')">Close Budget</button>
+                        </form>
+                    <% } %>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><%= budget.name %></h5>
+                                <small class="text-muted"><%= budget.code %> | <%= budget.type %> | <%= budget.period %></small>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Status:</strong> <span class="badge bg-<%= budget.status === 'active' ? 'success' : budget.status === 'closed' ? 'secondary' : 'warning' %>"><%= budget.status %></span></p>
+                                <% if (budget.department) { %>
+                                    <p><strong>Department:</strong> <%= budget.department %></p>
+                                <% } %>
+                                <% if (budget.eventId) { %>
+                                    <p><strong>Event:</strong> <%= budget.eventId?.name %></p>
+                                <% } %>
+                                <p><strong>Total Allocated:</strong> KES <%= budget.totalAllocated.toLocaleString() %></p>
+                                <p><strong>Total Spent:</strong> KES <%= budget.totalSpent.toLocaleString() %> (<%= (budget.totalSpent / budget.totalAllocated * 100).toFixed(1) %>)</p>
+                                <p><strong>Remaining:</strong> KES <%= budget.totalRemaining.toLocaleString() %></p>
+                                <% if (budget.notes) { %>
+                                    <p><strong>Notes:</strong> <%= budget.notes %></p>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Category Breakdown</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th class="text-end">Allocated</th>
+                                            <th class="text-end">Spent</th>
+                                            <th class="text-end">Remaining</th>
+                                            <th>Progress</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% budget.categories.forEach(cat => { 
+                                            const spent = cat.spent || 0;
+                                            const allocated = cat.allocated || 0;
+                                            const remaining = allocated - spent;
+                                            const pct = allocated > 0 ? (spent / allocated * 100).toFixed(1) : 0;
+                                        %>
+                                            <tr>
+                                                <td><%= cat.category.replace('_', ' ') %></td>
+                                                <td class="text-end">KES <%= allocated.toLocaleString() %></td>
+                                                <td class="text-end">KES <%= spent.toLocaleString() %></td>
+                                                <td class="text-end <%= remaining < 0 ? 'text-danger' : '' %>">KES <%= remaining.toLocaleString() %></td>
+                                                <td style="width: 150px;">
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar <%= pct >= 90 ? 'bg-danger' : pct >= 75 ? 'bg-warning' : 'bg-success' %>" style="width: <%= Math.min(pct, 100) %>%">
+                                                            <%= pct %>%
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <% }); %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Alerts</h5>
+                            </div>
+                            <div class="card-body">
+                                <% if (budget.alertTriggered) { %>
+                                    <div class="alert alert-warning">
+                                        <strong>Warning:</strong> Spending has reached <%= ((budget.totalSpent / budget.totalAllocated) * 100).toFixed(1) %>% of budget.
+                                    </div>
+                                <% } %>
+                                <% if (budget.criticalAlertTriggered) { %>
+                                    <div class="alert alert-danger">
+                                        <strong>Critical:</strong> Spending exceeds <%= budget.criticalThresholdPercent %>% of budget.
+                                    </div>
+                                <% } %>
+                                <% if (!budget.alertTriggered) { %>
+                                    <p class="text-muted">No alerts. Budget is on track.</p>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h5 class="mb-0">Info</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Created By:</strong> <%= budget.createdBy?.name || 'System' %></p>
+                                <p><strong>Created At:</strong> <%= new Date(budget.createdAt).toLocaleString() %></p>
+                                <p><strong>Updated At:</strong> <%= new Date(budget.updatedAt).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Linked Expenses -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Linked Expenses</h5>
+                    </div>
+                    <div class="card-body">
+                        <% if (expenses && expenses.length > 0) { %>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Category</th>
+                                        <th class="text-end">Amount</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% expenses.forEach(exp => { %>
+                                        <tr>
+                                            <td><%= exp.title %></td>
+                                            <td><%= exp.category %></td>
+                                            <td class="text-end">KES <%= exp.netAmount.toLocaleString() %></td>
+                                            <td><span class="badge bg-<%= exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning' %>"><%= exp.status %></span></td>
+                                            <td><%= exp.paidDate ? new Date(exp.paidDate).toLocaleDateString() : '-' %></td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        <% } else { %>
+                            <p class="text-muted">No expenses linked to this budget yet.</p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

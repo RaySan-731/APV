@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Dashboard - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+      /* Additional finance-specific styles can go here */
+      .finance-card { border-left: 4px solid #007bff; }
+      .finance-card.bg-primary { background-color: #007bff; color: white; }
+      .finance-card.bg-success { background-color: #28a745; color: white; }
+      .finance-card.bg-warning { background-color: #ffc107; color: black; }
+      .finance-card.bg-info { background-color: #17a2b8; color: white; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <%- include('../partials/sidebar', { user, page: 'finance/dashboard' }) %>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Financial Dashboard</h1>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <!-- Filters -->
+                <form method="GET" action="/finance/dashboard" class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <select name="dateRange" class="form-select" onchange="this.form.submit()">
+                            <option value="week" <%= dateRange === 'week' ? 'selected' : '' %>>Last 7 Days</option>
+                            <option value="month" <%= dateRange === 'month' ? 'selected' : '' %>>Last Month</option>
+                            <option value="quarter" <%= dateRange === 'quarter' ? 'selected' : '' %>>Last Quarter</option>
+                            <option value="year" <%= dateRange === 'year' ? 'selected' : '' %>>Last Year</option>
+                            <option value="custom" <%= dateRange === 'custom' ? 'selected' : '' %>>Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3" style="<%= dateRange === 'custom' ? '' : 'display:none' %>">
+                        <input type="date" name="startDate" class="form-control" value="<%= startDate || '' %>">
+                    </div>
+                    <div class="col-md-3" style="<%= dateRange === 'custom' ? '' : 'display:none' %>">
+                        <input type="date" name="endDate" class="form-control" value="<%= endDate || '' %>">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="schoolId" class="form-select" onchange="this.form.submit()">
+                            <option value="">All Schools</option>
+                            <% schools.forEach(school => { %>
+                                <option value="<%= school._id %>" <%= schoolId == school._id ? 'selected' : '' %>><%= school.name %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                </form>
+
+                <!-- Key Stats Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Revenue</h5>
+                                <p class="card-text fs-4">KES <%= (stats.totalRevenue || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Collected</h5>
+                                <p class="card-text fs-4">KES <%= (stats.totalCollected || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-dark">
+                            <div class="card-body">
+                                <h5 class="card-title">Outstanding Invoices</h5>
+                                <p class="card-text fs-4">KES <%= (stats.outstandingInvoices || 0).toLocaleString() %></p>
+                                <% if (stats.overdueInvoices > 0) { %>
+                                    <small class="text-dark"><%= stats.overdueInvoices %> overdue</small>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Expenses</h5>
+                                <p class="card-text fs-4">KES <%= (stats.totalExpenses || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Net Income & Profit Margin -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="card <%= stats.netIncome >= 0 ? 'bg-success' : 'bg-danger' %> text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Net Income</h5>
+                                <p class="card-text fs-2">KES <%= (stats.netIncome || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-secondary text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Profit Margin</h5>
+                                <p class="card-text fs-2"><%= (stats.profitMargin || 0).toFixed(1) %>%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                Monthly Revenue vs Collected
+                            </div>
+                            <div class="card-body">
+                                <canvas id="trendChart" height="100"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                Expenses by Category
+                            </div>
+                            <div class="card-body">
+                                <canvas id="categoryChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Schools & Budget Alerts -->
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                Top Schools by Revenue
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>School</th>
+                                            <th class="text-end">Revenue</th>
+                                            <th class="text-end">Invoices</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% stats.topSchools.slice(0, 10).forEach(s => { %>
+                                            <tr>
+                                                <td><%= s.schoolName || 'Unknown' %></td>
+                                                <td class="text-end">KES <%= (s.totalRevenue || 0).toLocaleString() %></td>
+                                                <td class="text-end"><%= s.invoiceCount || 0 %></td>
+                                            </tr>
+                                        <% }); %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-warning">
+                            <div class="card-header text-warning d-flex justify-content-between align-items-center">
+                                <span>Budget Alerts (<%= budgetAlerts.length %>)</span>
+                                <a href="/finance/budgets?alert=true" class="btn btn-sm btn-warning">View All</a>
+                            </div>
+                            <div class="card-body">
+                                <% if (budgetAlerts.length === 0) { %>
+                                    <p class="text-muted">No active budget alerts.</p>
+                                <% } else { %>
+                                    <ul class="list-group list-group-flush">
+                                        <% budgetAlerts.forEach(alert => { %>
+                                            <li class="list-group-item">
+                                                <strong><%= alert.name %></strong><br>
+                                                <small class="text-warning">
+                                                    Spent KES <%= alert.totalSpent?.toLocaleString() || 0 %> of KES <%= alert.totalAllocated?.toLocaleString() || 0 %> 
+                                                    (<%= ((alert.totalSpent / alert.totalAllocated) * 100).toFixed(1) %>%)
+                                                    <% if (alert.criticalAlertTriggered) { %>
+                                                        <span class="badge bg-danger">Critical</span>
+                                                    <% } else if (alert.alertTriggered) { %>
+                                                        <span class="badge bg-warning text-dark">Warning</span>
+                                                    <% } %>
+                                                </small>
+                                            </li>
+                                        <% }); %>
+                                    </ul>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Revenue vs Expenses trend
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: [<% monthlyTrend.forEach(m => { %>'<%= m._id %>', <% }); %>],
+                datasets: [{
+                    label: 'Revenue',
+                    data: [<% monthlyTrend.forEach(m => { %><%= m.revenue || 0 %>, <% }); %>],
+                    borderColor: 'rgb(75, 192, 192)',
+                    fill: false,
+                    tension: 0.1
+                }, {
+                    label: 'Collected',
+                    data: [<% monthlyTrend.forEach(m => { %><%= m.collected || 0 %>, <% }); %>],
+                    borderColor: 'rgb(54, 162, 235)',
+                    fill: false,
+                    tension: 0.1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // Expense by category
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        new Chart(categoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: [<% expenseByCategory.forEach(c => { %>'<%= c._id %>', <% }); %>],
+                datasets: [{
+                    data: [<% expenseByCategory.forEach(c => { %><%= c.total || 0 %>, <% }); %>],
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                        '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384', '#9C9C9C'
+                    ]
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // Show/hide custom date fields
+        document.querySelector('select[name="dateRange"]').addEventListener('change', function() {
+            const custom = this.value === 'custom';
+            document.querySelectorAll('[id$="DateDiv"]').forEach(div => {
+                div.style.display = custom ? 'block' : 'none';
+            });
+        });
+
+        // Mobile sidebar toggle
+        document.getElementById('mobileSidebarToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+    </script>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

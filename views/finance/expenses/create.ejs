@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Expense - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/expenses' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title"><%= preselectedEvent ? 'Add Expense for Event' : 'Add Expense' %></h1>
+                <a href="/finance/expenses" class="btn btn-outline-secondary btn-sm">Back to List</a>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <form action="/finance/expenses/create" method="POST">
+                                    <div class="mb-3">
+                                        <label class="form-label">Title *</label>
+                                        <input type="text" name="title" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Description</label>
+                                        <textarea name="description" class="form-control" rows="2"></textarea>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Category *</label>
+                                            <select name="category" class="form-select" required>
+                                                <option value="">Select category</option>
+                                                <% ['equipment','transport','venue','materials','catering','accommodation','trainer_allowance','marketing','utilities','office','other'].forEach(cat => { %>
+                                                    <option value="<%= cat %>"><%= cat.replace('_', ' ') %></option>
+                                                <% }); %>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Amount (KES) *</label>
+                                            <input type="number" name="amount" class="form-control" min="0" step="0.01" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Tax Amount</label>
+                                            <input type="number" name="taxAmount" class="form-control" min="0" step="0.01" value="0">
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Associated Event</label>
+                                            <select name="eventId" class="form-select">
+                                                <option value="">None</option>
+                                                <% events.forEach(ev => { %>
+                                                    <option value="<%= ev._id %>" <%= preselectedEvent && preselectedEvent._id == ev._id ? 'selected' : '' %>>
+                                                        <%= ev.name %> (<%= new Date(ev.startDate).toLocaleDateString() %>)
+                                                    </option>
+                                                <% }); %>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Associated School</label>
+                                            <select name="schoolId" class="form-select">
+                                                <option value="">None</option>
+                                                <% schools.forEach(sc => { %>
+                                                    <option value="<%= sc._id %>"><%= sc.name %></option>
+                                                <% }); %>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Incurred By</label>
+                                            <select name="staffId" class="form-select">
+                                                <option value="">Select staff</option>
+                                                <% staff.forEach(s => { %>
+                                                    <option value="<%= s._id %>"><%= s.name %></option>
+                                                <% }); %>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Payment Method *</label>
+                                            <select name="paymentMethod" class="form-select" required>
+                                                <option value="cash">Cash</option>
+                                                <option value="mpesa">M-Pesa</option>
+                                                <option value="bank_transfer">Bank Transfer</option>
+                                                <option value="credit_card">Credit Card</option>
+                                                <option value="petty_cash">Petty Cash</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Payment Reference</label>
+                                            <input type="text" name="paymentReference" class="form-control" placeholder="Transaction ID">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Payment Date</label>
+                                            <input type="date" name="paidDate" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>">
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Is Reimbursement?</label>
+                                            <select name="isReimbursement" class="form-select">
+                                                <option value="false">No</option>
+                                                <option value="true">Yes</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Reimbursed To</label>
+                                            <select name="reimbursedTo" class="form-select">
+                                                <option value="">None</option>
+                                                <% staff.forEach(s => { %>
+                                                    <option value="<%= s._id %>"><%= s.name %></option>
+                                                <% }); %>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Initial Status</label>
+                                            <select name="status" class="form-select">
+                                                <option value="pending">Pending Approval</option>
+                                                <option value="approved">Approved</option>
+                                                <option value="paid">Paid</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Notes</label>
+                                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary">Save Expense</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header"><h5 class="mb-0">Expense Guidelines</h5></div>
+                            <div class="card-body">
+                                <ul>
+                                    <li>Always attach a receipt (image or PDF)</li>
+                                    <li>Use correct category for budget tracking</li>
+                                    <li>Link to event for accurate event cost tracking</li>
+                                    <li>Reimbursements should have "Reimbursed To" staff set</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

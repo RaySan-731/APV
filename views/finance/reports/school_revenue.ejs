@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Revenue Report - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/reports' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">School Revenue Report</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/reports" class="btn btn-outline-secondary btn-sm">Back</a>
+                    <form action="/finance/reports/export" method="POST" class="d-inline">
+                        <input type="hidden" name="reportType" value="school_revenue">
+                        <input type="hidden" name="startDate" value="<%= startDate %>">
+                        <input type="hidden" name="endDate" value="<%= endDate %>">
+                        <button type="submit" class="btn btn-outline-success btn-sm ms-2">Export CSV</button>
+                    </form>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="mb-4">
+                            School Revenue Report
+                            <small class="text-muted">
+                                <%= new Date(startDate).toLocaleDateString() %> - <%= new Date(endDate).toLocaleDateString() %>
+                            </small>
+                        </h4>
+
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>School</th>
+                                        <th class="text-end">Total Billed</th>
+                                        <th class="text-end">Total Paid</th>
+                                        <th class="text-end">Outstanding</th>
+                                        <th class="text-center">Invoices</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% reportData.forEach((school, idx) => { %>
+                                        <tr>
+                                            <td><%= idx + 1 %></td>
+                                            <td><%= school.schoolName %></td>
+                                            <td class="text-end">KES <%= school.totalBilled.toLocaleString() %></td>
+                                            <td class="text-end text-success">KES <%= school.totalPaid.toLocaleString() %></td>
+                                            <td class="text-end text-danger fw-bold">KES <%= school.outstanding.toLocaleString() %></td>
+                                            <td class="text-center"><%= school.invoiceCount %></td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-primary">
+                                        <th colspan="2">TOTAL</th>
+                                        <th class="text-end">KES <%= reportData.reduce((sum, s) => sum + s.totalBilled, 0).toLocaleString() %></th>
+                                        <th class="text-end">KES <%= reportData.reduce((sum, s) => sum + s.totalPaid, 0).toLocaleString() %></th>
+                                        <th class="text-end">KES <%= reportData.reduce((sum, s) => sum + s.outstanding, 0).toLocaleString() %></th>
+                                        <th class="text-center"><%= reportData.reduce((sum, s) => sum + s.invoiceCount, 0) %></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

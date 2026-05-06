@@ -68,7 +68,32 @@ const staffSchema = new mongoose.Schema({
     canManageStaff: { type: Boolean, default: false },
     canViewAnalytics: { type: Boolean, default: false },
     canManageSchools: { type: Boolean, default: false },
-    canSendInvitations: { type: Boolean, default: false }
+    canSendInvitations: { type: Boolean, default: false },
+    canManageInvoices: { type: Boolean, default: false },
+    canManagePayroll: { type: Boolean, default: false },
+    canManageBudgets: { type: Boolean, default: false }
+  },
+
+  // Trainer compensation rates (for payroll calculation)
+  compensationRates: {
+    dailyRate: { type: Number, min: 0, default: 0 },
+    eventRate: { type: Number, min: 0, default: 0 },
+    transportAllowance: { type: Number, min: 0, default: 0 },
+    mealAllowance: { type: Number, min: 0, default: 0 },
+    overnightAllowance: { type: Number, min: 0, default: 0 }
+  },
+  // Payment method for trainer payouts
+  paymentMethod: {
+    type: String,
+    enum: ['bank_transfer', 'mpesa', 'cash', 'cheque'],
+    default: 'mpesa'
+  },
+  paymentDetails: {
+    bankName: String,
+    accountNumber: String,
+    accountName: String,
+    branch: String,
+    mpesaNumber: String
   },
 
   // Availability & Leave

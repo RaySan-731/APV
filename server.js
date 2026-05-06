@@ -122,19 +122,19 @@ const ReportTemplate = require('./models/ReportTemplate');
 const ScheduledReport = require('./models/ScheduledReport');
 const Student = require('./models/Student');
 
-// Finance models
-const Invoice = require('./models/Invoice');
-const Expense = require('./models/Expense');
-const ServicePackage = require('./models/ServicePackage');
-const Budget = require('./models/Budget');
-const Payroll = require('./models/Payroll');
-
 // Communication models
 const Message = require('./models/Message');
 const Notification = require('./models/Notification');
 const NotificationPreference = require('./models/NotificationPreference');
 const Announcement = require('./models/Announcement');
 const EmailLog = require('./models/EmailLog');
+
+// Finance models
+const Invoice = require('./models/Invoice');
+const Expense = require('./models/Expense');
+const Budget = require('./models/Budget');
+const Payroll = require('./models/Payroll');
+const ServicePackage = require('./models/ServicePackage');
 
 // Email service (enhanced)
 const emailService = require('./backend/services/emailService');
@@ -247,11 +247,6 @@ async function getCurrentStaff(req) {
         employmentStartDate: new Date(),
         permissions: isAdminRole ? {
           canViewFinancials: true,
-          canManageBudgets: true,
-          canManageInvoices: true,
-          canManagePayroll: true,
-          canManageExpenses: true,
-          canViewFinancialReports: true,
           canApproveReports: true,
           canScheduleEvents: true,
           canManageStaff: true,
@@ -417,11 +412,6 @@ app.post('/login', async (req, res) => {
           employmentStartDate: new Date(),
           permissions: isAdminRole ? {
             canViewFinancials: true,
-            canManageBudgets: true,
-            canManageInvoices: true,
-            canManagePayroll: true,
-            canManageExpenses: true,
-            canViewFinancialReports: true,
             canApproveReports: true,
             canScheduleEvents: true,
             canManageStaff: true,
@@ -7015,7 +7005,7 @@ app.post('/api/announcements', requireAuth, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Staff profile not found. Cannot create announcement.' });
     }
 
-    const {
+    const {     
       title,
       content,
       format = 'plain',
@@ -7353,15 +7343,9 @@ function requireFounder(req, res, next) {
   return res.status(403).send('Forbidden: founder role required');
 }
 
-// Import and use finance routes
+// ============ FINANCE ROUTES ============
 const financeRoutes = require('./backend/routes/finance');
 app.use('/finance', financeRoutes);
-app.use('/api/finance', financeRoutes);
-
-// Aliases for dashboard sub-pages (if needed)
-app.get('/dashboard/finance', (req, res) => {
-  res.redirect('/finance/dashboard');
-});
 
 // 404 handler
 app.use((req, res) => {
@@ -7532,11 +7516,6 @@ const ensureFounderPermissionsAndStaff = async () => {
           employmentStartDate: new Date(),
           permissions: {
             canViewFinancials: true,
-            canManageBudgets: true,
-            canManageInvoices: true,
-            canManagePayroll: true,
-            canManageExpenses: true,
-            canViewFinancialReports: true,
             canApproveReports: true,
             canScheduleEvents: true,
             canManageStaff: true,
@@ -7554,18 +7533,12 @@ const ensureFounderPermissionsAndStaff = async () => {
         }
         const permFlags = {
           canViewFinancials: true,
-          canManageBudgets: true,
-          canManageInvoices: true,
-          canManagePayroll: true,
-          canManageExpenses: true,
-          canViewFinancialReports: true,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canExportData: true,
-          canScheduleReports: true,
           canApproveReports: true,
-          canSendInvitations: true,
-          canManageStaff: true
+          canScheduleEvents: true,
+          canManageStaff: true,
+          canViewAnalytics: true,
+          canManageSchools: true,
+          canSendInvitations: true
         };
         let changed = false;
         for (const [key, value] of Object.entries(permFlags)) {
@@ -7586,7 +7559,7 @@ const ensureFounderPermissionsAndStaff = async () => {
         'canViewEvents','canCreateEvents','canEditEvents','canDeleteEvents','canScheduleEvents',
         'canViewPrograms','canCreatePrograms','canEditPrograms','canDeletePrograms',
         'canViewBookings','canCreateBookings','canEditBookings','canDeleteBookings','canApproveBookings',
-        'canViewFinancials','canManageBudgets','canManageInvoices','canManagePayroll','canManageExpenses','canViewFinancialReports',
+        'canViewFinancials','canManageBudgets',
         'canViewAnalytics','canGenerateReports','canExportData','canScheduleReports','canApproveReports',
         'canSendMessages','canViewMessages','canCreateAnnouncements','canManageAnnouncements','canViewAllNotifications',
         'canManageSystem','canViewAuditLogs','canManagePermissions'
@@ -7622,8 +7595,6 @@ const ensureFounderPermissionsAndStaff = async () => {
     console.error('Error in ensureFounderPermissionsAndStaff:', err);
   }
 };
-
-
 
 const startServer = async () => {
   try {

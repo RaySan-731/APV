@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profit & Loss Statement - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/reports' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Profit & Loss Statement</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/reports" class="btn btn-outline-secondary btn-sm">Back to Reports</a>
+                    <form action="/finance/reports/export" method="POST" class="d-inline">
+                        <input type="hidden" name="reportType" value="profit_loss">
+                        <input type="hidden" name="startDate" value="<%= startDate %>">
+                        <input type="hidden" name="endDate" value="<%= endDate %>">
+                        <button type="submit" class="btn btn-outline-success btn-sm ms-2">Export CSV</button>
+                    </form>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="text-center mb-4">
+                            Profit & Loss Statement<br>
+                            <small class="text-muted">
+                                <%= new Date(startDate).toLocaleDateString() %> - <%= new Date(endDate).toLocaleDateString() %>
+                            </small>
+                        </h4>
+
+                        <table class="table table-bordered">
+                            <tbody>
+                                <tr class="table-success">
+                                    <td><strong>Total Revenue</strong></td>
+                                    <td class="text-end"><strong>KES <%= (reportData.revenue || 0).toLocaleString() %></strong></td>
+                                </tr>
+                                <tr class="table-danger">
+                                    <td><strong>Total Expenses</strong></td>
+                                    <td class="text-end"><strong>KES <%= (reportData.expenses || 0).toLocaleString() %></strong></td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td><strong>Gross Profit</strong></td>
+                                    <td class="text-end"><strong>KES <%= ((reportData.revenue || 0) - (reportData.expenses || 0)).toLocaleString() %></strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Trainer Payroll Costs</td>
+                                    <td class="text-end">KES <%= (reportData.payroll || 0).toLocaleString() %></td>
+                                </tr>
+                                <tr class="table-info">
+                                    <td><strong>Net Income</strong></td>
+                                    <td class="text-end"><strong>KES <%= (reportData.netIncome || 0).toLocaleString() %></strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="mt-4">
+                            <a href="/finance/reports" class="btn btn-outline-primary">Generate Another Report</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

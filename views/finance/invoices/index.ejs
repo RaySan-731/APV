@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoices - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <%- include('../partials/sidebar', { user, page: 'finance/invoices' }) %>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Invoices</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/invoices/create" class="btn btn-primary btn-sm">New Invoice</a>
+                    <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm ms-2">Dashboard</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <!-- Summary Stats -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Invoices</h6>
+                                <p class="fs-4"><%= summary.totalCount || 0 %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Amount</h6>
+                                <p class="fs-4">KES <%= (summary.totalAmount || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Collected</h6>
+                                <p class="fs-4 text-success">KES <%= (summary.totalPaid || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Outstanding</h6>
+                                <p class="fs-4 text-danger">KES <%= (summary.totalOutstanding || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <form method="GET" class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <select name="schoolId" class="form-select">
+                            <option value="">All Schools</option>
+                            <% schools.forEach(s => { %>
+                                <option value="<%= s._id %>" <%= filters.schoolId == s._id ? 'selected' : '' %>><%= s.name %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="status" class="form-select">
+                            <option value="">All Status</option>
+                            <option value="issued" <%= filters.status === 'issued' ? 'selected' : '' %>>Issued</option>
+                            <option value="sent" <%= filters.status === 'sent' ? 'selected' : '' %>>Sent</option>
+                            <option value="partial" <%= filters.status === 'partial' ? 'selected' : '' %>>Partial</option>
+                            <option value="paid" <%= filters.status === 'paid' ? 'selected' : '' %>>Paid</option>
+                            <option value="overdue" <%= filters.status === 'overdue' ? 'selected' : '' %>>Overdue</option>
+                            <option value="cancelled" <%= filters.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" name="startDate" class="form-control" value="<%= filters.startDate || '' %>">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" name="endDate" class="form-control" value="<%= filters.endDate || '' %>">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-secondary w-100">Filter</button>
+                    </div>
+                </form>
+
+                <!-- Invoices Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>School</th>
+                                        <th>Date</th>
+                                        <th>Due Date</th>
+                                        <th>Amount</th>
+                                        <th>Paid</th>
+                                        <th>Balance</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% invoices.forEach(inv => { %>
+                                        <tr class="<%= inv.status === 'overdue' ? 'table-danger' : inv.status === 'paid' ? 'table-success' : '' %>">
+                                            <td><%= inv.invoiceNumber %></td>
+                                            <td><a href="/schools/<%= inv.schoolId._id %>"><%= inv.schoolId.name %></a></td>
+                                            <td><%= new Date(inv.issueDate).toLocaleDateString() %></td>
+                                            <td><%= new Date(inv.dueDate).toLocaleDateString() %></td>
+                                            <td>KES <%= inv.totalAmount.toLocaleString() %></td>
+                                            <td>KES <%= inv.amountPaid.toLocaleString() %></td>
+                                            <td class="<%= inv.balance > 0 ? 'text-danger fw-bold' : '' %>">
+                                                KES <%= inv.balance.toLocaleString() %>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<%= 
+                                                    inv.status === 'paid' ? 'success' :
+                                                    inv.status === 'overdue' ? 'danger' :
+                                                    inv.status === 'partial' ? 'warning' :
+                                                    inv.status === 'cancelled' ? 'secondary' :
+                                                    'primary'
+                                                %>">
+                                                    <%= inv.status %>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="/finance/invoices/<%= inv._id %>" class="btn btn-outline-primary">View</a>
+                                                    <a href="/finance/invoices/<%= inv._id %>/download" class="btn btn-outline-secondary" target="_blank">PDF</a>
+                                                    <% if (inv.status !== 'paid' && inv.status !== 'cancelled') { %>
+                                                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#paymentModal<%= inv._id %>">
+                                                            Record Payment
+                                                        </button>
+                                                    <% } %>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Payment Modal -->
+                                        <div class="modal fade" id="paymentModal<%= inv._id %>" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <form action="/finance/invoices/<%= inv._id %>/payments" method="POST">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Record Payment - <%= inv.invoiceNumber %></h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Amount</label>
+                                                                <input type="number" name="amount" class="form-control" max="<%= inv.balance %>" required>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Payment Date</label>
+                                                                <input type="date" name="paymentDate" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Method</label>
+                                                                <select name="method" class="form-select">
+                                                                    <option value="mpesa">M-Pesa</option>
+                                                                    <option value="bank_transfer">Bank Transfer</option>
+                                                                    <option value="cheque">Cheque</option>
+                                                                    <option value="cash">Cash</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Reference (Optional)</label>
+                                                                <input type="text" name="reference" class="form-control">
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary">Record Payment</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <% if (pagination.pages > 1) { %>
+                            <nav class="mt-4">
+                                <ul class="pagination">
+                                    <% for (let i = 1; i <= pagination.pages; i++) { %>
+                                        <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+                                            <a class="page-link" href="?page=<%= i %>&schoolId=<%= filters.schoolId %>&status=<%= filters.status %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>"><%= i %></a>
+                                        </li>
+                                    <% } %>
+                                </ul>
+                            </nav>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

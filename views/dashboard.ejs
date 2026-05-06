@@ -752,7 +752,7 @@
                                 <p><strong>Zone:</strong> <%= school.zone || 'Not assigned' %></p>
                                 <p><strong>Region:</strong> <%= school.region || 'Not assigned' %></p>
                                 <p><strong>Service Package:</strong> <%= school.servicePackage || 'standard' %></p>
-                                <p><strong>Service Status:</strong> <span class="badge badge-<%= school.serviceStatus === 'active' ? 'success' : school.serviceStatus === 'on_hold' ? 'warning' : 'secondary' %>"><%= school.serviceStatus.replace('_', ' ') %></span></p>
+                                <p><strong>Service Status:</strong> <span class="badge badge-<%= (school.serviceStatus || 'inactive') === 'active' ? 'success' : (school.serviceStatus || 'inactive') === 'on_hold' ? 'warning' : 'secondary' %>"><%=(school.serviceStatus || 'inactive').replace('_', ' ') %></span></p>
                             </div>
                         </div>
 

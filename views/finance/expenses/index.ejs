@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expenses - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/expenses' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Expense Tracking</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/expenses/create" class="btn btn-primary btn-sm">Add Expense</a>
+                    <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm ms-2">Dashboard</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <!-- Category Summary -->
+                <div class="row g-3 mb-4">
+                    <% const categories = ['equipment','transport','venue','materials','catering','accommodation','trainer_allowance','marketing','utilities','office','other']; %>
+                    <% const catColors = { equipment: 'danger', transport: 'warning', venue: 'info', materials: 'primary', catering: 'success', accommodation: 'secondary', trainer_allowance: 'dark', marketing: 'primary', utilities: 'info', office: 'light', other: 'secondary' }; %>
+                    <% categories.forEach(cat => { 
+                        const catData = categorySummary.find(s => s._id === cat);
+                        const total = catData?.totalAmount || 0;
+                        const count = catData?.count || 0;
+                    %>
+                        <div class="col-md-2 col-4">
+                            <div class="card bg-<%= catColors[cat] || 'secondary' %> text-white">
+                                <div class="card-body p-2">
+                                    <small class="text-uppercase"><%= cat.replace('_', ' ') %></small>
+                                    <h6 class="card-title mb-0">KES <%= total.toLocaleString() %></h6>
+                                    <small><%= count %> items</small>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+
+                <!-- Filters -->
+                <form method="GET" class="row g-3 mb-4">
+                    <div class="col-md-2">
+                        <select name="category" class="form-select">
+                            <option value="">All Categories</option>
+                            <% categories.forEach(cat => { %>
+                                <option value="<%= cat %>" <%= filters.category === cat ? 'selected' : '' %>><%= cat.replace('_', ' ') %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="status" class="form-select">
+                            <option value="">All Status</option>
+                            <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>Pending</option>
+                            <option value="approved" <%= filters.status === 'approved' ? 'selected' : '' %>>Approved</option>
+                            <option value="rejected" <%= filters.status === 'rejected' ? 'selected' : '' %>>Rejected</option>
+                            <option value="paid" <%= filters.status === 'paid' ? 'selected' : '' %>>Paid</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" name="startDate" class="form-control" value="<%= filters.startDate || '' %>">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" name="endDate" class="form-control" value="<%= filters.endDate || '' %>">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-secondary w-100">Filter</button>
+                    </div>
+                </form>
+
+                <!-- Expenses Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Title</th>
+                                        <th>Category</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Receipt</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% expenses.forEach(exp => { %>
+                                        <tr>
+                                            <td><%= exp.paidDate ? new Date(exp.paidDate).toLocaleDateString() : '-' %></td>
+                                            <td>
+                                                <strong><%= exp.title %></strong>
+                                                <% if (exp.eventId) { %>
+                                                    <br><small class="text-muted"><%= exp.eventId.name %></small>
+                                                <% } %>
+                                            </td>
+                                            <td><span class="badge bg-primary"><%= exp.category.replace('_', ' ') %></span></td>
+                                            <td class="<%= exp.status === 'approved' ? 'text-success' : exp.status === 'rejected' ? 'text-danger' : '' %>">
+                                                KES <%= exp.amount.toLocaleString() %>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<%= 
+                                                    exp.status === 'approved' ? 'success' :
+                                                    exp.status === 'rejected' ? 'danger' :
+                                                    exp.status === 'pending' ? 'warning' : 'secondary'
+                                                %>">
+                                                    <%= exp.status %>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <% if (exp.receiptUrl) { %>
+                                                    <a href="<%= exp.receiptUrl %>" target="_blank" class="btn btn-sm btn-outline-info">View Receipt</a>
+                                                <% } else if (exp.status === 'pending') { %>
+                                                    <form action="/finance/expenses/upload-receipt" method="POST" enctype="multipart/form-data" class="d-inline">
+                                                        <input type="hidden" name="expenseId" value="<%= exp._id %>">
+                                                        <input type="file" name="receipt" accept="image/*,.pdf" style="display:none" onchange="this.form.submit()">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="this.previousElementSibling.click()">Upload</button>
+                                                    </form>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <% if (exp.status === 'pending') { %>
+                                                      <form action="/finance/expenses/<%= exp._id %>" method="POST" class="d-inline">
+                                                        <input type="hidden" name="status" value="approved">
+                                                        <button type="submit" class="btn btn-outline-success">Approve</button>
+                                                      </form>
+                                                      <form action="/finance/expenses/<%= exp._id %>" method="POST" class="d-inline">
+                                                        <input type="hidden" name="status" value="rejected">
+                                                        <button type="submit" class="btn btn-outline-danger">Reject</button>
+                                                      </form>
+                                                    <% } else { %>
+                                                        <span class="text-muted">No actions</span>
+                                                    <% } %>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <% if (pagination.pages > 1) { %>
+                    <nav class="mt-4">
+                        <ul class="pagination">
+                            <% for (let i = 1; i <= pagination.pages; i++) { %>
+                                <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+                                    <a class="page-link" href="?page=<%= i %>&category=<%= filters.category %>&status=<%= filters.status %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>"><%= i %></a>
+                                </li>
+                            <% } %>
+                        </ul>
+                    </nav>
+                <% } %>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

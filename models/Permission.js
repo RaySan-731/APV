@@ -48,9 +48,13 @@ const permissionSchema = new mongoose.Schema({
      canDeleteBookings: { type: Boolean, default: false },
      canApproveBookings: { type: Boolean, default: false },
 
-     // Financial Access
-     canViewFinancials: { type: Boolean, default: false },
-     canManageBudgets: { type: Boolean, default: false },
+      // Financial Access
+      canViewFinancials: { type: Boolean, default: false },
+      canManageBudgets: { type: Boolean, default: false },
+      canManageInvoices: { type: Boolean, default: false },
+      canManagePayroll: { type: Boolean, default: false },
+      canManageExpenses: { type: Boolean, default: false },
+      canViewFinancialReports: { type: Boolean, default: false },
 
      // Analytics & Reports
      canViewAnalytics: { type: Boolean, default: false },

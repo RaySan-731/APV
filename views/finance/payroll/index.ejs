@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trainer Payroll - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/payroll' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Trainer Payroll</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/payroll/calculate" class="btn btn-primary btn-sm">Calculate New Payroll</a>
+                    <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm ms-2">Dashboard</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <!-- Summary Stats -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Payrolls</h6>
+                                <p class="fs-4"><%= summary.totalCount || 0 %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Gross</h6>
+                                <p class="fs-4 text-primary">KES <%= (summary.totalGross || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Net</h6>
+                                <p class="fs-4 text-success">KES <%= (summary.totalNet || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Deductions</h6>
+                                <p class="fs-4 text-danger">KES <%= (summary.totalDeductions || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <form method="GET" class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <select name="trainerId" class="form-select">
+                            <option value="">All Trainers</option>
+                            <% trainers.forEach(t => { %>
+                                <option value="<%= t._id %>" <%= filters.trainerId == t._id ? 'selected' : '' %>><%= t.name %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="month" name="period" class="form-control" value="<%= filters.period || '' %>">
+                    </div>
+                    <div class="col-md-2">
+                        <select name="status" class="form-select">
+                            <option value="">All Status</option>
+                            <option value="draft" <%= filters.status === 'draft' ? 'selected' : '' %>>Draft</option>
+                            <option value="calculated" <%= filters.status === 'calculated' ? 'selected' : '' %>>Calculated</option>
+                            <option value="approved" <%= filters.status === 'approved' ? 'selected' : '' %>>Approved</option>
+                            <option value="paid" <%= filters.status === 'paid' ? 'selected' : '' %>>Paid</option>
+                            <option value="cancelled" <%= filters.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-secondary w-100">Filter</button>
+                    </div>
+                </form>
+
+                <!-- Payroll Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Payroll #</th>
+                                        <th>Trainer</th>
+                                        <th>Period</th>
+                                        <th>Gross</th>
+                                        <th>Deductions</th>
+                                        <th>Net</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% payrolls.forEach(pay => { %>
+                                        <tr class="<%= pay.status === 'paid' ? 'table-success' : pay.status === 'approved' ? 'table-primary' : '' %>">
+                                            <td><%= pay.payrollNumber %></td>
+                                            <td><%= pay.trainerId?.name || 'Unknown' %></td>
+                                            <td>
+                                                <%= new Date(pay.periodStart).toLocaleDateString() %> - 
+                                                <%= new Date(pay.periodEnd).toLocaleDateString() %>
+                                            </td>
+                                            <td class="fw-bold">KES <%= pay.grossAmount.toLocaleString() %></td>
+                                            <td class="text-danger">KES <%= pay.deductions.toLocaleString() %></td>
+                                            <td class="text-success fw-bold">KES <%= pay.netAmount.toLocaleString() %></td>
+                                            <td>
+                                                <span class="badge bg-<%= 
+                                                    pay.status === 'paid' ? 'success' :
+                                                    pay.status === 'approved' ? 'primary' :
+                                                    pay.status === 'calculated' ? 'info' :
+                                                    pay.status === 'draft' ? 'secondary' :
+                                                    pay.status === 'cancelled' ? 'dark' : 'warning'
+                                                %>">
+                                                    <%= pay.status %>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="/finance/payroll/<%= pay._id %>/payslip" class="btn btn-outline-primary" target="_blank">Payslip</a>
+                                                    <% if (pay.status === 'calculated') { %>
+                                                        <form action="/finance/payroll/<%= pay._id %>/approve" method="POST" class="d-inline">
+                                                            <button type="submit" class="btn btn-outline-success">Approve</button>
+                                                        </form>
+                                                    <% } %>
+                                                    <% if (pay.status === 'approved') { %>
+                                                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#payModal<%= pay._id %>">
+                                                            Mark Paid
+                                                        </button>
+                                                    <% } %>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Payment Modal -->
+                                        <div class="modal fade" id="payModal<%= pay._id %>" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <form action="/finance/payroll/<%= pay._id %>/mark-paid" method="POST">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Mark as Paid - <%= pay.payrollNumber %></h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <p>Net Pay: <strong>KES <%= pay.netAmount.toLocaleString() %></strong></p>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Payment Method</label>
+                                                                <select name="paymentMethod" class="form-select">
+                                                                    <option value="mpesa">M-Pesa</option>
+                                                                    <option value="bank_transfer">Bank Transfer</option>
+                                                                    <option value="cash">Cash</option>
+                                                                    <option value="cheque">Cheque</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Transaction Reference</label>
+                                                                <input type="text" name="paymentReference" class="form-control" placeholder="e.g. M-Pesa Code">
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-success">Confirm Payment</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <% if (pagination.pages > 1) { %>
+                            <nav class="mt-4">
+                                <ul class="pagination">
+                                    <% for (let i = 1; i <= pagination.pages; i++) { %>
+                                        <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+                                            <a class="page-link" href="?page=<%= i %>&trainerId=<%= filters.trainerId %>&period=<%= filters.period %>&status=<%= filters.status %>"><%= i %></a>
+                                        </li>
+                                    <% } %>
+                                </ul>
+                            </nav>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

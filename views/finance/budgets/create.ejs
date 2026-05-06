@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Budget - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar', { user, page: 'finance/budgets' }) %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title"><%= pkg ? 'Edit' : 'Create' %> Budget</h1>
+                <a href="/finance/budgets" class="btn btn-outline-secondary btn-sm">Back to List</a>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <form action="/finance/budgets/create" method="POST">
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Budget Name *</label>
+                                            <input type="text" name="name" class="form-control" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Budget Code *</label>
+                                            <input type="text" name="code" class="form-control" required>
+                                            <small class="text-muted">Unique identifier (e.g., BGT-2026-001)</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Type *</label>
+                                            <select name="type" class="form-select" required>
+                                                <option value="event">Event</option>
+                                                <option value="monthly">Monthly</option>
+                                                <option value="quarterly">Quarterly</option>
+                                                <option value="annual">Annual</option>
+                                                <option value="project">Project</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Period *</label>
+                                            <input type="text" name="period" class="form-control" placeholder="e.g., 2026-05 or Q2-2026" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Department</label>
+                                            <input type="text" name="department" class="form-control" placeholder="e.g., Training">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Associated Event (optional)</label>
+                                        <select name="eventId" class="form-select">
+                                            <option value="">None</option>
+                                            <% events.forEach(ev => { %>
+                                                <option value="<%= ev._id %>"><%= ev.name %> (<%= new Date(ev.startDate).toLocaleDateString() %>)</option>
+                                            <% }); %>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Budget Categories</label>
+                                        <div id="categoryRows">
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-md-3">
+                                                    <select name="categories[0][category]" class="form-select">
+                                                        <% expenseCategories.forEach(cat => { %>
+                                                            <option value="<%= cat %>"><%= cat.replace('_', ' ') %></option>
+                                                        <% }); %>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <input type="number" name="categories[0][allocated]" class="form-control" placeholder="Allocated" step="0.01" min="0">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <input type="text" name="categories[0][notes]" class="form-control" placeholder="Notes (optional)">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="addCategoryRow()">Add Category</button>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Notes</label>
+                                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Initial Status</label>
+                                        <select name="status" class="form-select">
+                                            <option value="draft">Draft</option>
+                                            <option value="active">Active</option>
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary">Create Budget</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    let categoryCount = 1;
+    function addCategoryRow() {
+        const container = document.getElementById('categoryRows');
+        const idx = categoryCount;
+        categoryCount++;
+        const row = document.createElement('div');
+        row.className = 'row g-2 mb-2';
+        row.innerHTML = `
+            <div class="col-md-3">
+                <select name="categories[${idx}][category]" class="form-select">
+                    <% expenseCategories.forEach(cat => { %>
+                        <option value="<%= cat %>"><%= cat.replace('_', ' ') %></option>
+                    <% }); %>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="number" name="categories[${idx}][allocated]" class="form-control" placeholder="Allocated" step="0.01" min="0">
+            </div>
+            <div class="col-md-6">
+                <input type="text" name="categories[${idx}][notes]" class="form-control" placeholder="Notes (optional)">
+            </div>
+        `;
+        container.appendChild(row);
+    }
+    </script>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

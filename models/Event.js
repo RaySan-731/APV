@@ -139,9 +139,18 @@ const eventSchema = new mongoose.Schema({
   // Financial
   budget: {
     total: { type: Number, min: 0, default: 0 },
-    breakdown: mongoose.Schema.Types.Mixed
+    breakdown: mongoose.Schema.Types.Mixed,
+    spent: { type: Number, min: 0, default: 0 }
   },
   costPerParticipant: { type: Number, min: 0, default: 0 },
+
+  // Trainer compensation settings for this event
+  trainerRates: {
+    dailyRate: { type: Number, min: 0, default: 0 },
+    transportAllowance: { type: Number, min: 0, default: 0 },
+    mealAllowance: { type: Number, min: 0, default: 0 },
+    overnightAllowance: { type: Number, min: 0, default: 0 }
+  },
 
   // Status & Publishing
   status: {

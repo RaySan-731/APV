@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        .invoice-card { border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; margin-bottom:1rem; background:var(--card); display:flex; justify-content:space-between; align-items:flex-start; }
+        .invoice-info h3 { margin:0 0 0.5rem 0; font-size:1.1rem; }
+        .invoice-meta { font-size:0.9rem; color:var(--muted-foreground); margin-bottom:0.5rem; }
+        .invoice-total { font-weight:600; font-size:1.1rem; color:var(--foreground); }
+        .status-badge { display:inline-block; padding:0.25rem 0.5rem; border-radius:999px; font-size:0.75rem; font-weight:600; text-transform:uppercase; }
+        .status-paid { background:hsl(140,60%,40%); color:white; }
+        .status-issued { background:hsl(30,80%,60%); color:white; }
+        .status-partial { background:hsl(40,80%,50%); color:white; }
+        .status-overdue { background:hsl(0,70%,60%); color:white; }
+        .status-sent { background:hsl(210,60%,50%); color:white; }
+        .filters { display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+        .filter-btn { padding:0.5rem 1rem; border:1px solid var(--border); background:var(--card); border-radius:var(--radius); cursor:pointer; }
+        .filter-btn.active { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); }
+        .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:2rem; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path><path d="M3 6h18"></path><path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Payments</h1>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Summary Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Total Invoiced</span>
+                        <span class="stat-value">KES <%= stats?.totalInvoiced ? stats.totalInvoiced.toLocaleString() : '0' %></span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Total Paid</span>
+                        <span class="stat-value">KES <%= stats?.totalPaid ? stats.totalPaid.toLocaleString() : '0' %></span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Outstanding</span>
+                        <span class="stat-value">KES <%= stats?.totalInvoiced - stats?.totalPaid ? (stats.totalInvoiced - stats.totalPaid).toLocaleString() : '0' %></span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Overdue Invoices</span>
+                        <span class="stat-value"><%= stats?.overdueCount || 0 %></span>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="issued">Issued</button>
+                    <button class="filter-btn" data-filter="sent">Sent</button>
+                    <button class="filter-btn" data-filter="partial">Partial</button>
+                    <button class="filter-btn" data-filter="overdue">Overdue</button>
+                    <button class="filter-btn" data-filter="paid">Paid</button>
+                </div>
+
+                <!-- Invoice List -->
+                <div class="invoice-list">
+                    <% if (!invoices || invoices.length === 0) { %>
+                        <div class="empty-state">
+                            <p>No invoices found.</p>
+                        </div>
+                    <% } else { %>
+                        <% invoices.forEach(invoice => { %>
+                            <div class="invoice-card" data-status="<%= invoice.status %>">
+                                <div class="invoice-info">
+                                    <h3>Invoice <%= invoice.invoiceNumber %></h3>
+                                    <div class="invoice-meta">
+                                        Issued: <%= new Date(invoice.issueDate).toLocaleDateString() %> • Due: <%= new Date(invoice.dueDate).toLocaleDateString() %>
+                                    </div>
+                                    <div class="invoice-meta">
+                                        Type: <%= invoice.invoiceType.replace('_',' ') %> • Items: <%= invoice.items.length %>
+                                    </div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div class="invoice-total">KES <%= invoice.totalAmount.toLocaleString() %></div>
+                                    <div style="margin:0.5rem 0;">
+                                        <span class="status-badge status-<%= invoice.status %>"><%= invoice.status %></span>
+                                    </div>
+                                    <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem;">
+                                        <a href="/api/school/invoices/<%= invoice._id %>/download" class="btn btn-outline btn-sm" target="_blank">Download Receipt</a>
+                                        <% if (['issued','sent','partial','overdue'].includes(invoice.status)) { %>
+                                            <button class="btn btn-outline btn-sm raise-query-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>">Raise Query</button>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    <% } %>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Raise Query Modal -->
+    <div id="queryModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+        <div class="modal-content" style="background:var(--card);padding:2rem;border-radius:var(--radius);max-width:500px;width:90%;">
+            <h3>Raise Payment Query</h3>
+            <p id="queryInvoiceInfo" style="margin-bottom:1rem;color:var(--muted-foreground);"></p>
+            <form id="queryForm">
+                <input type="hidden" id="queryInvoiceId">
+                <div class="form-group">
+                    <label for="querySubject">Subject</label>
+                    <input type="text" id="querySubject" name="subject" class="form-input" required placeholder="Payment query for invoice">
+                </div>
+                <div class="form-group">
+                    <label for="queryBody">Message</label>
+                    <textarea id="queryBody" name="body" class="form-input" rows="4" required placeholder="Describe your query..."></textarea>
+                </div>
+                <div class="form-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="cancelQueryBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Query</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Filter invoices
+            const filterBtns = document.querySelectorAll('.filter-btn');
+            const invoiceCards = document.querySelectorAll('.invoice-card');
+
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const filter = btn.dataset.filter;
+                    invoiceCards.forEach(card => {
+                        if (filter === 'all' || card.dataset.status === filter) {
+                            card.style.display = 'flex';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+            });
+
+            // Raise query modal
+            const modal = document.getElementById('queryModal');
+            const cancelBtn = document.getElementById('cancelQueryBtn');
+            const queryForm = document.getElementById('queryForm');
+            const queryInvoiceInfo = document.getElementById('queryInvoiceInfo');
+
+            document.querySelectorAll('.raise-query-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const invoiceId = btn.dataset.invoiceId;
+                    const invoiceNum = btn.dataset.invoiceNum;
+                    document.getElementById('queryInvoiceId').value = invoiceId;
+                    queryInvoiceInfo.textContent = `Invoice: ${invoiceNum}`;
+                    modal.style.display = 'flex';
+                });
+            });
+
+            cancelBtn?.addEventListener('click', () => modal.style.display = 'none');
+            window.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+            queryForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const invoiceId = document.getElementById('queryInvoiceId').value;
+                const subject = document.getElementById('querySubject').value;
+                const body = document.getElementById('queryBody').value;
+
+                const res = await fetch(`/api/school/invoices/${invoiceId}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, message: body })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('Query submitted successfully');
+                    modal.style.display = 'none';
+                    queryForm.reset();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -20,12 +20,12 @@ const staffSchema = new mongoose.Schema({
   },
 
   // Employment Information
-  role: {
-    type: String,
-    required: true,
-    enum: ['trainer', 'senior trainer', 'supervisor', 'admin', 'coordinator'],
-    default: 'trainer'
-  },
+   role: {
+     type: String,
+     required: true,
+     enum: ['trainer', 'senior trainer', 'supervisor', 'admin', 'coordinator', 'school_admin'],
+     default: 'trainer'
+   },
   status: {
     type: String,
     enum: ['Active', 'On Leave', 'Inactive', 'Suspended'],
@@ -51,13 +51,18 @@ const staffSchema = new mongoose.Schema({
   },
   notes: String,
 
-  // Assignment Information
-  assignedSchools: [{
-    schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School' },
-    assignmentType: { type: String, enum: ['primary', 'secondary'], default: 'primary' },
-    assignedDate: { type: Date, default: Date.now },
-    status: { type: String, enum: ['active', 'transferred'], default: 'active' }
-  }],
+   // Assignment Information
+   assignedSchools: [{
+     schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School' },
+     assignmentType: { type: String, enum: ['primary', 'secondary'], default: 'primary' },
+     assignedDate: { type: Date, default: Date.now },
+     status: { type: String, enum: ['active', 'transferred'], default: 'active' }
+   }],
+   // For school_admin: direct link to their school
+   schoolId: {
+     type: mongoose.Schema.Types.ObjectId,
+     ref: 'School'
+   },
   zones: [{ type: String }], // Geographic zones assigned to
 
   // Permissions & Access

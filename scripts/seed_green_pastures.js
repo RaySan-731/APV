@@ -9,7 +9,7 @@ const Student = require(path.join(__dirname, '..', 'models', 'Student'));
 async function seedData() {
   try {
     // Connect to MongoDB
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/apv_ventures';
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/apv-ventures';
     await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB\n');
 

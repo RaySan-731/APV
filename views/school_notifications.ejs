@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        .notif-list { list-style:none; padding:0; margin:0; }
+        .notif-item { padding:1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; }
+        .notif-item.unread { background:var(--secondary); }
+        .notif-content h4 { margin:0 0 0.25rem 0; font-size:1rem; }
+        .notif-content p { margin:0; font-size:0.9rem; color:var(--muted-foreground); }
+        .notif-time { font-size:0.75rem; color:var(--muted-foreground); white-space:nowrap; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path><path d="M3 6h18"></path><path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Notifications</h1>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="card">
+                    <div class="card-body">
+                        <% if (!notifications || notifications.length === 0) { %>
+                            <div class="empty-state"><p>No notifications</p></div>
+                        <% } else { %>
+                            <ul class="notif-list">
+                                <% notifications.forEach(n => { %>
+                                    <li class="notif-item <%= !n.isRead ? 'unread' : '' %>">
+                                        <div class="notif-content">
+                                            <h4><%= n.title %></h4>
+                                            <p><%= n.message %></p>
+                                        </div>
+                                        <div class="notif-time"><%= new Date(n.createdAt).toLocaleString() %></div>
+                                    </li>
+                                <% }) %>
+                            </ul>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Auto-mark visible notification as read
+            document.querySelectorAll('.notif-item.unread').forEach(item => {
+                // optionally mark read via API
+            });
+        });
+    </script>
+</body>
+</html>

@@ -27,11 +27,11 @@ const userSchema = new mongoose.Schema({
     trim: true,
     sparse: true
   },
-  role: {
-    type: String,
-    enum: ['founder', 'commissioner', 'training_officer', 'medical', 'rover', 'trainer', 'staff'],
-    default: 'rover'
-  },
+   role: {
+     type: String,
+     enum: ['founder', 'commissioner', 'training_officer', 'medical', 'rover', 'trainer', 'staff', 'senior trainer', 'supervisor', 'admin', 'coordinator', 'school_admin'],
+     default: 'rover'
+   },
   isActive: {
     type: Boolean,
     default: true

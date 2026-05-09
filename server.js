@@ -171,7 +171,7 @@ if (process.env.MONGODB_URI) {
 // Middleware functions
 const requireAuth = (req, res, next) => {
   if (!req.session.user) {
-    const isApiRequest = req.xhr || 
+    const isApiRequest = req.xhr ||
                          req.headers.accept?.includes('application/json') ||
                          req.headers['content-type']?.includes('application/json') ||
                          req.path.startsWith('/api/');
@@ -186,12 +186,12 @@ const requireAuth = (req, res, next) => {
 const requirePermission = (permission) => {
   return async (req, res, next) => {
     if (!req.session.user) {
-      const isApiRequest = req.xhr || 
+      const isApiRequest = req.xhr ||
                            req.headers.accept?.includes('application/json') ||
                            req.headers['content-type']?.includes('application/json') ||
                            req.path.startsWith('/api/') ||
                            (req.path.startsWith('/dashboard/') && (
-                             req.method === 'POST' || 
+                             req.method === 'POST' ||
                              req.headers['content-type']?.includes('application/json')
                            ));
       if (isApiRequest) {
@@ -203,7 +203,7 @@ const requirePermission = (permission) => {
     try {
       const staffPermissions = await Permission.findOne({ role: req.session.user.role });
       if (!staffPermissions || !staffPermissions.permissions[permission]) {
-        const isApiRequest = req.xhr || 
+        const isApiRequest = req.xhr ||
                              req.headers.accept?.includes('application/json') ||
                              req.headers['content-type']?.includes('application/json') ||
                              req.path.startsWith('/api/') ||
@@ -223,6 +223,84 @@ const requirePermission = (permission) => {
       res.status(500).json({ success: false, error: 'Permission check failed' });
     }
   };
+};
+
+// School Admin authentication & authorization middleware
+const requireSchoolAdmin = async (req, res, next) => {
+  if (!req.session.user) {
+    return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  }
+
+  try {
+    // Check if user has school_admin role
+    if (req.session.user.role !== 'school_admin') {
+      return res.status(403).render('404', {
+        user: req.session.user,
+        error: 'Access denied. School admin privileges required.'
+      });
+    }
+
+    // Fetch Staff record with school linkage
+    const staff = await Staff.findOne({ email: req.session.user.email.toLowerCase() })
+      .select('_id name email role schoolId')
+      .lean();
+
+    if (!staff || staff.role !== 'school_admin') {
+      return res.status(403).render('404', {
+        user: req.session.user,
+        error: 'School admin profile not found or inactive.'
+      });
+    }
+
+    if (!staff.schoolId) {
+      return res.status(403).render('404', {
+        user: req.session.user,
+        error: 'School admin not assigned to a school. Please contact founder.'
+      });
+    }
+
+    // Attach staff and school info to request
+    req.staff = staff;
+    req.schoolId = staff.schoolId;
+
+    // Verify school exists and is active
+    const school = await School.findById(staff.schoolId).select('name status serviceStatus').lean();
+    if (!school) {
+      return res.status(403).render('404', {
+        user: req.session.user,
+        error: 'Associated school not found. Please contact founder.'
+      });
+    }
+
+    if (school.status !== 'active') {
+      return res.status(403).render('404', {
+        user: req.session.user,
+        error: 'School account is inactive. Please contact founder.'
+      });
+    }
+
+    req.school = school;
+    next();
+  } catch (err) {
+    console.error('School admin auth error:', err);
+    res.status(500).render('404', {
+      user: req.session.user,
+      error: 'Authentication error. Please try again.'
+    });
+  }
+};
+
+// School data isolation filter (for queries)
+const schoolFilter = (req, res, next) => {
+  if (req.query && req.query.schoolId) {
+    // Ensure school admin can only access their own school
+    if (req.session.user.role === 'school_admin') {
+      if (req.query.schoolId.toString() !== req.schoolId.toString()) {
+        return res.status(403).json({ success: false, error: 'Access denied to this school data' });
+      }
+    }
+  }
+  next();
 };
 
 // Helper: Get Staff document from session (converts User session to Staff)
@@ -1879,6 +1957,434 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
      res.status(500).json({ success: false, error: 'Failed to fetch leave requests' });
    }
  });
+
+  // ============ SCHOOL ADMIN ROUTES ============
+
+  // School Admin Dashboard Page
+  app.get('/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      // Fetch initial data for server-side rendering
+      const schoolId = req.schoolId;
+      const school = req.school;
+
+      const [
+        totalScouts,
+        activeGroupsCount,
+        upcomingEvents,
+        pendingInvoices,
+        unreadNotificationsCount,
+        unreadMessagesCount
+      ] = await Promise.all([
+        Student.countDocuments({ school: schoolId, status: 'active' }),
+        ScoutGroup.countDocuments({ schoolId, status: 'active' }),
+        Event.find({
+          'targetSchools.schoolId': schoolId,
+          startDate: { $gte: new Date(), $lte: new Date(Date.now() + 30*24*60*60*1000) },
+          status: { $in: ['confirmed', 'in_progress', 'scheduled'] }
+        }).sort({ startDate: 1 }).limit(1).lean(),
+        Invoice.countDocuments({
+          schoolId,
+          status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
+        }),
+        Notification.countDocuments({
+          recipientId: req.staff._id,
+          isRead: false,
+          dismissed: false
+        }),
+        Message.countDocuments({
+          'recipients.staffId': req.staff._id,
+          'recipients.status': 'sent',
+          'recipients.deleted': { $ne: true }
+        })
+      ]);
+
+      const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+
+      res.render('school_dashboard', {
+        user: req.session.user,
+        school,
+        stats: {
+          totalScouts,
+          activeGroupsCount,
+          upcomingEventsCount: upcomingEvents.length,
+          pendingInvoices,
+          unreadNotifications: unreadNotificationsCount,
+          unreadMessages: unreadMessagesCount
+        },
+        nextEvent,
+        page: 'school_dashboard'
+      });
+    } catch (err) {
+      console.error('School dashboard error:', err);
+      res.status(500).render('404', { user: req.session.user, error: 'Failed to load dashboard' });
+    }
+  });
+
+  // API: School Dashboard Data (JSON)
+  app.get('/api/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getDashboardData(req, res);
+  });
+
+  // API: Get school profile
+  app.get('/api/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getSchoolProfile(req, res);
+  });
+
+  // API: Update school profile
+  app.post('/api/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.updateSchoolProfile(req, res);
+  });
+
+  // API: Get scouts data
+  app.get('/api/school/scouts', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getScoutsData(req, res);
+  });
+
+  // API: Add scout
+  app.post('/api/school/scouts', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.addScout(req, res);
+  });
+
+  // API: Update scout
+  app.put('/api/school/scouts/:scoutId', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.updateScout(req, res);
+  });
+
+  // API: Get events
+  app.get('/api/school/events', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getEvents(req, res);
+  });
+
+  // API: Get single event details
+  app.get('/api/school/events/:eventId', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getEventDetails(req, res);
+  });
+
+  // API: Update event attendance/RSVP
+  app.post('/api/school/events/:eventId/attendance', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.updateEventAttendance(req, res);
+  });
+
+  // API: Get invoices
+  app.get('/api/school/invoices', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getInvoices(req, res);
+  });
+
+  // API: Download invoice
+  app.get('/api/school/invoices/:invoiceId/download', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.downloadInvoice(req, res);
+  });
+
+  // API: Raise payment query
+  app.post('/api/school/invoices/:invoiceId/query', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.raisePaymentQuery(req, res);
+  });
+
+  // API: Get documents
+  app.get('/api/school/documents', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getDocuments(req, res);
+  });
+
+  // API: Upload document
+  app.post('/api/school/documents', requireAuth, requireSchoolAdmin, upload.single('document'), async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.uploadDocument(req, res);
+  });
+
+  // API: Get messages (conversation with founder)
+  app.get('/api/school/messages', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getMessages(req, res);
+  });
+
+  // API: Send message to founder
+  app.post('/api/school/messages', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.sendMessage(req, res);
+  });
+
+  // API: Get notifications
+  app.get('/api/school/notifications', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getNotifications(req, res);
+  });
+
+  // API: Mark notification as read
+  app.post('/api/school/notifications/:notificationId/read', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.markNotificationRead(req, res);
+  });
+
+  // School Admin Dashboard Page
+  app.get('/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const schoolId = req.schoolId;
+      const school = req.school;
+
+      const [
+        totalScouts,
+        activeGroupsCount,
+        upcomingEvents,
+        pendingInvoices,
+        unreadNotificationsCount,
+        unreadMessagesCount
+      ] = await Promise.all([
+        Student.countDocuments({ school: schoolId, status: 'active' }),
+        ScoutGroup.countDocuments({ schoolId, status: 'active' }),
+        Event.find({
+          'targetSchools.schoolId': schoolId,
+          startDate: { $gte: new Date(), $lte: new Date(Date.now() + 30*24*60*60*1000) },
+          status: { $in: ['confirmed', 'in_progress', 'scheduled'] }
+        }).sort({ startDate: 1 }).limit(1).lean(),
+        Invoice.countDocuments({
+          schoolId,
+          status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
+        }),
+        Notification.countDocuments({
+          recipientId: req.staff._id,
+          isRead: false,
+          dismissed: false
+        }),
+        Message.countDocuments({
+          'recipients.staffId': req.staff._id,
+          'recipients.status': 'sent',
+          'recipients.deleted': { $ne: true }
+        })
+      ]);
+
+      const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+
+      res.render('school_dashboard', {
+        user: req.session.user,
+        school,
+        stats: {
+          totalScouts,
+          activeGroupsCount,
+          upcomingEventsCount: upcomingEvents.length,
+          pastEventsCount: null, // not needed on dashboard
+          pendingInvoices,
+          totalPaidThisYear: 0, // compute separately if needed
+          daysSinceLastVisit: await calculateDaysSinceLastVisit(schoolId),
+          unreadNotifications: unreadNotificationsCount,
+          unreadMessages: unreadMessagesCount
+        },
+        nextEvent,
+        pendingActions: await buildPendingActions(schoolId, req.staff._id),
+        notifications: {
+          unreadCount: unreadNotificationsCount,
+          recent: await Notification.find({ recipientId: req.staff._id, isRead: false, dismissed: false })
+            .sort({ createdAt: -1 }).limit(5).lean()
+        },
+        page: 'school_dashboard'
+      });
+    } catch (err) {
+      console.error('School dashboard error:', err);
+      res.status(500).render('404', { user: req.session.user, error: 'Failed to load dashboard' });
+    }
+  });
+
+  // School Profile Page
+  app.get('/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const school = await School.findById(req.schoolId).lean();
+      const primaryStaff = school?.assignedStaff?.find(a => a.assignmentType === 'primary');
+      let trainer = null;
+      if (primaryStaff?.staffId) {
+        trainer = await Staff.findById(primaryStaff.staffId).select('name email').lean();
+      }
+      res.render('school_profile', {
+        user: req.session.user,
+        school,
+        trainer,
+        page: 'school_profile'
+      });
+    } catch (err) {
+      console.error('School profile error:', err);
+      res.status(500).render('404', { user: req.session.user, error: err.message });
+    }
+  });
+
+  // Scouts & Groups Page
+  app.get('/school/scouts', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const schoolId = req.schoolId;
+      const [groups, scouts] = await Promise.all([
+        ScoutGroup.find({ schoolId }).sort({ name: 1 }).lean(),
+        Student.find({ school: schoolId, status: 'active' }).sort({ fullName: 1 }).lean()
+      ]);
+      res.render('school_scouts', {
+        user: req.session.user,
+        groups,
+        scouts,
+        schoolId,
+        page: 'school_scouts'
+      });
+    } catch (err) {
+      console.error('School scouts error:', err);
+      res.status(500).render('404', { user: req.session.user, error: err.message });
+    }
+  });
+
+  // Events Page
+  app.get('/school/events', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const events = await Event.find({
+        'targetSchools.schoolId': req.schoolId
+      }).sort({ startDate: -1 }).lean();
+      res.render('school_events', {
+        user: req.session.user,
+        events,
+        schoolId: req.schoolId,
+        page: 'school_events'
+      });
+    } catch (err) {
+      console.error('School events error:', err);
+      res.status(500).render('404', { user: req.session.user, error: err.message });
+    }
+  });
+
+  // Payments Page
+  app.get('/school/payments', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const invoices = await Invoice.find({ schoolId: req.schoolId })
+        .sort({ issueDate: -1 })
+        .lean();
+      const stats = await Invoice.aggregate([
+        { $match: { schoolId: new mongoose.Types.ObjectId(req.schoolId) } },
+        {
+          $group: {
+            _id: null,
+            totalInvoiced: { $sum: '$totalAmount' },
+            totalPaid: { $sum: '$amountPaid' },
+            overdueCount: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$status', 'issued'] }, { $lt: ['$dueDate', new Date()] }] },
+                  1, 0
+                ]
+              }
+            }
+          }
+        }
+      ]);
+      res.render('school_payments', {
+        user: req.session.user,
+        invoices,
+        stats: stats[0] || { totalInvoiced: 0, totalPaid: 0, overdueCount: 0 },
+        page: 'school_payments'
+      });
+    } catch (err) {
+      console.error('School payments error:', err);
+      res.status(500).render('404', { user: req.session.user, error: err.message });
+    }
+  });
+
+  // Documents Page
+  app.get('/school/documents', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const documents = await SchoolDocument.find({ schoolId: req.schoolId })
+        .populate('uploadedBy', 'name email')
+        .sort({ uploadedAt: -1 })
+        .lean();
+      res.render('school_documents', {
+        user: req.session.user,
+        documents,
+        page: 'school_documents'
+      });
+    } catch (err) {
+      console.error('School documents error:', err);
+      res.status(500).render('404', { user: req.session.user, error: err.message });
+    }
+  });
+
+  // Messages Page
+  app.get('/school/messages', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const founders = await Staff.find({ role: { $in: ['admin', 'founder'] } }).select('_id').lean();
+      const founderIds = founders.map(f => f._id);
+      const messages = await Message.find({
+        $or: [
+          { senderId: req.staff._id, 'recipients.staffId': { $in: founderIds } },
+          { senderId: { $in: founderIds }, 'recipients.staffId': req.staff._id }
+        ]
+      }).sort({ sentAt: -1 }).limit(20).lean();
+
+      res.render('school_messages', {
+        user: req.session.user,
+        messages,
+        page: 'school_messages'
+      });
+    } catch (err) {
+      console.error('School messages error:', err);
+      res.status(500).render('404', { user: req.session.user, error: err.message });
+    }
+  });
+
+  // Notifications Page
+  app.get('/school/notifications', requireAuth, requireSchoolAdmin, async (req, res) => {
+    try {
+      const notifications = await Notification.find({ recipientId: req.staff._id })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+      res.render('school_notifications', {
+        user: req.session.user,
+        notifications,
+        page: 'school_notifications'
+      });
+    } catch (err) {
+      console.error('School notifications error:', err);
+      res.status(500).render('404', { user: req.session.user, error: err.message });
+    }
+  });
+
+  // Placeholder for calculateDaysSinceLastVisit used in dashboard
+  async function calculateDaysSinceLastVisit(schoolId) {
+    const lastVisit = await VisitLog.findOne({ schoolId }).sort({ date: -1 }).select('date').lean();
+    if (!lastVisit) return null;
+    const diffTime = Math.abs(new Date() - new Date(lastVisit.date));
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  async function buildPendingActions(schoolId, staffId) {
+    const actions = [];
+    const pendingInvoices = await Invoice.countDocuments({
+      schoolId,
+      status: { $in: ['issued', 'sent', 'overdue'] }
+    });
+    if (pendingInvoices > 0) {
+      actions.push({ type: 'payment', count: pendingInvoices, message: `${pendingInvoices} invoice${pendingInvoices > 1 ? 's' : ''} need attention`, actionUrl: '/school/payments' });
+    }
+    const unreadMessages = await Message.countDocuments({
+      'recipients.staffId': staffId,
+      'recipients.status': 'sent',
+      'recipients.deleted': { $ne: true }
+    });
+    if (unreadMessages > 0) {
+      actions.push({ type: 'message', count: unreadMessages, message: `${unreadMessages} unread message${unreadMessages > 1 ? 's' : ''}`, actionUrl: '/school/messages' });
+    }
+    const unreadNotifications = await Notification.countDocuments({
+      recipientId: staffId,
+      isRead: false, dismissed: false
+    });
+    if (unreadNotifications > 0) {
+      actions.push({ type: 'notification', count: unreadNotifications, message: `${unreadNotifications} notification${unreadNotifications > 1 ? 's' : ''}`, actionUrl: '/school/notifications' });
+    }
+    return actions;
+  }
 
   // Get school details
   app.get('/api/school/:schoolId', requireAuth, async (req, res) => {

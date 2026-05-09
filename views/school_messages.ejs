@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        .messages-container { display:flex; gap:1rem; height:calc(100vh - 180px); }
+        .conversation-list { width:300px; border-right:1px solid var(--border); overflow-y:auto; flex-shrink:0; }
+        .conversation-item { padding:1rem; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.2s; }
+        .conversation-item:hover { background:var(--muted); }
+        .conversation-item.active { background:var(--secondary); border-left:3px solid var(--primary); }
+        .conversation-subject { font-weight:600; margin-bottom:0.25rem; }
+        .conversation-snippet { font-size:0.9rem; color:var(--muted-foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .conversation-time { font-size:0.75rem; color:var(--muted-foreground); margin-top:0.25rem; }
+        .unread-indicator { width:8px;height:8px;background:var(--accent);border-radius:50%;display:inline-block;margin-right:0.5rem; }
+        .message-view { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+        .message-header { padding:1rem; border-bottom:1px solid var(--border); }
+        .message-body { flex:1; overflow-y:auto; padding:1rem; }
+        .message-item { margin-bottom:1.5rem; max-width:80%; }
+        .message-item.sent { margin-left:auto; background:var(--primary); color:var(--primary-foreground); padding:0.75rem 1rem; border-radius:var(--radius) 0 var(--radius) var(--radius); }
+        .message-item.received { margin-right:auto; background:var(--muted); padding:0.75rem 1rem; border-radius:0 var(--radius) var(--radius) var(--radius); }
+        .message-meta { font-size:0.75rem; margin-top:0.5rem; opacity:0.7; }
+        .compose-area { padding:1rem; border-top:1px solid var(--border); }
+        .compose-form { display:flex; flex-direction:column; gap:0.75rem; }
+        .compose-form textarea { flex:1; resize:none; min-height:100px; font-family:inherit; }
+        @media (max-width: 768px) {
+            .messages-container { flex-direction:column; height:auto; }
+            .conversation-list { width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path><path d="M3 6h18"></path><path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Messages</h1>
+                <div class="header-actions">
+                    <button type="button" class="btn btn-primary" id="composeBtn">+ New Message</button>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="messages-container">
+                    <!-- Conversation List -->
+                    <div class="conversation-list">
+                        <% if (!messages || messages.length === 0) { %>
+                            <p class="placeholder-text" style="padding:1rem;">No conversations yet.</p>
+                        <% } else { %>
+                            <% messages.forEach(msg => { %>
+                                <div class="conversation-item <%= msg.senderId === '<%= user.id %>' ? 'active' : '' %>">
+                                    <div class="conversation-subject">
+                                        <% if (msg.senderId !== '<%= user.id %>') { %><span class="unread-indicator"></span><% } %>
+                                        <%= msg.subject || 'No subject' %>
+                                    </div>
+                                    <div class="conversation-snippet"><%= msg.body.substring(0, 60) %>...</div>
+                                    <div class="conversation-time"><%= new Date(msg.sentAt).toLocaleDateString() %></div>
+                                </div>
+                            <% }) %>
+                        <% } %>
+                    </div>
+
+                    <!-- Messages View -->
+                    <div class="message-view">
+                        <div class="message-header">
+                            <h2 id="messageThreadSubject">Select a conversation</h2>
+                            <p class="text-muted" id="messageThreadInfo"></p>
+                        </div>
+                        <div class="message-body" id="messageBody">
+                            <div class="empty-state">Select a conversation to view messages</div>
+                        </div>
+                        <div class="compose-area" id="composeArea" style="display:none;">
+                            <form id="replyForm" class="compose-form">
+                                <textarea name="body" placeholder="Type your message..." required></textarea>
+                                <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                                    <button type="button" class="btn btn-secondary" id="cancelReply">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Send Reply</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Compose New Modal -->
+    <div id="composeModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+        <div class="modal-content" style="background:var(--card);padding:2rem;border-radius:var(--radius);max-width:600px;width:90%;">
+            <h3>Send Message to Founder</h3>
+            <form id="composeForm" class="form-grid" style="gap:0.75rem;margin-top:1rem;">
+                <div class="form-group">
+                    <label for="msgSubject">Subject</label>
+                    <input type="text" id="msgSubject" name="subject" class="form-input" required placeholder="Message subject">
+                </div>
+                <div class="form-group">
+                    <label for="msgBody">Message</label>
+                    <textarea id="msgBody" name="body" class="form-input" rows="6" required placeholder="Type your message to the founder..."></textarea>
+                </div>
+                <div class="form-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary" id="cancelCompose">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentThread = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Compose new message
+            document.getElementById('composeBtn')?.addEventListener('click', () => {
+                document.getElementById('composeModal').style.display = 'flex';
+            });
+
+            document.getElementById('cancelCompose')?.addEventListener('click', () => {
+                document.getElementById('composeModal').style.display = 'none';
+                document.getElementById('composeForm').reset();
+            });
+
+            document.getElementById('composeModal').addEventListener('click', (e) => {
+                if (e.target.id === 'composeModal') e.target.style.display = 'none';
+            });
+
+            document.getElementById('composeForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const subject = document.getElementById('msgSubject').value;
+                const body = document.getElementById('msgBody').value;
+
+                const res = await fetch('/api/school/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, body })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('Message sent');
+                    document.getElementById('composeModal').style.display = 'none';
+                    document.getElementById('composeForm').reset();
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            });
+
+            // Load conversation (for now we'll simulate with data attributes)
+            // In a full implementation, fetch messages for selected conversation via API
+            const conversationItems = document.querySelectorAll('.conversation-item');
+            conversationItems.forEach(item => {
+                item.addEventListener('click', async () => {
+                    conversationItems.forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    const subject = item.querySelector('.conversation-subject').textContent.trim();
+                    document.getElementById('messageThreadSubject').textContent = subject;
+                    document.getElementById('messageThreadInfo').textContent = 'Loading...';
+                    document.getElementById('composeArea').style.display = 'flex';
+
+                    // Load full conversation messages (in real app, fetch from /api/school/messages)
+                    // For now, show simple mock
+                    document.getElementById('messageBody').innerHTML = `
+                        <div class="message-item received">
+                            <div>${item.querySelector('.conversation-snippet').textContent}</div>
+                            <div class="message-meta">From: Founder • ${item.querySelector('.conversation-time').textContent}</div>
+                        </div>
+                    `;
+                });
+            });
+
+            // Reply form
+            document.getElementById('cancelReply')?.addEventListener('click', () => {
+                document.getElementById('replyForm').reset();
+                document.getElementById('composeArea').style.display = 'none';
+            });
+
+            document.getElementById('replyForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const body = e.target.body.value;
+                // This would fetch and reply
+                alert('Reply sent (demo)');
+                e.target.reset();
+                document.getElementById('composeArea').style.display = 'none';
+            });
+        });
+    </script>
+</body>
+</html>

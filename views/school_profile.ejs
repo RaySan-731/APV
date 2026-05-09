@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Profile - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <%- include('../partials/sidebar') %>
+
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">School Profile</h1>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2><%= school?.name || 'School' %> Profile</h2>
+                        <button type="button" class="btn btn-outline btn-sm" id="editToggleBtn">Edit Profile</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="profileViewMode">
+                            <div class="profile-grid">
+                                <div class="profile-section">
+                                    <h3>Contact Information</h3>
+                                    <dl class="profile-dl">
+                                        <dt>School Name</dt>
+                                        <dd><%= school?.name %></dd>
+                                        <dt>Contact Person</dt>
+                                        <dd><%= school?.contactPerson?.name %></dd>
+                                        <dt>Admin Email</dt>
+                                        <dd><a href="mailto:<%= school?.contactPerson?.email %>"><%= school?.contactPerson?.email %></a></dd>
+                                        <dt>Phone</dt>
+                                        <dd><a href="tel:<%= school?.contactPerson?.phone %>"><%= school?.contactPerson?.phone %></a></dd>
+                                        <dt>Address</dt>
+                                        <dd><%= school?.address?.street %>, <%= school?.address?.city %>, <%= school?.address?.country %></dd>
+                                    </dl>
+                                </div>
+                                <div class="profile-section">
+                                    <h3>Service Details</h3>
+                                    <dl class="profile-dl">
+                                        <dt>Zone</dt>
+                                        <dd><%= school?.zone || 'Not set' %></dd>
+                                        <dt>Region</dt>
+                                        <dd><%= school?.region || 'Not set' %></dd>
+                                        <dt>Onboarding Date</dt>
+                                        <dd><%= new Date(school?.onboardingDate).toLocaleDateString() %></dd>
+                                        <dt>Service Status</dt>
+                                        <dd><span class="status-badge status-<%= school?.serviceStatus %>"><%= school?.serviceStatus.replace('_',' ') %></span></dd>
+                                        <dt>Assigned Trainer</dt>
+                                        <dd><%= trainer?.name || 'Not assigned' %> (<%= trainer?.email || '' %>)</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="profileEditMode" style="display: none;">
+                            <form id="profileEditForm" class="form-grid">
+                                <div class="form-group">
+                                    <label for="phone">Phone Number</label>
+                                    <input type="tel" id="phone" name="phone" class="form-input" value="<%= school?.contactPerson?.phone || '' %>" placeholder="+254 700 000 000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="adminEmail">Admin Email</label>
+                                    <input type="email" id="adminEmail" name="adminEmail" class="form-input" value="<%= school?.contactPerson?.email || '' %>" placeholder="admin@school.ac.ke">
+                                </div>
+                                <div class="form-group">
+                                    <label for="logo">Logo URL (optional)</label>
+                                    <input type="url" id="logo" name="logo" class="form-input" value="<%= school?.logoUrl || '' %>" placeholder="https://...">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const editToggle = document.getElementById('editToggleBtn');
+            const viewMode = document.getElementById('profileViewMode');
+            const editMode = document.getElementById('profileEditMode');
+            const cancelBtn = document.getElementById('cancelEditBtn');
+            const form = document.getElementById('profileEditForm');
+
+            editToggle?.addEventListener('click', () => {
+                viewMode.style.display = 'none';
+                editMode.style.display = 'block';
+            });
+
+            cancelBtn?.addEventListener('click', () => {
+                editMode.style.display = 'none';
+                viewMode.style.display = 'block';
+            });
+
+            form?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+
+                const res = await fetch('/api/school/profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await res.json();
+                if (result.success) {
+                    alert('Profile updated successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -121,6 +121,7 @@ const SchoolDocument = require('./models/SchoolDocument');
 const ReportTemplate = require('./models/ReportTemplate');
 const ScheduledReport = require('./models/ScheduledReport');
 const Student = require('./models/Student');
+const SystemSettings = require('./models/SystemSettings');
 
 // Communication models
 const Message = require('./models/Message');
@@ -143,6 +144,7 @@ const emailService = require('./backend/services/emailService');
 const analyticsController = require('./backend/controllers/analyticsController');
 const reportsController = require('./backend/controllers/reportsController');
 const exportController = require('./backend/controllers/exportController');
+const settingsController = require('./backend/controllers/settingsController');
 
 // Import and start report scheduler
 const reportScheduler = require('./backend/services/reportScheduler');
@@ -159,6 +161,8 @@ if (process.env.MONGODB_URI) {
     // Start schedulers
     reportScheduler.start();
     notificationScheduler.start();
+    // Initialize default system settings and holidays
+    initializeSystemSettings();
   })
   .catch(err => {
     console.error('MongoDB connection error:', err.message);
@@ -288,7 +292,7 @@ const requireSchoolAdmin = async (req, res, next) => {
       error: 'Authentication error. Please try again.'
     });
   }
-};
+ };
 
 // School data isolation filter (for queries)
 const schoolFilter = (req, res, next) => {
@@ -301,6 +305,103 @@ const schoolFilter = (req, res, next) => {
     }
   }
   next();
+};
+
+// School Edit Access middleware: allows school_admin (own school) OR users with canEditSchools permission
+const requireSchoolEditAccess = async (req, res, next) => {
+  if (!req.session.user) {
+    return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  }
+
+  try {
+    const { schoolId } = req.params;
+
+    // Validate schoolId format
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).json({ success: false, error: 'Invalid school identifier' });
+    }
+
+    // Case 1: User is school_admin - can only edit their own school
+    if (req.session.user.role === 'school_admin') {
+      const staff = await Staff.findOne({ email: req.session.user.email.toLowerCase() })
+        .select('_id name email role schoolId')
+        .lean();
+
+      if (!staff || staff.role !== 'school_admin' || !staff.schoolId) {
+        return res.status(403).json({ success: false, error: 'School admin profile not found or not assigned to a school.' });
+      }
+
+      if (staff.schoolId.toString() !== schoolId) {
+        return res.status(403).json({ success: false, error: 'Access denied. School admins can only edit their own school.' });
+      }
+
+      const school = await School.findById(schoolId).select('name status serviceStatus').lean();
+      if (!school || school.status !== 'active') {
+        return res.status(403).json({ success: false, error: 'School not found or inactive.' });
+      }
+
+      req.staff = staff;
+      req.schoolId = staff.schoolId;
+      req.school = school;
+      return next();
+    }
+
+    // Case 2: User has canEditSchools permission (admin/founder/etc)
+    const permissions = await Permission.findOne({ role: req.session.user.role });
+    if (!permissions || !permissions.permissions?.canEditSchools) {
+      return res.status(403).json({ success: false, error: 'Access denied. Insufficient permissions.' });
+    }
+
+    // Load staff record for audit logging (create if missing for admin/founder)
+    let staff = await Staff.findOne({ email: req.session.user.email.toLowerCase() });
+    if (!staff) {
+      const user = await User.findOne({ email: req.session.user.email.toLowerCase() });
+      if (user) {
+        staff = new Staff({
+          name: user.name,
+          email: user.email,
+          role: user.role === 'founder' ? 'admin' : user.role,
+          status: 'Active',
+          department: 'Administration',
+          employmentStartDate: new Date(),
+          permissions: {
+            canViewFinancials: true,
+            canApproveReports: true,
+            canScheduleEvents: true,
+            canManageStaff: true,
+            canViewAnalytics: true,
+            canManageSchools: true,
+            canSendInvitations: true
+          }
+        });
+        await staff.save();
+      }
+    }
+
+    if (staff) {
+      req.staff = staff.toObject ? staff.toObject() : staff;
+    } else {
+      // Fallback staff object for audit
+      req.staff = {
+        _id: null,
+        name: req.session.user.name,
+        email: req.session.user.email,
+        role: req.session.user.role
+      };
+    }
+
+    // Verify school exists
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+    req.schoolId = schoolId;
+    req.school = school.toObject ? school.toObject() : school;
+    next();
+  } catch (err) {
+    console.error('School edit access error:', err);
+    res.status(500).json({ success: false, error: 'Authentication error. Please try again.' });
+  }
 };
 
 // Helper: Get Staff document from session (converts User session to Staff)
@@ -420,6 +521,138 @@ function validateEventStatusTransition(oldStatus, newStatus) {
     return `Invalid status transition: ${oldStatus} → ${newStatus}. Allowed: ${allowed.join(', ')}`;
   }
   return null;
+}
+
+// Initialize default SystemSettings and Kenya public holidays
+async function initializeSystemSettings() {
+  try {
+    let settings = await SystemSettings.findOne({ _id: 'global-settings' });
+    if (!settings) {
+      settings = new SystemSettings({
+        _id: 'global-settings',
+        type: 'combined',
+        organization: {
+          organizationName: 'Arrow-Park Ventures',
+          tagline: 'Empowering Youth Through Scouting',
+          logoUrl: '/images/logo.png',
+          primaryColor: '#0066cc',
+          country: 'Kenya'
+        },
+        system: {
+          reportSubmissionDeadlineDays: 3,
+          paymentTermsDays: 30,
+          overdueThresholdDays: 7,
+          eventReminderDays: 2,
+          autoArchiveMonths: 12,
+          workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          workingHours: { start: '08:00', end: '17:00' }
+        },
+        backup: {
+          enabled: true,
+          frequency: 'daily',
+          time: '02:00',
+          retentionDays: 30,
+          cloudProvider: 'local',
+          status: 'active'
+        },
+        publicHolidays: getDefaultKenyaHolidays()
+      });
+      await settings.save();
+      console.log('Default system settings created with Kenya holidays');
+    } else {
+      // Ensure holidays are populated if missing
+      if (!settings.publicHolidays || settings.publicHolidays.length === 0) {
+        settings.publicHolidays = getDefaultKenyaHolidays();
+        await settings.save();
+        console.log('Kenya holidays added to settings');
+      }
+    }
+  } catch (err) {
+    console.error('Error initializing system settings:', err);
+  }
+}
+
+// Default Kenya public holidays (non-exhaustive, can be customized)
+function getDefaultKenyaHolidays() {
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear + 1]; // current and next year
+  const holidays = [];
+
+  const kenyaHolidays = [
+    { name: 'New Year\'s Day', month: 0, day: 1 }, // Jan 1
+    { name: 'Good Friday', month: null, day: null, easter: true, offset: -2 }, // Easter calculation
+    { name: 'Easter Monday', month: null, day: null, easter: true, offset: 1 },
+    { name: 'Labour Day', month: 4, day: 1 }, // May 1
+    { name: 'Madaraka Day', month: 5, day: 1 }, // Jun 1 (actually June 1)
+    { name: 'Madaraka Day (Observed)', month: 5, day: 2 }, // sometimes moved
+    { name: 'Huduma Day', month: 9, day: 20 }, // Oct 20 (formerly Moi Day)
+    { name: 'Mashujaa Day', month: 10, day: 20 }, // Oct 20? Actually Mashujaa Day is Oct 20
+    { name: 'Jamhuri Day', month: 11, day: 12 }, // Dec 12
+    { name: 'Christmas Day', month: 11, day: 25 },
+    { name: 'Boxing Day', month: 11, day: 26 }
+  ];
+
+  // Actually better to use proper known dates
+  // Let's define a clearer set for Kenya:
+  const fixedHolidays = [
+    { name: "New Year's Day", month: 0, day: 1 },
+    { name: 'Labour Day', month: 4, day: 1 },
+    { name: 'Madaraka Day', month: 5, day: 1 },
+    { name: 'Huduma Day', month: 9, day: 20 },
+    { name: 'Mashujaa Day', month: 10, day: 20 },
+    { name: 'Jamhuri Day', month: 11, day: 12 },
+    { name: 'Christmas Day', month: 11, day: 25 },
+    { name: 'Boxing Day', month: 11, day: 26 }
+  ];
+
+  // Easter-based: compute for each year
+  function getEasterSunday(year) {
+    // Anonymous Gregorian algorithm
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month, day);
+  }
+
+  years.forEach(year => {
+    // Fixed holidays
+    fixedHolidays.forEach(h => {
+      const d = new Date(year, h.month, h.day);
+      holidays.push({
+        date: d,
+        name: h.name,
+        year: year,
+        isRecurring: true
+      });
+    });
+    // Good Friday and Easter Monday
+    const easter = getEasterSunday(year);
+    holidays.push({
+      date: new Date(easter.getFullYear(), easter.getMonth(), easter.getDate() - 2),
+      name: 'Good Friday',
+      year: year,
+      isRecurring: true
+    });
+    holidays.push({
+      date: new Date(easter.getFullYear(), easter.getMonth(), easter.getDate() + 1),
+      name: 'Easter Monday',
+      year: year,
+      isRecurring: true
+    });
+  });
+
+  return holidays;
 }
 
 // Routes
@@ -2026,17 +2259,17 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     schoolController.getDashboardData(req, res);
   });
 
-  // API: Get school profile
-  app.get('/api/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
-    const schoolController = require('./backend/controllers/schoolController');
-    schoolController.getSchoolProfile(req, res);
-  });
+   // API: Get school profile
+   app.get('/api/school/profile', requireAuth, requireSchoolEditAccess, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.getSchoolProfile(req, res);
+   });
 
-  // API: Update school profile
-  app.post('/api/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
-    const schoolController = require('./backend/controllers/schoolController');
-    schoolController.updateSchoolProfile(req, res);
-  });
+   // API: Update school profile
+   app.post('/api/school/profile', requireAuth, requireSchoolEditAccess, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.updateSchoolProfile(req, res);
+   });
 
   // API: Get scouts data
   app.get('/api/school/scouts', requireAuth, requireSchoolAdmin, async (req, res) => {
@@ -4818,7 +5051,12 @@ app.get('/dashboard/announcements', requireAuth, (req, res) => {
 
 app.get('/dashboard/settings', requireAuth, async (req, res) => {
   try {
-    res.render('settings', { user: req.session.user, page: 'settings' });
+    const permission = await Permission.findOne({ role: req.session.user.role });
+    res.render('settings', {
+      user: req.session.user,
+      page: 'settings',
+      permission: permission ? permission.permissions : {}
+    });
   } catch (err) {
     console.error('Settings page error:', err);
     res.status(500).render('404', { user: req.session.user });
@@ -6653,6 +6891,48 @@ app.post('/api/reports/templates/save', requireAuth, requirePermission('canGener
 app.get('/api/reports/templates', requireAuth, requirePermission('canGenerateReports'), exportController.getReportTemplates);
 app.get('/api/reports/scheduled', requireAuth, requirePermission('canGenerateReports'), exportController.getScheduledReports);
 app.post('/api/reports/scheduled', requireAuth, requirePermission('canGenerateReports'), exportController.createScheduledReport);
+
+// ============ SETTINGS & CONFIGURATION API ROUTES ============
+
+// Settings - Get all or by section
+app.get('/api/settings', requireAuth, requirePermission('canManageSystem'), settingsController.getSettings);
+app.get('/api/settings/organization', requireAuth, requirePermission('canManageSystem'), (req, res) => {
+  req.query.section = 'organization';
+  settingsController.getSettings(req, res);
+});
+app.get('/api/settings/system', requireAuth, requirePermission('canManageSystem'), (req, res) => {
+  req.query.section = 'system';
+  settingsController.getSettings(req, res);
+});
+app.get('/api/settings/backup', requireAuth, requirePermission('canManageSystem'), (req, res) => {
+  req.query.section = 'backup';
+  settingsController.getSettings(req, res);
+});
+
+// Update organization profile
+app.post('/api/settings/organization', requireAuth, requirePermission('canManageSystem'), settingsController.updateOrganizationProfile);
+
+// Update system defaults
+app.post('/api/settings/system', requireAuth, requirePermission('canManageSystem'), settingsController.updateSystemDefaults);
+
+// Update backup configuration
+app.post('/api/settings/backup', requireAuth, requirePermission('canManageSystem'), settingsController.updateBackupConfig);
+
+// Manual backup trigger
+app.post('/api/backup/trigger', requireAuth, requirePermission('canManageSystem'), settingsController.triggerBackup);
+
+// Backup history
+app.get('/api/backup/history', requireAuth, requirePermission('canManageSystem'), settingsController.getBackupHistory);
+app.get('/api/backup/download/:filename', requireAuth, requirePermission('canManageSystem'), settingsController.downloadBackup);
+app.post('/api/backup/delete/:filename', requireAuth, requirePermission('canManageSystem'), settingsController.deleteBackup);
+
+// Public Holidays
+app.get('/api/settings/holidays', requireAuth, settingsController.getPublicHolidays);
+app.post('/api/settings/holidays', requireAuth, requirePermission('canManageSystem'), settingsController.savePublicHoliday);
+app.delete('/api/settings/holidays/:date', requireAuth, requirePermission('canManageSystem'), settingsController.deletePublicHoliday);
+
+// Organization Profile (for email templates, invoices, reports)
+app.get('/api/organization/profile', settingsController.getOrganizationProfile);
 
 // ============ COMMUNICATION API ROUTES ============
 

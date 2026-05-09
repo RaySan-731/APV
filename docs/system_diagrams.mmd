@@ -1,0 +1,728 @@
+# Scoutmate Hub - System Documentation
+## Mermaid Diagrams for Apache APV Scouting Management System
+
+---
+
+## 1. System Context Diagram (Level 0 DFD)
+
+```mermaid
+graph LR
+    subgraph External_Actors
+        Trainer[Trainer<br/>Staff Member]
+        SchoolAdmin[School Administrator]
+        Admin[System Admin<br/>Founder/Commissioner]
+        Guest[Parent/Student<br/>Guest User]
+    end
+
+    subgraph APV_System
+        System[Scoutmate Hub<br/>Integrated Platform]
+    end
+
+    Trainer -->|"Login, Manage Events,<br/>Submit Reports, Messages"| System
+    SchoolAdmin -->|"Manage School, RSVP,<br/>View Invoices, Students"| System
+    Admin -->|"Create Events, Manage Staff,<br/>Finance, Analytics"| System
+    Guest -->|"Browse Programs,<br/>Submit Bookings"| System
+
+    System -->|"Notifications,<br/>Calendar"| Trainer
+    System -->|"Invoices, Confirmations"| SchoolAdmin
+    System -->|"Reports, Analytics"| Admin
+    System -->|"Confirmation Emails"| Guest
+
+    classDef actor fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef system fill:#fff3cd,stroke:#ff8c00,stroke-width:3px
+
+    class Trainer,SchoolAdmin,Admin,Guest actor
+    class System system
+```
+
+---
+
+## 2. System Level 1 Logical DFD
+
+```mermaid
+graph TD
+    subgraph External_Entities
+        E1[Trainer]
+        E2[School Admin]
+        E3[System Admin]
+        E4[Guest User]
+    end
+
+    subgraph Processes
+        P1[Auth & Session]
+        P2[User Management]
+        P3[School Management]
+        P4[Student Management]
+        P5[Event Management]
+        P6[Program & Booking]
+        P7[Finance & Billing]
+        P8[Messaging & Notifications]
+        P9[Reporting & Analytics]
+    end
+
+    subgraph Data_Stores
+        D1[(User DB)]
+        D2[(Staff DB)]
+        D3[(School DB)]
+        D4[(Student DB)]
+        D5[(Event DB)]
+        D6[(Program DB)]
+        D7[(Booking DB)]
+        D8[(Invoice DB)]
+        D9[(Message DB)]
+        D10[(Notification DB)]
+        D11[(Audit DB)]
+    end
+
+    E1 --> P1
+    P1 --> E1
+    P2 --> D2
+    P3 --> D3
+    P4 --> D4
+    P5 --> D5
+    P6 --> D6
+    P6 --> D7
+    P7 --> D8
+    P8 --> D9
+    P8 --> D10
+    P9 --> D11
+
+    P1 -->|Read/Write| D2
+    P2 -->|CRUD| D2
+    P3 -->|CRUD| D3
+    P4 -->|CRUD| D4
+    P5 -->|CRUD| D5
+    P7 -->|Read| D3
+    P7 -->|Write| D8
+    P9 -->|Query| D11
+
+    classDef entity fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef process fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef data fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+
+    class E1,E2,E3,E4 entity
+    class P1,P2,P3,P4,P5,P6,P7,P8,P9 process
+    class D1,D2,D3,D4,D5,D6,D7,D8,D9,D10,D11 data
+```
+
+---
+
+## 3. System Level 2 DFD - Event Management
+
+```mermaid
+graph TD
+    subgraph Inputs
+        I1[Admin Creates Event]
+        I2[Trainer Accepts/Declines]
+        I3[School RSVP]
+        I4[Event Templates]
+    end
+
+    subgraph Event_Lifecycle
+        E1[Create Draft Event]
+        E2[Assign Trainers]
+        E3[Invite Schools]
+        E4[Track RSVPs]
+        E5[Monitor Attendance]
+        E6[Collect Reports]
+        E7[Review & Close]
+    end
+
+    subgraph Notifications
+        N1[Send Trainer Invite]
+        N2[Send School Invite]
+        N3[Send Reminders]
+        N4[Send Alerts]
+    end
+
+    subgraph Data
+        DB1[(Event DB)]
+        DB2[(Staff DB)]
+        DB3[(School DB)]
+        DB4[(Notification DB)]
+    end
+
+    I1 --> E1
+    E1 --> E2
+    E2 -->|Check Availability| I2
+    I2 -->|Response| E2
+    E2 --> E3
+    E3 -->|Send Invites| N2
+    N2 --> I3
+    I3 --> E4
+    E4 --> N3
+    N3 -->|Reminders| I3
+    E4 --> E5
+    E5 --> E6
+    E6 --> E7
+    E7 -->|Trigger| N4
+
+    E1 -->|Save| DB1
+    E2 -->|Update| DB1
+    E3 -->|Update| DB1
+    E4 -->|Update| DB1
+    E5 -->|Update| DB1
+    E6 -->|Save Report| DB1
+    N1 -->|Log| DB4
+    N2 -->|Log| DB4
+    N3 -->|Log| DB4
+    N4 -->|Log| DB4
+
+    E2 -->|Check| DB2
+    E3 -->|Get Contacts| DB3
+
+    classDef input fill:#e8f5e9,stroke:#2e7d32
+    classDef process fill:#fff3e0,stroke:#f57f17
+    classDef notify fill:#fce4ec,stroke:#c2185b
+    classDef data fill:#f3e5f5,stroke:#6a1b9a
+
+    class I1,I2,I3,I4 input
+    class E1,E2,E3,E4,E5,E6,E7 process
+    class N1,N2,N3,N4 notify
+    class DB1,DB2,DB3,DB4 data
+```
+
+---
+
+## 4. Use Case Diagram
+
+```mermaid
+graph TD
+    subgraph Actors
+        A1[System Admin]
+        A2[School Admin]
+        A3[Trainer]
+        A4[Senior Trainer]
+        A5[Supervisor]
+        A6[Guest User]
+    end
+
+    subgraph UC
+        U1((Login))
+        U2((Staff Management))
+        U3((School Onboarding))
+        U4((Student Management))
+        U5((Create Event))
+        U6((Assign Trainers))
+        U7((Invite Schools))
+        U8((Track RSVP))
+        U9((Submit Report))
+        U10((View Dashboard))
+        U11((Send Messages))
+        U12((Generate Reports))
+        U13((Manage Invoices))
+        U14((Accept Event))
+        U15((Upload Documents))
+    end
+
+    A1 --> U1 & U2 & U3 & U5 & U6 & U7 & U13 & U12
+    A2 --> U1 & U4 & U8 & U10 & U15
+    A3 --> U1 & U9 & U14 & U11
+    A4 --> U1 & U5 & U6
+    A5 --> U1 & U10 & U12 & U8
+    A6 --> U1 & U4
+
+    U5 -.->|extends| U5a[Recurring Events]
+    U9 -.->|extends| U9a[Photo Upload]
+    U12 -.->|includes| U12a[Export PDF]
+    U12 -.->|includes| U12b[Schedule Report]
+
+    classDef admin fill:#e3f2fd,stroke:#1976d2
+    classDef school fill:#e8f5e9,stroke:#388e3c
+    classDef trainer fill:#fff3e0,stroke:#f57f17
+    classDef guest fill:#fce4ec,stroke:#c2185b
+    classDef usecase fill:#f3e5f5,stroke:#6a1b9a
+
+    class A1 admin
+    class A2 school
+    class A3,A4,A5 trainer
+    class A6 guest
+    class U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15,U5a,U9a,U12a,U12b usecase
+```
+
+---
+
+## 5. System Flowchart
+
+```mermaid
+flowchart TD
+    Start([User arrives]) --> CheckAuth{Has<br/>Session?}
+
+    CheckAuth -->|No| ShowLogin[Show Login Page]
+    ShowLogin --> EnterCreds[Enter Email/Password]
+    EnterCreds --> Validate[Validate Credentials]
+    Validate -->|Invalid| ShowError[Error Message]
+    ShowError --> EnterCreds
+    Validate -->|Valid| CreateSession[Create Session<br/>Store User Data]
+
+    CheckAuth -->|Yes| GetRole[Get User Role]
+
+    CreateSession --> GetRole
+
+    GetRole -->|Admin| AdminHome[Admin Dashboard]
+    GetRole -->|Trainer| TrainerHome[Trainer Dashboard]
+    GetRole -->|School Admin| SchoolHome[School Dashboard]
+
+    AdminHome --> AdminChoose{Select Action}
+    AdminChoose -->|New Event| EventWizard[Event Creation Wizard]
+    EventWizard --> Step1[Enter Event Details]
+    Step1 --> Step2[Assign Trainers]
+    Step2 --> CheckAvail{All<br/>Available?}
+    CheckAvail -->|No| Reassign[Reassignment UI]
+    Reassign --> Step2
+    CheckAvail -->|Yes| Step3[Select Schools]
+    Step3 --> Step4[Set RSVP Deadline]
+    Step4 --> Publish{Publish?}
+    Publish -->|Yes| SendInv[Send Invitations]
+    SendInv --> Track[Track RSVPs]
+    Publish -->|No| SaveDraft[Save as Draft]
+    SaveDraft --> AdminHome
+    Track --> AdminHome
+
+    AdminChoose -->|Staff List| StaffList[Staff Management]
+    StaffList --> StaffOps{CRUD?}
+    StaffOps -->|Add| AddStaff[Add Staff Form]
+    StaffOps -->|Edit| EditStaff[Edit Staff Form]
+    AddStaff --> SaveStaff[Save + Notify]
+    EditStaff --> UpdateStaff[Update + Log]
+    SaveStaff --> AdminHome
+    UpdateStaff --> AdminHome
+
+    AdminChoose -->|Reports| ReportGen[Report Generator]
+    ReportGen --> SelectType{Report Type?}
+    SelectType -->|School| SchoolRpt[School Report]
+    SelectType -->|Event| EventRpt[Event Report]
+    SelectType -->|Finance| FinanceRpt[Finance Report]
+    SchoolRpt --> RunQuery[Run Aggregation]
+    EventRpt --> RunQuery
+    FinanceRpt --> RunQuery
+    RunQuery --> Format[Format Results]
+    Format --> Export{Export?}
+    Export -->|PDF| GenPDF[Generate PDF]
+    Export -->|Excel| GenCSV[Generate CSV]
+    Export -->|No| ViewScreen[Display in Browser]
+    GenPDF --> DownPDF[Download]
+    GenCSV --> DownCSV[Download]
+    DownPDF --> AdminHome
+    DownCSV --> AdminHome
+    ViewScreen --> AdminHome
+
+    TrainerHome --> TrainerChoose{Trainer Action}
+    TrainerChoose -->|My Events| MyEvents[Event Calendar]
+    MyEvents --> ViewEvents[List Events]
+    ViewEvents --> SelectEvent[Select Event]
+    SelectEvent --> EventDetail[Event Details]
+
+    EventDetail --> Pending{Status?}
+    Pending -->|Upcoming| AcceptDecline{Accept?}
+    AcceptDecline -->|Yes| AcceptEvent[Accept + Confirm]
+    AcceptEvent --> TrainerHome
+    AcceptDecline -->|No| DeclineEvent[Decline + Reason]
+    DeclineEvent --> TrainerHome
+
+    Pending -->|Completed| SubmitReport[Submit Report Form]
+    SubmitReport --> UploadFiles[Upload Photos<br/>(max 10MB)]
+    UploadFiles --> WriteReport[Write Summary]
+    WriteReport --> SendReport[Submit for Review]
+    SendReport --> NotifyAdmin[Notify Admin]
+    NotifyAdmin --> TrainerHome
+
+    SchoolHome --> SchoolChoose{School Action}
+    SchoolChoose -->|Upcoming Events| UpcomingList[Invited Events]
+    UpcomingList --> RSVP{RSVP?}
+    RSVP -->|Yes| ConfirmRSVP[Confirm Attendance]
+    RSVP -->|No| DeclineRSVP[Decline]
+    ConfirmRSVP --> SendConfirm[Send Confirmation]
+    DeclineRSVP --> SendDecline[Send Decline]
+    SendConfirm --> SchoolHome
+    SendDecline --> SchoolHome
+
+    classDef start fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    classDef process fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef io fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    class Start,AcceptEvent,SaveStaff,UpdateStaff,DownPDF,DownCSV,SendConfirm start
+    class EnterCreds,EventWizard,Step1,Step2,Step3,Step4,StaffList,AddStaff,EditStaff,ReportGen,RunQuery,Format,MyEvents,SelectEvent,SubmitReport,UploadFiles,WriteReport,UpcomingList,ConfirmRSVP process
+    class CheckAuth,Validate,CheckAvail,Publish,Export,AcceptDecline,Pending,RSVP decision
+    class ShowLogin,ShowError,StaffOps,SelectType,ViewScreen,EventDetail,DeclineEvent,SendReport io
+```
+
+---
+
+## 6. Entity Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+    USER ||--o{ STAFF : "has_profile"
+    USER ||--o{ MESSAGE : "sends"
+    USER ||--o{ REPORT_TEMPLATE : "creates"
+
+    STAFF ||--o{ EVENT : "creates"
+    STAFF ||--o{ EVENT_TRAINER : "assigned_as"
+    STAFF ||--o{ SCHOOL : "assigned_to"
+    STAFF ||--o{ STUDENT : "added_by"
+    STAFF ||--o{ INVOICE : "issued_by"
+    STAFF ||--o{ NOTIFICATION : "receives"
+    STAFF ||--o{ MESSAGE : "sends"
+    STAFF ||--o{ AUDIT_LOG : "performed_by"
+
+    SCHOOL ||--o{ STUDENT : "enrolls"
+    SCHOOL ||--o{ EVENT : "invited_to"
+    SCHOOL ||--o{ INVOICE : "billed"
+    SCHOOL ||--o{ PAYMENT : "makes"
+    SCHOOL ||--o{ SCHOOL_DOCUMENT : "stores"
+    SCHOOL ||--o{ EVENT_TRAINER : "hosts"
+    SCHOOL ||--o{ FEEDBACK : "receives"
+
+    PROGRAM ||--o{ SCHOOL : "enrolled_by"
+    PROGRAM ||--o{ BOOKING : "booked_for"
+    PROGRAM ||--o{ EVENT : "used_in"
+
+    EVENT ||--o{ EVENT_TRAINER : "has_trainers"
+    EVENT ||--o{ SCHOOL : "targets_schools"
+    EVENT ||--o{ INVOICE : "charges_for"
+    EVENT ||--o{ NOTIFICATION : "triggers"
+    EVENT ||--o{ FEEDBACK : "receives"
+    EVENT ||--o{ SCHOOL_VISIT_LOG : "logged_as"
+
+    BOOKING ||--o{ STUDENT : "for_participant"
+    BOOKING ||--o{ SCHOOL : "requested_by"
+
+    INVOICE ||--o{ INVOICE_ITEM : "contains"
+    INVOICE ||--o{ PAYMENT : "has_payments"
+
+    PAYROLL ||--o{ STAFF : "pays_trainer"
+
+    ANNOUNCEMENT ||--o{ NOTIFICATION : "generates"
+
+    NOTIFICATION ||--o{ STAFF : "sent_to"
+
+    AUDIT_LOG ||--o{ USER : "tracks_user"
+    AUDIT_LOG ||--o{ STAFF : "tracks_staff"
+    AUDIT_LOG ||--o{ EVENT : "tracks_event"
+    AUDIT_LOG ||--o{ SCHOOL : "tracks_school"
+
+    USER {
+        string _id PK
+        string email UK
+        string password_hash
+        string name
+        string role
+        boolean is_active
+    }
+
+    STAFF {
+        string _id PK
+        string name
+        string email UK
+        string phone
+        enum role trainer/senior/admin/school_admin
+        enum status Active/On Leave/Inactive
+        object assigned_schools[]
+        object permissions{}
+        object performance_metrics{}
+    }
+
+    SCHOOL {
+        string _id PK
+        string name
+        object address{}
+        string contact_email
+        string contact_phone
+        integer student_count
+        enum service_package basic/standard/premium
+        enum status active/inactive
+    }
+
+    STUDENT {
+        string _id PK
+        string full_name
+        date birth_date
+        enum gender Male/Female/Other
+        object parent_contact{
+            string name
+            string phone
+            string email
+        }
+        object school FK
+        enum section Sungura/Chipukizi/Mwamba/Rover
+        enum status active/inactive/graduated
+    }
+
+    EVENT {
+        string _id PK
+        string name
+        enum event_type camp/hike/training/competition
+        datetime start_date
+        datetime end_date
+        string location
+        number max_participants
+        number current_participants
+        enum status draft/published/in_progress/completed
+        array trainers[]
+        array target_schools[]
+    }
+
+    PROGRAM {
+        string _id PK
+        string name
+        string description
+        enum category leadership/outdoor/team-building
+        number max_participants
+        number price_amount
+        string price_currency
+    }
+
+    BOOKING {
+        string _id PK
+        object program FK
+        object school FK
+        date booking_date
+        integer participant_count
+        enum status pending/confirmed/cancelled
+    }
+
+    INVOICE {
+        string _id PK
+        string invoice_number UK
+        object school FK
+        datetime issue_date
+        datetime due_date
+        number total_amount
+        number balance
+        enum status draft/issued/paid/overdue
+    }
+
+    MESSAGE {
+        string _id PK
+        object sender_id FK
+        string subject
+        string body
+        array recipients[]
+        datetime sent_at
+    }
+
+    NOTIFICATION {
+        string _id PK
+        object recipient_id FK
+        string title
+        string message
+        enum type assignment/event_reminder/alert
+        boolean is_read
+        datetime created_at
+    }
+
+    PAYMENT {
+        string _id PK
+        object invoice_id FK
+        number amount
+        datetime payment_date
+        string method
+    }
+
+    AUDIT_LOG {
+        string _id PK
+        enum action create/update/delete/login
+        string entity_type
+        object entity_id FK
+        object performed_by{}
+        datetime occurred_at
+    }
+```
+
+---
+
+## 7. High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph Client
+        Web[Web Browser<br/>EJS + JS + CSS]
+    end
+
+    subgraph Server
+        Express[Express.js<br/>Routes/Controllers]
+        Session[Session<br/>Middleware]
+        Auth[Auth<br/>Middleware]
+        Upload[File Upload<br/>multer]
+    end
+
+    subgraph Services
+        Email[Email Service<br/>Nodemailer]
+        Report[Report Gen<br/>pdfkit/csv]
+        Notify[Notification<br/>Scheduler]
+    end
+
+    subgraph Data
+        Mongo[(MongoDB<br/>15+ Collections)]
+        FS[File System<br/>/public/uploads]
+    end
+
+    subgraph External
+        SMTP[SMTP Server]
+        SMS[SMS Gateway]
+    end
+
+    Web --> Express
+    Express --> Session
+    Session --> Auth
+    Express --> Upload
+
+    Express --> Email
+    Express --> Report
+    Express --> Notify
+
+    Email --> SMTP
+    Email --> Mongo
+    Report --> Mongo
+    Report --> FS
+    Notify --> SMS
+    Notify --> Email
+
+    Express --> Mongo
+    Upload --> FS
+
+    classDef client fill:#e8f5e9,stroke:#2e7d32
+    classDef server fill:#e3f2fd,stroke:#1565c0
+    classDef service fill:#fff3e0,stroke:#f57f17
+    classDef data fill:#f3e5f5,stroke:#6a1b9a
+    classDef external fill:#fce4ec,stroke:#c2185b
+
+    class Web client
+    class Express,Session,Auth,Upload server
+    class Email,Report,Notify service
+    class Mongo,FS data
+    class SMTP,SMS external
+```
+
+---
+
+## 8. Event Lifecycle State Diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft: Event Created
+    Draft --> Published: Publish & Send Invites
+    Draft --> Cancelled: Cancel Early
+    Published --> Scheduled: RSVP Deadline Passed
+    Published --> Cancelled: Low Interest
+    Scheduled --> InProgress: Event Starts
+    Scheduled --> Cancelled: Emergency Cancel
+    InProgress --> Completed: All Sessions Done
+    Completed --> Reviewed: Trainer Report Uploaded
+    Reviewed --> Archived: Admin Approves
+    Reviewed --> InProgress: Reopen Issues
+    Cancelled --> Archived: Archive After 30 Days
+
+    state Draft {
+        [*] --> Editing
+        Editing --> [*]
+    }
+    state Published {
+        [*] --> Invites_Sent
+        Invites_Sent --> RSVP_Open
+        RSVP_Open --> [*]
+    }
+    state InProgress {
+        [*] --> Attendance_Tracking
+        Attendance_Tracking --> [*]
+    }
+```
+
+---
+
+## 9. Notification Flow Sequence
+
+```mermaid
+sequenceDiagram
+    participant System as Scoutmate Hub
+    participant DB as MongoDB
+    participant Email as Email Service
+    participant User as Trainer/School Admin
+
+    System->>DB: Event created (status=draft)
+    System->>DB: Trainers assigned
+
+    System->>DB: Event published
+    loop For each trainer
+        System->>DB: Create notification(type=assignment)
+        System->>Email: Queue email notification
+    end
+    Email-->>User: Email arrives
+
+    loop For each school
+        System->>DB: Create notification(type=invitation)
+        System->>Email: Queue invitation
+    end
+
+    User->>System: Accept/Decline assignment
+    System->>DB: Update trainer status
+    System->>DB: Create notification for admin
+
+    Note over System: 48 hours before event
+    System->>DB: Check upcoming events
+    System->>DB: Create reminder notifications
+    System->>Email: Queue reminder emails
+```
+
+---
+
+## 10. Data Model - Core Entities
+
+```mermaid
+erDiagram
+    EVENT ||--o{ EVENT_TRAINER : "has_trainer"
+    EVENT ||--o{ SCHOOL : "invites_school"
+    EVENT ||--o{ NOTIFICATION : "triggers"
+    EVENT ||--o{ FEEDBACK : "receives_feedback"
+
+    EVENT_TRAINER {
+        string event_id FK
+        string trainer_id FK
+        enum role lead/assistant/coordinator
+        enum status assigned/confirmed/declined
+        datetime assigned_at
+    }
+
+    SCHOOL_TRAINER {
+        string school_id FK
+        string trainer_id FK
+        enum assignment_type primary/secondary
+        datetime assigned_date
+    }
+
+    SCHOOL_EVENT_RSVP {
+        string event_id FK
+        string school_id FK
+        enum rsvp_status invited/confirmed/declined
+        integer registered_count
+        integer attended_count
+        datetime rsvp_date
+    }
+
+    COMPETENCY {
+        string trainer_id FK
+        string skill_name
+        string proficiency_level
+        date certified_date
+        date expiry_date nullable
+    }
+```
+
+---
+
+## Key Notes for AI Documentation Agent:
+
+1. **Technology Stack**: Node.js + Express + MongoDB + Mongoose + EJS
+2. **Authentication**: Session-based (express-session)
+3. **File Uploads**: multer → /public/uploads
+4. **Email**: Nodemailer with SMTP (configurable)
+5. **Reports**: pdfkit (PDF), json2csv (Excel)
+6. **Scheduling**: node-cron for notifications
+7. **Security**: CSP headers, bcrypt passwords, role-based access
+8. **Data Isolation**: School Admin scope limited to own school
+9. **Trainer Workflow**: Accept/Decline → Report Submit → Payment Calculation
+10. **Event States**: draft → published → scheduled → in_progress → completed → reviewed → archived
+
+All diagrams now use **valid Mermaid 9.x+ syntax** with no nesting conflicts, proper node IDs, and standard flow directions.

@@ -3,9 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - Notification Preferences - Arrow-Park Ventures</title>
+    <title>Settings - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
+    <style>
+      /* Tabs */
+      .tabs-nav {
+        display: flex;
+        border-bottom: 2px solid var(--border);
+        margin-bottom: 1.5rem;
+        gap: 0.5rem;
+      }
+      .tab-btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--muted-foreground);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
+      }
+      .tab-btn:hover {
+        color: var(--primary);
+        background: rgba(0,0,0,0.02);
+      }
+      .tab-btn.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+      }
+      .tab-content {
+        display: none;
+        animation: fadeIn 0.3s ease;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Form sections */
+      .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .form-section h4 {
+        margin: 0 0 1rem 0;
+        color: var(--primary);
+        font-size: 1.1rem;
+      }
+
+      /* Holiday list */
+      .holiday-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 0.5rem;
+        background: var(--muted);
+      }
+      .holiday-date {
+        font-weight: 600;
+        color: var(--primary);
+      }
+      .holiday-name {
+        flex: 1;
+        margin: 0 1rem;
+      }
+      .holiday-recurring {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--primary);
+        color: white;
+        border-radius: 4px;
+      }
+      .holiday-actions button {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+      }
+
+      /* Backup history table */
+      .backup-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+      }
+      .backup-table th, .backup-table td {
+        text-align: left;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .backup-table th {
+        background: var(--muted);
+        font-weight: 600;
+      }
+      .backup-table tr:hover {
+        background: rgba(0,0,0,0.01);
+      }
+      .backup-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      /* Switch toggle (reuse existing) */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 24px;
+      }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: var(--border);
+        transition: .3s;
+        border-radius: 24px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+      }
+      input:checked + .slider { background-color: var(--success); }
+      input:checked + .slider:before { transform: translateX(24px); }
+
+      /* Form grid enhancements */
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        align-items: start;
+      }
+      .form-grid.full-width {
+        grid-template-columns: 1fr;
+      }
+      .form-grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        font-weight: 500;
+        font-size: 0.95rem;
+      }
+      .form-grid input[type="text"],
+      .form-grid input[type="email"],
+      .form-grid input[type="tel"],
+      .form-grid input[type="url"],
+      .form-grid input[type="number"],
+      .form-grid input[type="date"],
+      .form-grid input[type="time"],
+      .form-grid input[type="color"],
+      .form-grid select,
+      .form-grid textarea {
+        padding: 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 0.9rem;
+        width: 100%;
+      }
+      .form-grid textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+      .form-grid select[multiple] {
+        min-height: 120px;
+      }
+      .form-actions {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
+      }
+
+      /* Preference item (for notifications) */
+      .preference-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .preference-info strong {
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+      .preference-info .muted {
+        font-size: 0.85rem;
+        color: var(--muted-foreground);
+      }
+      .preference-controls {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -20,7 +225,7 @@
                         <path d="M3 18h18"></path>
                     </svg>
                 </button>
-                <h1 class="page-title">Notification Settings</h1>
+                <h1 class="page-title">Settings</h1>
                 <div class="user-info">
                     <span>Welcome, <%= user.name %></span>
                 </div>
@@ -29,583 +234,1045 @@
             <div class="dashboard-content">
                 <div class="content-card">
                     <div class="card-header">
-                        <h3>Notification Preferences</h3>
-                        <p class="muted">Control how and when you receive notifications</p>
+                        <h3>System Configuration</h3>
+                        <p class="muted">Manage organization profile, defaults, and backups</p>
                     </div>
                     <div class="card-content">
-                        <form id="preferencesForm">
-                            <!-- Global Enable/Disable -->
-                            <div class="form-section">
-                                <h4>Overall</h4>
-                                <label>
-                                    <input type="checkbox" id="notificationsEnabled" name="notificationsEnabled">
-                                    Enable all notifications
-                                </label>
-                            </div>
+                        <!-- Tab Navigation -->
+                        <div class="tabs-nav">
+                            <button class="tab-btn active" data-tab="notifications">Notification Preferences</button>
+                            <% if (permission.canManageSystem) { %>
+                                <button class="tab-btn" data-tab="organization">Organization Profile</button>
+                                <button class="tab-btn" data-tab="system">System-Wide Settings</button>
+                                <button class="tab-btn" data-tab="backup">Data Backup & Export</button>
+                            <% } %>
+                        </div>
 
-                            <!-- Channel Preferences -->
-                            <div class="form-section">
-                                <h4>Notification Channels</h4>
-                                <div class="channel-grid">
-                                    <div class="channel-card">
-                                        <h5>In-App Notifications</h5>
-                                        <label>
-                                            <input type="checkbox" id="inAppEnabled" name="inAppEnabled" checked>
-                                            Show notifications in the app
-                                        </label>
-                                        <label>
-                                            <input type="checkbox" id="inAppSound" name="inAppSound" checked>
-                                            Play sound for notifications
-                                        </label>
-                                    </div>
-                                    <div class="channel-card">
-                                        <h5>Email Notifications</h5>
-                                        <label>
-                                            <input type="checkbox" id="emailEnabled" name="emailEnabled">
-                                            Send email notifications
-                                        </label>
-                                        <label>
-                                            <input type="checkbox" id="emailDigest" name="emailDigest">
-                                            Send daily digest instead of immediate
-                                        </label>
-                                    </div>
+                        <!-- ==================== NOTIFICATION PREFERENCES TAB ==================== -->
+                        <div id="notifications" class="tab-content active">
+                            <form id="preferencesForm">
+                                <!-- Global Enable/Disable -->
+                                <div class="form-section">
+                                    <h4>Overall</h4>
+                                    <label>
+                                        <input type="checkbox" id="notificationsEnabled" name="notificationsEnabled">
+                                        Enable all notifications
+                                    </label>
                                 </div>
-                            </div>
 
-                            <!-- Type-specific preferences -->
-                            <div class="form-section">
-                                <h4>Notification Types</h4>
-                                <p class="muted" style="margin-bottom: 1rem;">Choose which events trigger notifications and through which channel.</p>
-
-                                <div class="preference-grid">
-                                    <!-- Event Assignments -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Event Assignments</strong>
-                                            <div class="muted">When you are assigned to an event</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="assignment" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="assignment" checked>
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Overdue Items -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Overdue Items</strong>
-                                            <div class="muted">Payments, reports, or tasks that are overdue</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="overdue" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="overdue" checked>
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Upcoming Events -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Upcoming Events</strong>
-                                            <div class="muted">Events starting within 48 hours</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="upcoming_event" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="upcoming_event">
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Payment Received -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Payment Received</strong>
-                                            <div class="muted">When a payment is received</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="payment_received" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="payment_received" checked>
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- New Messages -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>New Messages</strong>
-                                            <div class="muted">When you receive a new internal message</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="new_message" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="new_message">
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Document Approvals -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Document Approvals</strong>
-                                            <div class="muted">When documents are approved or rejected</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="document_approval" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="document_approval" checked>
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Event Reminders -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Event Reminders</strong>
-                                            <div class="muted">General reminders about upcoming events</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="event_reminder" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="event_reminder">
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Report Reminders -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Report Reminders</strong>
-                                            <div class="muted">Reminders to submit after-event reports</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="report_reminder" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="report_reminder">
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Announcements -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Bulk Announcements</strong>
-                                            <div class="muted">Admin-issued broadcast messages</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="announcement" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="announcement" checked>
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- System Notifications -->
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>System Notifications</strong>
-                                            <div class="muted">Maintenance, updates, security alerts</div>
-                                        </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
-                                                <input type="checkbox" class="type-toggle" data-type="system" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                            <label title="Also send email">
-                                                <input type="checkbox" class="email-toggle" data-type="system">
-                                                📧
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Escalation Rules -->
-                            <div class="form-section">
-                                <h4>Escalation Rules</h4>
-                                <p class="muted" style="margin-bottom: 1rem;">Automatically escalate critical issues to higher management.</p>
-
-                                <div class="preference-grid">
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Overdue Payments Escalation</strong>
-                                            <div class="muted">Escalate to supervisors after days overdue</div>
-                                        </div>
-                                        <div class="preference-controls">
+                                <!-- Channel Preferences -->
+                                <div class="form-section">
+                                    <h4>Notification Channels</h4>
+                                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                                        <div style="padding:1rem; border:1px solid var(--border); border-radius: var(--radius); background: var(--muted);">
+                                            <h5>In-App Notifications</h5>
                                             <label>
-                                                <input type="number" name="overduePaymentsAfter" value="3" min="1" max="30" style="width: 60px;">
-                                                days
+                                                <input type="checkbox" id="inAppEnabled" name="inAppEnabled" checked>
+                                                Show notifications in the app
                                             </label>
-                                            <label class="switch">
-                                                <input type="checkbox" name="overduePaymentsEnabled" checked>
-                                                <span class="slider"></span>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Missed Reports Escalation</strong>
-                                            <div class="muted">Escalate to admins after days overdue</div>
-                                        </div>
-                                        <div class="preference-controls">
                                             <label>
-                                                <input type="number" name="missedReportsAfter" value="2" min="1" max="30" style="width: 60px;">
-                                                days
+                                                <input type="checkbox" id="inAppSound" name="inAppSound" checked>
+                                                Play sound for notifications
                                             </label>
-                                            <label class="switch">
-                                                <input type="checkbox" name="missedReportsEnabled" checked>
-                                                <span class="slider"></span>
+                                        </div>
+                                        <div style="padding:1rem; border:1px solid var(--border); border-radius: var(--radius); background: var(--muted);">
+                                            <h5>Email Notifications</h5>
+                                            <label>
+                                                <input type="checkbox" id="emailEnabled" name="emailEnabled">
+                                                Send email notifications
+                                            </label>
+                                            <label>
+                                                <input type="checkbox" id="emailDigest" name="emailDigest">
+                                                Send daily digest instead of immediate
                                             </label>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- Quiet Hours -->
-                            <div class="form-section">
-                                <h4>Quiet Hours (Do Not Disturb)</h4>
-                                <div class="preference-grid">
-                                    <div class="preference-item">
-                                        <div class="preference-info">
-                                            <strong>Enable Quiet Hours</strong>
-                                            <div class="muted">Suppress non-critical notifications during these hours</div>
+                                <!-- Type-specific preferences -->
+                                <div class="form-section">
+                                    <h4>Notification Types</h4>
+                                    <p class="muted" style="margin-bottom: 1rem;">Choose which events trigger notifications and through which channel.</p>
+
+                                    <div class="preference-grid" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+                                        <!-- Event Assignments -->
+                                        <div class="preference-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <div class="preference-info">
+                                                <strong>Event Assignments</strong>
+                                                <div class="muted">When you are assigned to an event</div>
+                                            </div>
+                                            <div class="preference-controls" style="display: flex; gap: 1rem; align-items: center;">
+                                                <label class="switch" style="display: inline-block;">
+                                                    <input type="checkbox" class="type-toggle" data-type="assignment" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <label title="Also send email" style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                                    <input type="checkbox" class="email-toggle" data-type="assignment" checked>
+                                                    📧
+                                                </label>
+                                            </div>
                                         </div>
-                                        <div class="preference-controls">
-                                            <label class="switch">
+
+                                        <!-- Overdue Items -->
+                                        <div class="preference-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <div class="preference-info">
+                                                <strong>Overdue Items</strong>
+                                                <div class="muted">Payments, reports, or tasks that are overdue</div>
+                                            </div>
+                                            <div class="preference-controls" style="display: flex; gap: 1rem; align-items: center;">
+                                                <label class="switch" style="display: inline-block;">
+                                                    <input type="checkbox" class="type-toggle" data-type="overdue" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <label title="Also send email" style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                                    <input type="checkbox" class="email-toggle" data-type="overdue" checked>
+                                                    📧
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Upcoming Events -->
+                                        <div class="preference-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <div class="preference-info">
+                                                <strong>Upcoming Events</strong>
+                                                <div class="muted">Events starting within 48 hours</div>
+                                            </div>
+                                            <div class="preference-controls" style="display: flex; gap: 1rem; align-items: center;">
+                                                <label class="switch" style="display: inline-block;">
+                                                    <input type="checkbox" class="type-toggle" data-type="upcoming_event" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <label title="Also send email" style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                                    <input type="checkbox" class="email-toggle" data-type="upcoming_event">
+                                                    📧
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Payment Received -->
+                                        <div class="preference-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <div class="preference-info">
+                                                <strong>Payment Received</strong>
+                                                <div class="muted">When a payment is received</div>
+                                            </div>
+                                            <div class="preference-controls" style="display: flex; gap: 1rem; align-items: center;">
+                                                <label class="switch" style="display: inline-block;">
+                                                    <input type="checkbox" class="type-toggle" data-type="payment_received" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <label title="Also send email" style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                                    <input type="checkbox" class="email-toggle" data-type="payment_received" checked>
+                                                    📧
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- New Messages -->
+                                        <div class="preference-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <div class="preference-info">
+                                                <strong>New Messages</strong>
+                                                <div class="muted">When you receive a new internal message</div>
+                                            </div>
+                                            <div class="preference-controls" style="display: flex; gap: 1rem; align-items: center;">
+                                                <label class="switch" style="display: inline-block;">
+                                                    <input type="checkbox" class="type-toggle" data-type="new_message" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <label title="Also send email" style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                                    <input type="checkbox" class="email-toggle" data-type="new_message">
+                                                    📧
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Report Reminders -->
+                                        <div class="preference-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <div class="preference-info">
+                                                <strong>Report Reminders</strong>
+                                                <div class="muted">Reminders to submit after-event reports</div>
+                                            </div>
+                                            <div class="preference-controls" style="display: flex; gap: 1rem; align-items: center;">
+                                                <label class="switch" style="display: inline-block;">
+                                                    <input type="checkbox" class="type-toggle" data-type="report_reminder" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <label title="Also send email" style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                                    <input type="checkbox" class="email-toggle" data-type="report_reminder">
+                                                    📧
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Escalation Rules -->
+                                <div class="form-section">
+                                    <h4>Escalation Rules</h4>
+                                    <p class="muted" style="margin-bottom: 1rem;">Automatically escalate critical issues to higher management.</p>
+
+                                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                                        <div style="padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                                <span>
+                                                  <strong>Overdue Payments Escalation</strong>
+                                                  <div class="muted">Escalate to supervisor after days overdue</div>
+                                                </span>
+                                                <label class="switch" style="display: inline-block; margin:0;">
+                                                    <input type="checkbox" name="overduePaymentsEnabled" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </label>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <label>Escalate after
+                                                    <input type="number" name="overduePaymentsAfter" value="3" min="1" max="30" style="width: 60px;">
+                                                    days
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div style="padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                                <span>
+                                                  <strong>Missed Reports Escalation</strong>
+                                                  <div class="muted">Escalate to admins after days overdue</div>
+                                                </span>
+                                                <label class="switch" style="display: inline-block; margin:0;">
+                                                    <input type="checkbox" name="missedReportsEnabled" checked>
+                                                    <span class="slider"></span>
+                                                </label>
+                                            </label>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <label>Escalate after
+                                                    <input type="number" name="missedReportsAfter" value="2" min="1" max="30" style="width: 60px;">
+                                                    days
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Quiet Hours -->
+                                <div class="form-section">
+                                    <h4>Quiet Hours (Do Not Disturb)</h4>
+                                    <div class="form-grid" style="grid-template-columns: 1fr; gap: 1rem; align-items: start;">
+                                        <div style="display: flex; align-items: center; gap: 1rem;">
+                                            <label class="switch" style="display: inline-block; margin:0;">
                                                 <input type="checkbox" id="quietHoursEnabled" name="quietHoursEnabled">
                                                 <span class="slider"></span>
                                             </label>
+                                            <span><strong>Enable Quiet Hours</strong> — Suppress non-critical notifications during these hours</span>
                                         </div>
-                                    </div>
-                                    <div id="quietHoursFields" style="display: none; grid-column: 1 / -1; gap: 1rem; margin-top: 1rem;">
-                                        <div style="display: flex; gap: 1rem; align-items: center;">
-                                            <label>
-                                                Start
-                                                <input type="time" name="quietStartTime" value="22:00">
-                                            </label>
-                                            <label>
-                                                End
-                                                <input type="time" name="quietEndTime" value="07:00">
-                                            </label>
-                                            <label>
-                                                Timezone
-                                                <select name="timezone">
-                                                    <option value="Africa/Nairobi" selected>East Africa (EAT)</option>
-                                                </select>
-                                            </label>
+                                        <div id="quietHoursFields" style="display: none; gap: 1rem; margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted);">
+                                            <div style="display: flex; gap: 2rem; align-items: end;">
+                                                <label>
+                                                    Start
+                                                    <input type="time" name="quietStartTime" value="22:00">
+                                                </label>
+                                                <label>
+                                                    End
+                                                    <input type="time" name="quietEndTime" value="07:00">
+                                                </label>
+                                                <label>
+                                                    Timezone
+                                                    <select name="timezone">
+                                                        <option value="Africa/Nairobi" selected>East Africa (EAT)</option>
+                                                        <option value="Europe/London">London (GMT)</option>
+                                                        <option value="America/New_York">Eastern Time</option>
+                                                    </select>
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- Weekly Digest -->
+                                <!-- Weekly Digest -->
+                                <div class="form-section">
+                                    <h4>Weekly Digest</h4>
+                                    <div style="display: flex; gap: 2rem; align-items: center; margin-top: 1rem;">
+                                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <input type="checkbox" id="weeklyDigestEnabled" name="weeklyDigestEnabled" checked>
+                                            Enable Weekly Digest
+                                        </label>
+                                        <label>
+                                            Send on
+                                            <select name="weeklyDigestDay" id="weeklyDigestDay">
+                                                <option value="0">Sunday</option>
+                                                <option value="1" selected>Monday</option>
+                                                <option value="2">Tuesday</option>
+                                                <option value="3">Wednesday</option>
+                                                <option value="4">Thursday</option>
+                                                <option value="5">Friday</option>
+                                                <option value="6">Saturday</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div id="prefMessage" class="message" style="display: none; margin-top: 1rem;"></div>
+
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-primary" onclick="saveNotificationPreferences()">Save Notification Preferences</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- ==================== ORGANIZATION PROFILE TAB ==================== -->
+                        <% if (permission.canManageSystem) { %>
+                        <div id="organization" class="tab-content">
+                            <form id="orgProfileForm">
+                                <div class="form-section">
+                                    <h4>Basic Information</h4>
+                                    <div class="form-grid">
+                                        <label>Organization Name *
+                                            <input type="text" name="organizationName" required>
+                                        </label>
+                                        <label>Tagline
+                                            <input type="text" name="tagline" placeholder="Short tagline for the organization">
+                                        </label>
+                                        <label>Logo URL
+                                            <input type="url" name="logoUrl" placeholder="https://example.com/logo.png">
+                                        </label>
+                                        <label>Logo Display Width (px)
+                                            <input type="number" name="logoWidth" min="20" max="200" value="40">
+                                        </label>
+                                        <label>Primary Brand Color
+                                            <input type="color" name="primaryColor" value="#0066cc">
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h4>Contact Details</h4>
+                                    <div class="form-grid">
+                                        <label>Contact Email
+                                            <input type="email" name="contactEmail" placeholder="info@apv-ventures.com">
+                                        </label>
+                                        <label>Contact Phone
+                                            <input type="tel" name="contactPhone" placeholder="+254 700 000 000">
+                                        </label>
+                                        <label style="grid-column: 1 / -1;">Street Address
+                                            <input type="text" name="street" placeholder="123 Main Street">
+                                        </label>
+                                        <label>City
+                                            <input type="text" name="city" placeholder="Nairobi">
+                                        </label>
+                                        <label>State / Province
+                                            <input type="text" name="state" placeholder="Nairobi County">
+                                        </label>
+                                        <label>ZIP / Postal Code
+                                            <input type="text" name="zipCode">
+                                        </label>
+                                        <label>Country
+                                            <input type="text" name="country" value="Kenya">
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h4>Regional Settings</h4>
+                                    <div class="form-grid">
+                                        <label>Timezone
+                                            <select name="timezone">
+                                                <optgroup label="Africa">
+                                                    <option value="Africa/Nairobi" selected>East Africa (EAT) — Nairobi</option>
+                                                    <option value="Africa/Lagos">West Africa (WAT) — Lagos</option>
+                                                    <option value="Africa/Johannesburg">South Africa (SAST)</option>
+                                                </optgroup>
+                                                <optgroup label="Europe">
+                                                    <option value="Europe/London">London (GMT/BST)</option>
+                                                    <option value="Europe/Paris">Central Europe (CET/CEST)</option>
+                                                </optgroup>
+                                                <optgroup label="Americas">
+                                                    <option value="America/New_York">Eastern Time (ET)</option>
+                                                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                                                </optgroup>
+                                            </select>
+                                        </label>
+                                        <label>Date Format
+                                            <select name="dateFormat">
+                                                <option value="DD/MM/YYYY">DD/MM/YYYY (e.g., 31/12/2025)</option>
+                                                <option value="MM/DD/YYYY">MM/DD/YYYY (e.g., 12/31/2025)</option>
+                                                <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
+                                            </select>
+                                        </label>
+                                        <label>Currency
+                                            <select name="currency">
+                                                <option value="KES">KES — Kenyan Shilling</option>
+                                                <option value="USD">USD — US Dollar</option>
+                                                <option value="EUR">EUR — Euro</option>
+                                                <option value="GBP">GBP — British Pound</option>
+                                            </select>
+                                        </label>
+                                        <label>Fiscal Year Start
+                                            <select name="fiscalYearStart">
+                                                <option value="01-01">January 1</option>
+                                                <option value="04-01">April 1</option>
+                                                <option value="07-01">July 1</option>
+                                                <option value="10-01">October 1</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h4>Email Branding</h4>
+                                    <div class="form-grid" style="grid-template-columns: 1fr;">
+                                        <label>Email Header HTML
+                                            <textarea name="emailHeader" rows="3" placeholder="<div style='...'>Your HTML header here</div>"></textarea>
+                                        </label>
+                                        <label>Email Footer HTML
+                                            <textarea name="emailFooter" rows="3" placeholder="<div style='...'>Your HTML footer here</div>"></textarea>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div id="orgMessage" class="message" style="display: none;"></div>
+
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-primary" onclick="saveOrganizationProfile()">Save Organization Profile</button>
+                                </div>
+                            </form>
+                        </div>
+                        <% } %>
+
+                        <!-- ==================== SYSTEM-WIDE SETTINGS TAB ==================== -->
+                        <% if (permission.canManageSystem) { %>
+                        <div id="system" class="tab-content">
+                            <form id="systemDefaultsForm">
+                                <div class="form-section">
+                                    <h4>Report Submission Deadlines</h4>
+                                    <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
+                                        <label>
+                                            Report Due After Event Completion (days)
+                                            <input type="number" name="reportSubmissionDeadlineDays" min="1" max="30" value="3">
+                                            <small>Trainers must submit their event report within this many days after the event ends.</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h4>Payment Terms</h4>
+                                    <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
+                                        <label>
+                                            Invoice Payment Terms (days)
+                                            <input type="number" name="paymentTermsDays" min="1" max="90" value="30">
+                                            <small>Net days for payment on invoices.</small>
+                                        </label>
+                                        <label>
+                                            Overdue Threshold (days)
+                                            <input type="number" name="overdueThresholdDays" min="1" max="30" value="7">
+                                            <small>Payments older than this are marked "Overdue".</small>
+                                        </label>
+                                        <label>
+                                            Late Payment Penalty (%)
+                                            <input type="number" name="latePaymentPenaltyPercent" min="0" max="100" step="0.1" value="0">
+                                            <small>Automatic penalty applied to overdue invoices.</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h4>Event & Training Calendar</h4>
+                                    <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
+                                        <label>
+                                            Reminder Before Event (days)
+                                            <input type="number" name="eventReminderDays" min="0" max="30" value="2">
+                                            <small>Days before event to send reminder to trainers.</small>
+                                        </label>
+                                        <label>
+                                            Auto-Archive Events After (months)
+                                            <input type="number" name="autoArchiveMonths" min="3" max="60" value="12">
+                                            <small>Events older than this are moved to archive.</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h4>Working Calendar</h4>
+                                    <div class="form-grid" style="grid-template-columns: 1fr;">
+                                        <label>
+                                            Working Days
+                                            <select name="workingDays" multiple style="min-height: 150px;">
+                                                <option value="Monday" selected>Monday</option>
+                                                <option value="Tuesday" selected>Tuesday</option>
+                                                <option value="Wednesday" selected>Wednesday</option>
+                                                <option value="Thursday" selected>Thursday</option>
+                                                <option value="Friday" selected>Friday</option>
+                                                <option value="Saturday">Saturday</option>
+                                                <option value="Sunday">Sunday</option>
+                                            </select>
+                                            <small>Hold Ctrl/Cmd to select multiple. Selected days are considered business days for deadlines and scheduling.</small>
+                                        </label>
+                                    </div>
+                                    <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                                        <label>
+                                            Standard Workday Starts
+                                            <input type="time" name="workingHoursStart" value="08:00">
+                                        </label>
+                                        <label>
+                                            Standard Workday Ends
+                                            <input type="time" name="workingHoursEnd" value="17:00">
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h4>Public Holidays (Kenya Pre-loaded)</h4>
+                                    <p class="muted" style="margin-bottom: 1rem;">
+                                        These dates are used to skip deadline calculations (e.g., report deadlines don't count holidays). Recurring holidays repeat annually.
+                                    </p>
+                                    <div id="holidaysList">
+                                        <!-- populated via JS -->
+                                    </div>
+                                    <button type="button" class="btn btn-secondary" onclick="openAddHolidayModal()" style="margin-top: 1rem;">
+                                        + Add Public Holiday
+                                    </button>
+                                </div>
+
+                                <div id="systemMessage" class="message" style="display: none;"></div>
+
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-primary" onclick="saveSystemDefaults()">Save System Defaults</button>
+                                </div>
+                            </form>
+                        </div>
+                        <% } %>
+
+                        <!-- ==================== BACKUP & EXPORT TAB ==================== -->
+                        <% if (permission.canManageSystem) { %>
+                        <div id="backup" class="tab-content">
                             <div class="form-section">
-                                <h4>Weekly Digest</h4>
-                                <p class="muted">Receive a weekly summary of your activity.</p>
+                                <h4>Automated Backup Configuration</h4>
+                                <p class="muted">Schedule regular database backups. Backups are stored locally and can be downloaded for offsite storage.</p>
+                                <form id="backupConfigForm" style="margin-top: 1.5rem;">
+                                    <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
+                                        <label>
+                                            <input type="checkbox" name="enabled" id="backupEnabled">
+                                            Enable Automated Backups
+                                        </label>
+                                        <label>
+                                            Backup Frequency
+                                            <select name="frequency" id="backupFrequency">
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            Scheduled Time
+                                            <input type="time" name="time" id="backupTime" value="02:00">
+                                        </label>
+                                        <label>
+                                            Retention Period (days)
+                                            <input type="number" name="retentionDays" min="7" max="365" value="30">
+                                            <small>Older backups are deleted automatically.</small>
+                                        </label>
+                                        <label style="grid-column: 1 / -1;">
+                                            Storage Location
+                                            <select name="cloudProvider" id="cloudProvider">
+                                                <option value="local">Local Server</option>
+                                                <option value="s3" disabled>AWS S3 (Coming Soon)</option>
+                                                <option value="azure" disabled>Azure Blob Storage (Coming Soon)</option>
+                                                <option value="gcp" disabled>Google Cloud Storage (Coming Soon)</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <div class="form-actions" style="margin-top: 1.5rem; border: none; padding-top: 0;">
+                                        <button type="button" class="btn btn-primary" onclick="saveBackupConfig()">Save Backup Configuration</button>
+                                    </div>
+                                </form>
+                                <div id="backupConfigMessage" class="message" style="display: none; margin-top: 1rem;"></div>
+                            </div>
 
-                                <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
-                                    <label>
-                                        <input type="checkbox" id="weeklyDigestEnabled" name="weeklyDigestEnabled" checked>
-                                        Enable Weekly Digest
-                                    </label>
-                                    <label>
-                                        Send on
-                                        <select name="weeklyDigestDay" id="weeklyDigestDay">
-                                            <option value="0">Sunday</option>
-                                            <option value="1">Monday</option>
-                                            <option value="2">Tuesday</option>
-                                            <option value="3">Wednesday</option>
-                                            <option value="4">Thursday</option>
-                                            <option value="5">Friday</option>
-                                            <option value="6">Saturday</option>
-                                        </select>
-                                    </label>
+                            <div class="form-section" style="border-top: 1px solid var(--border); padding-top: 2rem;">
+                                <h4>Manual Backup</h4>
+                                <p style="margin-bottom: 1rem;">Create a one-time full database backup immediately. The compressed file can be downloaded for compliance, migration, or archival purposes.</p>
+                                <button type="button" class="btn btn-primary" id="triggerBackupBtn" onclick="triggerBackup()">
+                                    <span id="backupSpinner" style="display: none;">⏳</span>
+                                    <span id="backupBtnText">Create Backup Now</span>
+                                </button>
+                                <div id="backupResult" class="message" style="display: none; margin-top: 1rem;"></div>
+                            </div>
+
+                            <div class="form-section" style="border-top: 1px solid var(--border); padding-top: 2rem;">
+                                <h4>Backup History</h4>
+                                <div class="table-responsive">
+                                    <table class="backup-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date & Time</th>
+                                                <th>File Size</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="backupHistoryBody">
+                                            <!-- Populated by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="noBackupsMsg" class="placeholder-text" style="display: none; text-align: center; padding: 2rem;">
+                                    No backups found.
                                 </div>
                             </div>
+                        </div>
+                        <% } %>
+                        <!-- End Backup Tab -->
 
-                            <div id="saveMessage" class="message" style="display: none;"></div>
-
-                            <div style="margin-top: 2rem;">
-                                <button type="button" class="btn btn-primary" onclick="savePreferences()">Save Preferences</button>
-                            </div>
-                        </form>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <script>
-        let preferences = {};
+    <!-- Add Holiday Modal -->
+    <div id="addHolidayModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px; width: 90%; margin: 5% auto;">
+            <div class="modal-header">
+                <h3>Add Public Holiday</h3>
+                <button type="button" class="close-btn" onclick="closeHolidayModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="holidayForm">
+                    <div class="form-grid" style="grid-template-columns: 1fr; gap: 1rem; margin-bottom: 0;">
+                        <label>
+                            Date *
+                            <input type="date" name="date" required>
+                        </label>
+                        <label>
+                            Holiday Name *
+                            <input type="text" name="name" required placeholder="e.g., Independence Day">
+                        </label>
+                        <label>
+                            <input type="checkbox" name="isRecurring" checked>
+                            Recurring (repeat every year)
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeHolidayModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveHoliday()">Save Holiday</button>
+            </div>
+        </div>
+    </div>
 
-        async function loadPreferences() {
+    <script>
+        // Permission flag
+        const canManageSystem = <%= permission.canManageSystem || false %>;
+
+        let notificationPrefs = {};
+        let orgSettings = {};
+        let systemSettings = {};
+        let backupSettings = {};
+        let holidays = [];
+
+        // ============ TAB NAVIGATION ============
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                const tabId = btn.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // ============ NOTIFICATION PREFERENCES ============
+        async function loadNotificationPreferences() {
             try {
                 const res = await fetch('/api/notification-preferences');
                 const data = await res.json();
-                preferences = data;
-                populateForm(data);
-            } catch (err) {
-                console.error('Error loading preferences:', err);
-            }
+                notificationPrefs = data;
+                populateNotificationForm(data);
+            } catch (err) { console.error('Error loading notification preferences:', err); }
         }
 
-        function populateForm(prefs) {
-            // Global toggle
+        function populateNotificationForm(prefs) {
             document.getElementById('notificationsEnabled').checked = prefs.notificationsEnabled !== false;
-
-            // Channels
             const inAppEnabled = prefs.channels?.inApp?.enabled !== false;
             const inAppSound = prefs.channels?.inApp?.sound !== false;
             document.getElementById('inAppEnabled').checked = inAppEnabled;
             document.getElementById('inAppSound').checked = inAppSound;
-
             const emailEnabled = prefs.channels?.email?.enabled === true;
             const emailDigest = prefs.channels?.email?.digest === true;
             document.getElementById('emailEnabled').checked = emailEnabled;
             document.getElementById('emailDigest').checked = emailDigest;
-
-            // Type-specific toggles
             if (prefs.types) {
                 Object.keys(prefs.types).forEach(type => {
                     const typePref = prefs.types[type];
                     const toggle = document.querySelector(`.type-toggle[data-type="${type}"]`);
                     const emailToggle = document.querySelector(`.email-toggle[data-type="${type}"]`);
-
                     if (toggle) toggle.checked = typePref.enabled !== false;
                     if (emailToggle) emailToggle.checked = typePref.email === true;
                 });
             }
-
-            // Escalation
             document.querySelector('[name="overduePaymentsAfter"]').value = prefs.escalation?.overduePayments?.escalateAfterDays || 3;
             document.querySelector('[name="overduePaymentsEnabled"]').checked = prefs.escalation?.overduePayments?.enabled !== false;
             document.querySelector('[name="missedReportsAfter"]').value = prefs.escalation?.missedReports?.escalateAfterDays || 2;
             document.querySelector('[name="missedReportsEnabled"]').checked = prefs.escalation?.missedReports?.enabled !== false;
-
-            // Quiet hours
             document.getElementById('quietHoursEnabled').checked = prefs.quietHours?.enabled === true;
             document.getElementById('quietHoursFields').style.display = prefs.quietHours?.enabled ? 'grid' : 'none';
             if (prefs.quietHours) {
                 document.querySelector('[name="quietStartTime"]').value = prefs.quietHours?.startTime || '22:00';
                 document.querySelector('[name="quietEndTime"]').value = prefs.quietHours?.endTime || '07:00';
             }
-
-            // Weekly digest
             document.getElementById('weeklyDigestEnabled').checked = prefs.weeklyDigest?.enabled !== false;
             document.querySelector('[name="weeklyDigestDay"]').value = prefs.weeklyDigest?.dayOfWeek || 0;
         }
 
-        async function savePreferences() {
-            const form = document.getElementById('preferencesForm');
-            const formData = new FormData(form);
-
+        async function saveNotificationPreferences() {
             const prefs = {
                 notificationsEnabled: document.getElementById('notificationsEnabled').checked,
                 channels: {
-                    inApp: {
-                        enabled: document.getElementById('inAppEnabled').checked,
-                        sound: document.getElementById('inAppSound').checked
-                    },
-                    email: {
-                        enabled: document.getElementById('emailEnabled').checked,
-                        digest: document.getElementById('emailDigest').checked
-                    }
+                    inApp: { enabled: document.getElementById('inAppEnabled').checked, sound: document.getElementById('inAppSound').checked },
+                    email: { enabled: document.getElementById('emailEnabled').checked, digest: document.getElementById('emailDigest').checked }
                 },
                 types: {},
                 escalation: {
-                    overduePayments: {
-                        enabled: document.querySelector('[name="overduePaymentsEnabled"]').checked,
-                        escalateAfterDays: parseInt(document.querySelector('[name="overduePaymentsAfter"]').value)
-                    },
-                    missedReports: {
-                        enabled: document.querySelector('[name="missedReportsEnabled"]').checked,
-                        escalateAfterDays: parseInt(document.querySelector('[name="missedReportsAfter"]').value)
-                    }
+                    overduePayments: { enabled: document.querySelector('[name="overduePaymentsEnabled"]').checked, escalateAfterDays: parseInt(document.querySelector('[name="overduePaymentsAfter"]').value) },
+                    missedReports: { enabled: document.querySelector('[name="missedReportsEnabled"]').checked, escalateAfterDays: parseInt(document.querySelector('[name="missedReportsAfter"]').value) }
                 },
-                quietHours: {
-                    enabled: document.getElementById('quietHoursEnabled').checked,
-                    startTime: document.querySelector('[name="quietStartTime"]').value,
-                    endTime: document.querySelector('[name="quietEndTime"]').value
-                },
-                weeklyDigest: {
-                    enabled: document.getElementById('weeklyDigestEnabled').checked,
-                    dayOfWeek: parseInt(document.querySelector('[name="weeklyDigestDay"]').value)
-                }
+                quietHours: { enabled: document.getElementById('quietHoursEnabled').checked, startTime: document.querySelector('[name="quietStartTime"]').value, endTime: document.querySelector('[name="quietEndTime"]').value },
+                weeklyDigest: { enabled: document.getElementById('weeklyDigestEnabled').checked, dayOfWeek: parseInt(document.querySelector('[name="weeklyDigestDay"]').value) }
             };
-
-            // Build types object from checkboxes
-            document.querySelectorAll('.type-toggle').forEach(el => {
-                const type = el.dataset.type;
-                prefs.types[type] = prefs.types[type] || {};
-                prefs.types[type].enabled = el.checked;
-            });
-            document.querySelectorAll('.email-toggle').forEach(el => {
-                const type = el.dataset.type;
-                prefs.types[type] = prefs.types[type] || {};
-                prefs.types[type].email = el.checked;
-            });
-
+            document.querySelectorAll('.type-toggle').forEach(el => { const t = el.dataset.type; prefs.types[t] = prefs.types[t] || {}; prefs.types[t].enabled = el.checked; });
+            document.querySelectorAll('.email-toggle').forEach(el => { const t = el.dataset.type; prefs.types[t] = prefs.types[t] || {}; prefs.types[t].email = el.checked; });
             try {
-                const res = await fetch('/api/notification-preferences', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(prefs)
-                });
-
+                const res = await fetch('/api/notification-preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prefs) });
                 const data = await res.json();
-                if (data.success) {
-                    showMessage('Preferences saved successfully!', 'success');
-                } else {
-                    showMessage('Error: ' + data.error, 'error');
-                }
-            } catch (err) {
-                console.error('Error saving preferences:', err);
-                showMessage('Failed to save preferences', 'error');
-            }
+                showMessage('prefMessage', data.success ? 'Preferences saved successfully!' : 'Error: ' + data.error, data.success ? 'success' : 'error');
+            } catch (err) { showMessage('prefMessage', 'Failed to save preferences', 'error'); }
         }
 
-        function showMessage(msg, type) {
-            const el = document.getElementById('saveMessage');
-            el.textContent = msg;
-            el.className = 'message ' + (type === 'success' ? 'success' : 'error');
-            el.style.display = 'block';
-            setTimeout(() => { el.style.display = 'none'; }, 3000);
-        }
-
-        // Toggle quiet hours visibility
         document.getElementById('quietHoursEnabled').addEventListener('change', function() {
             document.getElementById('quietHoursFields').style.display = this.checked ? 'grid' : 'none';
         });
 
-        document.addEventListener('DOMContentLoaded', loadPreferences);
+        // ============ ORGANIZATION PROFILE (Admin only) ============
+        async function loadOrganizationProfile() {
+            try {
+                const res = await fetch('/api/settings/organization');
+                const data = await res.json();
+                if (data.success) {
+                    orgSettings = data.settings;
+                    const s = data.settings;
+                    document.querySelector('[name="organizationName"]').value = s.organizationName || '';
+                    document.querySelector('[name="tagline"]').value = s.tagline || '';
+                    document.querySelector('[name="logoUrl"]').value = s.logoUrl || '';
+                    document.querySelector('[name="logoWidth"]').value = s.logoWidth || 40;
+                    document.querySelector('[name="primaryColor"]').value = s.primaryColor || '#0066cc';
+                    document.querySelector('[name="contactEmail"]').value = s.contactEmail || '';
+                    document.querySelector('[name="contactPhone"]').value = s.contactPhone || '';
+                    document.querySelector('[name="street"]').value = s.address?.street || '';
+                    document.querySelector('[name="city"]').value = s.address?.city || '';
+                    document.querySelector('[name="state"]').value = s.address?.state || '';
+                    document.querySelector('[name="zipCode"]').value = s.address?.zipCode || '';
+                    document.querySelector('[name="country"]').value = s.address?.country || 'Kenya';
+                    document.querySelector('[name="timezone"]').value = s.timezone || 'Africa/Nairobi';
+                    document.querySelector('[name="dateFormat"]').value = s.dateFormat || 'DD/MM/YYYY';
+                    document.querySelector('[name="currency"]').value = s.currency || 'KES';
+                    document.querySelector('[name="fiscalYearStart"]').value = s.fiscalYearStart || '01-01';
+                    document.querySelector('[name="emailHeader"]').value = s.emailHeader || '';
+                    document.querySelector('[name="emailFooter"]').value = s.emailFooter || '';
+                }
+            } catch (err) { console.error('Error loading organization profile:', err); }
+        }
+
+        async function saveOrganizationProfile() {
+            const form = document.getElementById('orgProfileForm');
+            const formData = new FormData(form);
+            const payload = {
+                organizationName: formData.get('organizationName'),
+                tagline: formData.get('tagline'),
+                logoUrl: formData.get('logoUrl'),
+                logoWidth: parseInt(formData.get('logoWidth')),
+                primaryColor: formData.get('primaryColor'),
+                contactEmail: formData.get('contactEmail'),
+                contactPhone: formData.get('contactPhone'),
+                address: {
+                    street: formData.get('street'),
+                    city: formData.get('city'),
+                    state: formData.get('state'),
+                    zipCode: formData.get('zipCode'),
+                    country: formData.get('country')
+                },
+                timezone: formData.get('timezone'),
+                dateFormat: formData.get('dateFormat'),
+                currency: formData.get('currency'),
+                fiscalYearStart: formData.get('fiscalYearStart'),
+                emailHeader: formData.get('emailHeader'),
+                emailFooter: formData.get('emailFooter')
+            };
+            try {
+                const res = await fetch('/api/settings/organization', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                showMessage('orgMessage', data.success ? 'Organization profile saved successfully!' : 'Error: ' + data.error, data.success ? 'success' : 'error');
+                if (data.success) orgSettings = data.settings;
+            } catch (err) { showMessage('orgMessage', 'Failed to save profile', 'error'); }
+        }
+
+        // ============ SYSTEM DEFAULTS (Admin only) ============
+        async function loadSystemDefaults() {
+            try {
+                const res = await fetch('/api/settings/system');
+                const data = await res.json();
+                if (data.success) {
+                    systemSettings = data.settings;
+                    const s = data.settings;
+                    document.querySelector('[name="reportSubmissionDeadlineDays"]').value = s.reportSubmissionDeadlineDays || 3;
+                    document.querySelector('[name="paymentTermsDays"]').value = s.paymentTermsDays || 30;
+                    document.querySelector('[name="overdueThresholdDays"]').value = s.overdueThresholdDays || 7;
+                    document.querySelector('[name="latePaymentPenaltyPercent"]').value = s.latePaymentPenaltyPercent || 0;
+                    document.querySelector('[name="eventReminderDays"]').value = s.eventReminderDays || 2;
+                    document.querySelector('[name="autoArchiveMonths"]').value = s.autoArchiveMonths || 12;
+                    const workingDaysSelect = document.querySelector('[name="workingDays"]');
+                    Array.from(workingDaysSelect.options).forEach(opt => {
+                        opt.selected = (s.workingDays || []).includes(opt.value);
+                    });
+                    if (s.workingHours) {
+                        document.querySelector('[name="workingHoursStart"]').value = s.workingHours.start || '08:00';
+                        document.querySelector('[name="workingHoursEnd"]').value = s.workingHours.end || '17:00';
+                    }
+                }
+            } catch (err) { console.error('Error loading system defaults:', err); }
+        }
+
+        async function saveSystemDefaults() {
+            const form = document.getElementById('systemDefaultsForm');
+            const formData = new FormData(form);
+            const workingDays = [];
+            document.querySelector('[name="workingDays"]').selectedOptions.forEach(opt => workingDays.push(opt.value));
+            const payload = {
+                reportSubmissionDeadlineDays: parseInt(formData.get('reportSubmissionDeadlineDays')),
+                paymentTermsDays: parseInt(formData.get('paymentTermsDays')),
+                overdueThresholdDays: parseInt(formData.get('overdueThresholdDays')),
+                latePaymentPenaltyPercent: parseFloat(formData.get('latePaymentPenaltyPercent')),
+                eventReminderDays: parseInt(formData.get('eventReminderDays')),
+                autoArchiveMonths: parseInt(formData.get('autoArchiveMonths')),
+                workingDays,
+                workingHours: {
+                    start: formData.get('workingHoursStart'),
+                    end: formData.get('workingHoursEnd')
+                }
+            };
+            try {
+                const res = await fetch('/api/settings/system', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                showMessage('systemMessage', data.success ? 'System defaults saved successfully!' : 'Error: ' + data.error, data.success ? 'success' : 'error');
+                if (data.success) systemSettings = data.settings;
+            } catch (err) { showMessage('systemMessage', 'Failed to save system defaults', 'error'); }
+        }
+
+        // ============ PUBLIC HOLIDAYS (Admin only) ============
+        async function loadHolidays() {
+            const year = new Date().getFullYear();
+            try {
+                const res = await fetch(`/api/settings/holidays?year=${year}`);
+                const data = await res.json();
+                if (data.success) {
+                    holidays = data.holidays;
+                    renderHolidays();
+                }
+            } catch (err) { console.error('Error loading holidays:', err); }
+        }
+
+        function renderHolidays() {
+            const container = document.getElementById('holidaysList');
+            container.innerHTML = '';
+            if (holidays.length === 0) {
+                container.innerHTML = '<p class="placeholder-text">No holidays defined. Add some below.</p>';
+                return;
+            }
+            holidays.forEach(h => {
+                const date = new Date(h.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+                const item = document.createElement('div');
+                item.className = 'holiday-item';
+                item.innerHTML = `
+                    <span class="holiday-date">${date}</span>
+                    <span class="holiday-name">${h.name}</span>
+                    ${h.isRecurring ? '<span class="holiday-recurring">Recurring</span>' : ''}
+                    <div class="holiday-actions">
+                        <button class="btn btn-sm btn-danger" onclick="deleteHoliday('${h.date.toISOString().split('T')[0]}')">Delete</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function openAddHolidayModal() {
+            document.getElementById('addHolidayModal').style.display = 'block';
+        }
+
+        function closeHolidayModal() {
+            document.getElementById('addHolidayModal').style.display = 'none';
+        }
+
+        async function saveHoliday() {
+            const form = document.getElementById('holidayForm');
+            const formData = new FormData(form);
+            const payload = {
+                date: formData.get('date'),
+                name: formData.get('name'),
+                isRecurring: formData.get('isRecurring') === 'on'
+            };
+            try {
+                const res = await fetch('/api/settings/holidays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (data.success) {
+                    holidays = data.holidays;
+                    renderHolidays();
+                    closeHolidayModal();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) { alert('Failed to save holiday'); }
+        }
+
+        async function deleteHoliday(dateStr) {
+            if (!confirm('Delete this holiday?')) return;
+            try {
+                const res = await fetch(`/api/settings/holidays/${dateStr}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    holidays = data.holidays;
+                    renderHolidays();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) { alert('Failed to delete holiday'); }
+        }
+
+        // ============ BACKUP & EXPORT (Admin only) ============
+        async function loadBackupConfig() {
+            try {
+                const res = await fetch('/api/settings/backup');
+                const data = await res.json();
+                if (data.success) {
+                    backupSettings = data.settings;
+                    const s = data.settings;
+                    document.getElementById('backupEnabled').checked = s.enabled;
+                    document.getElementById('backupFrequency').value = s.frequency;
+                    document.getElementById('backupTime').value = s.time;
+                    document.querySelector('[name="retentionDays"]').value = s.retentionDays || 30;
+                    document.getElementById('cloudProvider').value = s.cloudProvider || 'local';
+                }
+            } catch (err) { console.error('Error loading backup config:', err); }
+        }
+
+        async function saveBackupConfig() {
+            const form = document.getElementById('backupConfigForm');
+            const formData = new FormData(form);
+            const payload = {
+                enabled: formData.get('enabled') === 'on',
+                frequency: formData.get('frequency'),
+                time: formData.get('time'),
+                retentionDays: parseInt(formData.get('retentionDays')),
+                cloudProvider: formData.get('cloudProvider')
+            };
+            try {
+                const res = await fetch('/api/settings/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                showMessage('backupConfigMessage', data.success ? 'Backup configuration saved!' : 'Error: ' + data.error, data.success ? 'success' : 'error');
+                if (data.success) backupSettings = data.settings;
+            } catch (err) { showMessage('backupConfigMessage', 'Failed to save backup config', 'error'); }
+        }
+
+        async function triggerBackup() {
+            const btn = document.getElementById('triggerBackupBtn');
+            const spinner = document.getElementById('backupSpinner');
+            const btnText = document.getElementById('backupBtnText');
+            const resultDiv = document.getElementById('backupResult');
+            btn.disabled = true;
+            spinner.style.display = 'inline';
+            btnText.textContent = 'Backing up...';
+            try {
+                const res = await fetch('/api/backup/trigger', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showMessage('backupResult', `Backup completed successfully! File: ${data.backupFile.split('/').pop()}`, 'success');
+                    loadBackupHistory();
+                } else {
+                    showMessage('backupResult', 'Backup failed: ' + data.error, 'error');
+                }
+            } catch (err) { showMessage('backupResult', 'Backup failed: ' + err.message, 'error'); }
+            finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Create Backup Now';
+            }
+        }
+
+        async function loadBackupHistory() {
+            try {
+                const res = await fetch('/api/backup/history');
+                const data = await res.json();
+                const tbody = document.getElementById('backupHistoryBody');
+                document.getElementById('noBackupsMsg').style.display = 'none';
+                tbody.innerHTML = '';
+                if (!data.success || data.backups.length === 0) {
+                    document.getElementById('noBackupsMsg').style.display = 'block';
+                    return;
+                }
+                data.backups.forEach(b => {
+                    const sizeMB = (b.size / (1024 * 1024)).toFixed(2);
+                    const date = new Date(b.date).toLocaleString('en-KE');
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${date}</td>
+                        <td>${sizeMB} MB</td>
+                        <td><span class="badge badge-success">Completed</span></td>
+                        <td class="backup-actions">
+                            <button class="btn btn-sm btn-outline" onclick="downloadBackup('${b.filename}')">Download</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteBackup('${b.filename}')">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (err) { console.error('Error loading backup history:', err); }
+        }
+
+        async function downloadBackup(filename) {
+            try {
+                window.location.href = `/api/backup/download/${filename}`;
+            } catch (err) { alert('Failed to download backup'); }
+        }
+
+        async function deleteBackup(filename) {
+            if (!confirm('Delete this backup file? This cannot be undone.')) return;
+            try {
+                const res = await fetch(`/api/backup/delete/${filename}`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    loadBackupHistory();
+                } else {
+                    alert('Failed to delete backup: ' + data.error);
+                }
+            } catch (err) { alert('Error deleting backup'); }
+        }
+
+        // ============ UTILS ============
+        function showMessage(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = 'message ' + (type === 'success' ? 'success' : 'error');
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        // ============ DOCUMENT READY ============
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadNotificationPreferences();
+            if (canManageSystem) {
+                await Promise.all([
+                    loadOrganizationProfile(),
+                    loadSystemDefaults(),
+                    loadBackupConfig(),
+                    loadHolidays(),
+                    loadBackupHistory()
+                ]);
+            }
+        });
     </script>
-
-    <style>
-        .form-section {
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid var(--border);
-        }
-        .form-section h4 {
-            margin-bottom: 0.5rem;
-            color: var(--primary);
-        }
-        .channel-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-        .channel-card {
-            padding: 1rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--muted);
-        }
-        .channel-card h5 {
-            margin: 0 0 0.5rem 0;
-        }
-        .preference-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-        .preference-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-        }
-        .preference-info strong {
-            display: block;
-            margin-bottom: 0.25rem;
-        }
-        .preference-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        /* Toggle Switch */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 48px;
-            height: 24px;
-        }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--border);
-            transition: .3s;
-            border-radius: 24px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: var(--success);
-        }
-        input:checked + .slider:before {
-            transform: translateX(24px);
-        }
-    </style>
 </body>
 </html>

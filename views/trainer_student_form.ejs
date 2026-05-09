@@ -240,6 +240,44 @@
     </div>
 
     <script>
+        function showToast(message, type = 'info', duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                opacity: 0;
+                transform: translateY(-20px);
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+
+            if (type === 'success') toast.style.backgroundColor = '#2563eb';
+            else if (type === 'error') toast.style.backgroundColor = '#dc2626';
+            else if (type === 'warning') toast.style.backgroundColor = '#f59e0b';
+            else toast.style.backgroundColor = '#64748b';
+
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+            }, 10);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, duration);
+        }
+
         function calculateAge() {
             const dob = document.getElementById('dateOfBirth').value;
             if (!dob) return;
@@ -291,11 +329,61 @@
             }
         }
 
-        // Form validation
-        document.getElementById('studentForm').addEventListener('submit', function(e) {
+        // Form validation and AJAX submission
+        document.getElementById('studentForm').addEventListener('submit', async function(e) {
+            // Prevent default form submission and stop other event listeners
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            // Custom age validation
             if (!checkAgeValidity()) {
-                e.preventDefault();
                 alert('Please correct the age/section mismatch before submitting.');
+                return;
+            }
+
+            const submitBtn = e.submitter || this.querySelector('[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Saving...';
+            submitBtn.disabled = true;
+
+            const formData = new FormData(this);
+            const jsonData = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(jsonData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Get selected school name
+                    const schoolSelect = document.getElementById('schoolId');
+                    const schoolName = schoolSelect.options[schoolSelect.selectedIndex].text;
+                    const studentName = document.getElementById('fullName').value;
+
+                    // Determine if creating new or updating
+                    const isEdit = window.location.pathname.includes('/edit') || document.querySelector('input[name="_method"]')?.value === 'PUT';
+                    const action = isEdit ? 'updated' : 'added';
+
+                    showToast(`"${studentName}" ${action} successfully to ${schoolName}`, 'success', 4000);
+                    
+                    // Redirect after showing toast
+                    setTimeout(() => {
+                        window.location.href = '/trainer/students';
+                    }, 1500);
+                } else {
+                    showToast(data.error || 'Failed to add student', 'error');
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                showToast('Network error. Please try again.', 'error');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
             }
         });
     </script>

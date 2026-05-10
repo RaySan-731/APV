@@ -39,7 +39,7 @@
                 </div>
                 <div class="user-info" style="display: flex; align-items: center; gap: 1rem;">
                     <div class="notification-bell" id="notificationBell" style="position: relative; cursor: pointer;">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                         </svg>
@@ -51,7 +51,7 @@
 
             <section class="dashboard-content">
                 <!-- Notification Panel -->
-                <div id="notificationPanel" class="notification-panel" style="display: none; position: fixed; top: 4rem; right: 2rem; width: 450px; max-height: calc(100vh - 5rem); background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-card); z-index: 999; overflow: hidden;">
+                <div id="notificationPanel" class="notification-panel">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border); background: var(--card); position: sticky; top: 0; z-index: 1;">
                         <div style="display: flex; gap: 1rem;">
                             <button class="panel-tab active" data-tab="notifications">Notifications</button>
@@ -352,10 +352,6 @@
         const eventData = <%- JSON.stringify(event) %>;
         // We'll derive from event.trainers which has trainerId objects
 
-        document.addEventListener('DOMContentLoaded', function() {
-            setupNotificationPanel();
-        });
-
         function confirmAccept() {
             showConfirmModal('Accept Event', 'Are you sure you want to accept this event assignment?', false, async () => {
                 await submitResponse('accept');
@@ -436,82 +432,6 @@
             }
         }
 
-        function setupNotificationPanel() {
-            const bell = document.getElementById('notificationBell');
-            const panel = document.getElementById('notificationPanel');
-            const closeBtn = document.getElementById('closeNotificationPanel');
-            const markAllBtn = document.getElementById('markAllReadBtn');
-
-            bell.addEventListener('click', () => {
-                panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-                if (panel.style.display === 'flex') {
-                    loadNotifications();
-                }
-            });
-
-            closeBtn.addEventListener('click', () => panel.style.display = 'none');
-            markAllBtn.addEventListener('click', async () => {
-                await fetch('/api/notifications/read-all', { method: 'POST' });
-                loadNotifications();
-            });
-
-            panel.querySelectorAll('.panel-tab').forEach(tab => {
-                tab.addEventListener('click', async () => {
-                    panel.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    await loadNotifications(tab.dataset.tab);
-                });
-            });
-
-            document.addEventListener('click', (e) => {
-                if (!panel.contains(e.target) && !bell.contains(e.target)) {
-                    panel.style.display = 'none';
-                }
-            });
-        }
-
-        async function loadNotifications(tab = 'notifications') {
-            const listEl = document.getElementById('notificationPanelList');
-            listEl.innerHTML = '<p style="padding: 1rem; text-align: center;">Loading...</p>';
-
-            try {
-                const response = await fetch(`/api/${tab}`);
-                const data = await response.json();
-
-                if (data.success && data[tab] && data[tab].length > 0) {
-                    listEl.innerHTML = data[tab].map(item => renderNotificationItem(item, tab)).join('');
-                } else {
-                    listEl.innerHTML = '<p style="padding: 1rem; text-align: center;">No ' + tab + ' yet.</p>';
-                }
-            } catch (err) {
-                listEl.innerHTML = '<p style="padding: 1rem; text-align: center; color: var(--danger);">Error loading notifications</p>';
-            }
-        }
-
-        function renderNotificationItem(item, type) {
-            const iconMap = { 'notification': '🔔', 'message': '💬', 'announcement': '📢' };
-            const icon = iconMap[type] || '📌';
-            let timeAgo;
-            const diff = Math.floor((new Date() - new Date(item.createdAt)) / 1000);
-            if (diff < 60) timeAgo = 'just now';
-            else if (diff < 3600) timeAgo = Math.floor(diff/60) + ' mins ago';
-            else if (diff < 86400) timeAgo = Math.floor(diff/3600) + ' hours ago';
-            else timeAgo = Math.floor(diff/86400) + ' days ago';
-
-            const actionLink = item.actionUrl ? `<a href="${item.actionUrl}" class="btn btn-sm btn-outline" style="margin-left: 0.5rem;">View</a>` : '';
-            return `
-                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
-                    <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                        <span style="font-size: 1.2rem;">${icon}</span>
-                        <div>
-                            <div style="font-weight: 500;">${escapeHtml(item.title || 'Notification')}</div>
-                            <div style="font-size: 0.875rem; color: var(--muted-foreground);">${escapeHtml(item.message || '')}</div>
-                            <div style="font-size: 0.75rem; color: var(--muted-foreground);">${timeAgo}</div>
-                        </div>
-                    </div>
-                    <div>${actionLink}</div>
-                </div>
-            `;
         }
 
         // Helper functions (same as trainer_events.js)
@@ -573,5 +493,10 @@
             return div.innerHTML;
         }
     </script>
+
+    <script>
+      window.currentUserId = '<%= user.id %>';
+    </script>
+    <script src="/js/notifications.js"></script>
 </body>
 </html>

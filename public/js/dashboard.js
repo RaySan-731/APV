@@ -1112,6 +1112,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initTableViewToggle();
         initCalendarView();
         initEventFormHandler();
+        initEventModalFeatures(); // Enhanced modal features
     }
 });
 
@@ -1364,16 +1365,214 @@ function initTableViewToggle() {
 
 // ============ MODAL FUNCTIONS ============
 
+// Clear datetime input
+function clearDateTime(fieldId) {
+    document.getElementById(fieldId).value = '';
+}
+
+// Character counter functionality
+function initCharacterCounters() {
+    const textareas = [
+        { id: 'eventDescription', countId: 'eventDescriptionCount', max: 500 },
+        { id: 'eventAgenda', countId: 'eventAgendaCount', max: 1000 }
+    ];
+
+    textareas.forEach(({ id, countId, max }) => {
+        const textarea = document.getElementById(id);
+        const counter = document.getElementById(countId);
+
+        if (textarea && counter) {
+            // Initialize count
+            counter.textContent = `${textarea.value.length}/${max}`;
+
+            // Update on input
+            textarea.addEventListener('input', function() {
+                const len = this.value.length;
+                counter.textContent = `${len}/${max}`;
+
+                // Visual warning when approaching limit
+                if (len >= max) {
+                    counter.style.color = 'var(--destructive)';
+                    counter.style.fontWeight = 'bold';
+                } else if (len >= max * 0.9) {
+                    counter.style.color = 'var(--accent)';
+                } else {
+                    counter.style.color = 'var(--muted-foreground)';
+                    counter.style.fontWeight = 'normal';
+                }
+            });
+        }
+    });
+}
+
+// Real-time form validation feedback
+function initFormValidation() {
+    const requiredFields = document.querySelectorAll('#eventForm [required]');
+
+    requiredFields.forEach(field => {
+        field.addEventListener('blur', function() {
+            validateField(this);
+        });
+
+        field.addEventListener('input', function() {
+            if (this.classList.contains('error')) {
+                validateField(this);
+            }
+        });
+    });
+}
+
+function validateField(field) {
+    const label = field.closest('label');
+    const errorEl = label.querySelector('.field-error');
+
+    // Remove existing error
+    if (errorEl) {
+        errorEl.remove();
+    }
+    field.classList.remove('error');
+
+    // Check required
+    if (field.hasAttribute('required') && !field.value.trim()) {
+        showFieldError(field, 'This field is required');
+        return false;
+    }
+
+    // Custom validation for specific fields
+    if (field.type === 'email' && field.value) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(field.value)) {
+            showFieldError(field, 'Please enter a valid email address');
+            return false;
+        }
+    }
+
+    // Number validation
+    if (field.type === 'number' && field.value) {
+        const min = field.min ? parseInt(field.min) : null;
+        const max = field.max ? parseInt(field.max) : null;
+        const val = parseInt(field.value);
+
+        if (min !== null && val < min) {
+            showFieldError(field, `Value must be at least ${min}`);
+            return false;
+        }
+        if (max !== null && val > max) {
+            showFieldError(field, `Value must be at most ${max}`);
+            return false;
+        }
+    }
+
+    // Valid
+    field.classList.add('valid');
+    return true;
+}
+
+function showFieldError(field, message) {
+    const label = field.closest('label');
+    const errorEl = document.createElement('small');
+    errorEl.className = 'field-error';
+    errorEl.textContent = message;
+    label.appendChild(errorEl);
+    field.classList.add('error');
+}
+
+// Remove equipment row with animation
+function removeEquipmentRow(btn) {
+    const row = btn.closest('.equipment-row');
+    if (row) {
+        row.style.transform = 'scale(0.95)';
+        row.style.opacity = '0';
+        setTimeout(() => row.remove(), 150);
+    }
+}
+
+// Remove prerequisite row with animation
+function removePrerequisiteRow(btn) {
+    const row = btn.closest('.prerequisite-row');
+    if (row) {
+        row.style.transform = 'scale(0.95)';
+        row.style.opacity = '0';
+        setTimeout(() => row.remove(), 150);
+    }
+}
+
+// Enhanced equipment row
+function addEquipmentItem(item = '', quantity = 1, providedBy = 'APV', notes = '') {
+    const container = document.getElementById('equipmentList');
+    const row = document.createElement('div');
+    row.className = 'equipment-row';
+    row.innerHTML = `
+        <input type="text" placeholder="Item name" value="${escapeHtml(item)}" class="form-control equipment-input" required autocomplete="off">
+        <input type="number" placeholder="Qty" value="${quantity}" min="1" class="form-control qty-input">
+        <select class="form-control provider-select">
+            <option value="APV" ${providedBy === 'APV' ? 'selected' : ''}>APV</option>
+            <option value="School" ${providedBy === 'School' ? 'selected' : ''}>School</option>
+            <option value="Participant" ${providedBy === 'Participant' ? 'selected' : ''}>Participant</option>
+        </select>
+        <input type="text" placeholder="Notes" value="${escapeHtml(notes)}" class="form-control" autocomplete="off">
+        <button type="button" class="btn btn-sm btn-outline btn-remove" onclick="removeEquipmentRow(this)" aria-label="Remove equipment item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+// Enhanced prerequisite row
+function addPrerequisiteItem(description = '', mandatory = true) {
+    const container = document.getElementById('prerequisitesList');
+    const row = document.createElement('div');
+    row.className = 'prerequisite-row';
+    row.innerHTML = `
+        <input type="text" placeholder="Prerequisite description" value="${escapeHtml(description)}" class="form-control" required autocomplete="off">
+        <label class="checkbox-label-inline">
+            <input type="checkbox" ${mandatory ? 'checked' : ''}> Mandatory
+        </label>
+        <button type="button" class="btn btn-sm btn-outline btn-remove" onclick="removePrerequisiteRow(this)" aria-label="Remove prerequisite">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+// Initialize event modal features
+function initEventModalFeatures() {
+    initCharacterCounters();
+    initFormValidation();
+}
+
 // Open Create Event Modal
 function openCreateEventModal() {
-    document.getElementById('eventModal').style.display = 'flex';
+    const modal = document.getElementById('eventModal');
+    modal.style.display = 'flex';
     document.getElementById('eventModalTitle').textContent = 'Create New Event';
-    document.getElementById('eventForm').reset();
+    const form = document.getElementById('eventForm');
+    form.reset();
     document.getElementById('eventId').value = '';
+
+    // Clear dynamic lists
     document.getElementById('equipmentList').innerHTML = '';
     document.getElementById('prerequisitesList').innerHTML = '';
-    addEquipmentItem(); // add one empty row
+
+    // Add one empty row
+    addEquipmentItem();
     addPrerequisiteItem();
+
+    // Reset char counters
+    initCharacterCounters();
+
+    // Clear any validation errors
+    document.querySelectorAll('.field-error').forEach(el => el.remove());
+    document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+    document.querySelectorAll('.valid').forEach(el => el.classList.remove('valid'));
+
+    document.getElementById('eventFormError').style.display = 'none';
 }
 
 // Open Edit Event Modal
@@ -1389,6 +1588,11 @@ async function openEditEventModal(eventId) {
         document.getElementById('eventModal').style.display = 'flex';
         document.getElementById('eventModalTitle').textContent = 'Edit Event';
         document.getElementById('eventId').value = event._id;
+
+        // Clear previous validation errors and states
+        document.querySelectorAll('.field-error').forEach(el => el.remove());
+        document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+        document.querySelectorAll('.valid').forEach(el => el.classList.remove('valid'));
 
         // Basic
         document.getElementById('eventName').value = event.name || '';
@@ -1442,6 +1646,9 @@ async function openEditEventModal(eventId) {
         document.getElementById('eventStatus').value = event.status || 'draft';
         document.getElementById('eventVisibility').value = event.visibility || 'private';
 
+        // Initialize character counters after values are set
+        initCharacterCounters();
+
     } catch (error) {
         console.error('Error loading event:', error);
         showToast('Failed to load event details', 'error');
@@ -1460,43 +1667,8 @@ function closeManageEventModal() {
 
 // ============ EVENT FORM HANDLING ============
 
-// Add equipment item row
-function addEquipmentItem(item = '', quantity = 1, providedBy = 'APV', notes = '') {
-    const container = document.getElementById('equipmentList');
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.gap = '0.5rem';
-    row.style.marginBottom = '0.5rem';
-    row.innerHTML = `
-        <input type="text" placeholder="Item name" value="${escapeHtml(item)}" style="flex: 2;" required>
-        <input type="number" placeholder="Qty" value="${quantity}" min="1" style="width: 60px;">
-        <select style="width: 130px;">
-            <option value="APV" ${providedBy === 'APV' ? 'selected' : ''}>Provided by APV</option>
-            <option value="School" ${providedBy === 'School' ? 'selected' : ''}>Provided by School</option>
-            <option value="Participant" ${providedBy === 'Participant' ? 'selected' : ''}>Provided by Participant</option>
-        </select>
-        <input type="text" placeholder="Notes" value="${escapeHtml(notes)}" style="flex: 1;">
-        <button type="button" class="btn btn-sm btn-outline" onclick="this.parentElement.remove()">✕</button>
-    `;
-    container.appendChild(row);
-}
-
-// Add prerequisite row
-function addPrerequisiteItem(description = '', mandatory = true) {
-    const container = document.getElementById('prerequisitesList');
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.gap = '0.5rem';
-    row.style.marginBottom = '0.5rem';
-    row.innerHTML = `
-        <input type="text" placeholder="Prerequisite description" value="${escapeHtml(description)}" style="flex: 2;" required>
-        <label style="display: flex; align-items: center; gap: 0.25rem; width: 100px;">
-            <input type="checkbox" ${mandatory ? 'checked' : ''}> Mandatory
-        </label>
-        <button type="button" class="btn btn-sm btn-outline" onclick="this.parentElement.remove()">✕</button>
-    `;
-    container.appendChild(row);
-}
+// (Enhanced addEquipmentItem, addPrerequisiteItem, and their remove functions
+// are defined earlier in the modal features section)
 
 // Collect equipment data from DOM
 function collectEquipmentData() {

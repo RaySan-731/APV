@@ -40,9 +40,6 @@ function setupEventListeners() {
         calendarViewType = this.value;
         renderCalendar(filteredEvents);
     });
-
-    // Notification panel
-    setupNotificationPanel();
 }
 
 async function loadEvents() {
@@ -649,105 +646,6 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
-
-// Notification Panel Setup (similar to trainer_dashboard)
-function setupNotificationPanel() {
-    const bell = document.getElementById('notificationBell');
-    const panel = document.getElementById('notificationPanel');
-    const closeBtn = document.getElementById('closeNotificationPanel');
-    const markAllBtn = document.getElementById('markAllReadBtn');
-
-    bell.addEventListener('click', () => {
-        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-        if (panel.style.display === 'flex') {
-            loadNotifications();
-        }
-    });
-
-    closeBtn.addEventListener('click', () => {
-        panel.style.display = 'none';
-    });
-
-    markAllBtn.addEventListener('click', async () => {
-        await fetch('/api/notifications/read-all', { method: 'POST' });
-        loadNotifications();
-    });
-
-    // Tab switching inside notification panel
-    panel.querySelectorAll('.panel-tab').forEach(tab => {
-        tab.addEventListener('click', async () => {
-            panel.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            const tabName = tab.dataset.tab;
-            await loadNotifications(tabName);
-        });
-    });
-
-    // Close when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!panel.contains(e.target) && !bell.contains(e.target)) {
-            panel.style.display = 'none';
-        }
-    });
-}
-
-async function loadNotifications(tab = 'notifications') {
-    const listEl = document.getElementById('notificationPanelList');
-    listEl.innerHTML = '<p style="padding: 1rem; text-align: center;">Loading...</p>';
-
-    try {
-        const response = await fetch(`/api/${tab}`);
-        const data = await response.json();
-
-        if (data.success && data[tab] && data[tab].length > 0) {
-            listEl.innerHTML = data[tab].map(item => renderNotificationItem(item, tab)).join('');
-        } else {
-            listEl.innerHTML = '<p style="padding: 1rem; text-align: center;">No ' + tab + ' yet.</p>';
-        }
-    } catch (err) {
-        listEl.innerHTML = '<p style="padding: 1rem; text-align: center; color: var(--danger);">Error loading notifications</p>';
-    }
-}
-
-function renderNotificationItem(item, type) {
-    const iconMap = {
-        'notification': '🔔',
-        'message': '💬',
-        'announcement': '📢'
-    };
-    const icon = iconMap[type] || '📌';
-    const timeAgo = getTimeAgo(new Date(item.createdAt));
-
-    let actionHtml = '';
-    if (item.actionUrl) {
-        actionHtml = `<a href="${item.actionUrl}" class="btn btn-sm btn-outline" style="margin-left: 0.5rem;">View</a>`;
-    }
-
-    return `
-        <div style="padding: 0.75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
-            <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="font-size: 1.2rem;">${icon}</span>
-                <div>
-                    <div style="font-weight: 500;">${escapeHtml(item.title || 'Notification')}</div>
-                    <div style="font-size: 0.875rem; color: var(--muted-foreground);">${escapeHtml(item.message || '')}</div>
-                    <div style="font-size: 0.75rem; color: var(--muted-foreground);">${timeAgo}</div>
-                </div>
-            </div>
-            <div>${actionHtml}</div>
-        </div>
-    `;
-}
-
-function getTimeAgo(date) {
-    const seconds = Math.floor((new Date() - date) / 1000);
-    if (seconds < 60) return 'just now';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return minutes + ' mins ago';
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return hours + ' hours ago';
-    const days = Math.floor(hours / 24);
-    return days + ' days ago';
 }
 
 // Reusable showAlert function

@@ -206,7 +206,7 @@ const requirePermission = (permission) => {
 
     try {
       const staffPermissions = await Permission.findOne({ role: req.session.user.role });
-      if (!staffPermissions || !staffPermissions.permissions[permission]) {
+      if (!staffPermissions || !staffPermissions.permissions || !staffPermissions.permissions[permission]) {
         const isApiRequest = req.xhr ||
                              req.headers.accept?.includes('application/json') ||
                              req.headers['content-type']?.includes('application/json') ||
@@ -4448,6 +4448,99 @@ app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewS
   } catch (err) {
     console.error('Error loading school profile:', err);
     res.status(500).render('404', { user: req.session.user, error: 'Error loading school profile' });
+  }
+});
+
+// GET: School edit form page (for admins/founders)
+app.get('/dashboard/schools/:schoolId/edit', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Invalid school identifier' });
+    }
+
+    const school = await School.findById(schoolId).lean();
+    if (!school) {
+      return res.status(404).render('404', { user: req.session.user, error: 'School not found' });
+    }
+
+    res.render('dashboard', {
+      user: req.session.user,
+      page: 'school-edit',
+      school
+    });
+  } catch (err) {
+    console.error('Error loading school edit form:', err);
+    res.status(500).render('404', { user: req.session.user, error: 'Failed to load edit form' });
+  }
+});
+
+// POST: Update school details (full edit for admins/founders)
+app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
+    const {
+      name,
+      street, city, state, zipCode, country,
+      zone, region,
+      contactName, contactEmail, contactPhone, contactPosition,
+      servicePackage,
+      notes
+    } = req.body;
+
+     const updateData = {};
+
+     if (name !== undefined && name.trim() !== '') {
+       updateData.name = name.trim();
+     }
+
+     // Address fields using dot notation to merge
+     if (street !== undefined) updateData['address.street'] = street.trim();
+     if (city !== undefined) updateData['address.city'] = city.trim();
+     if (state !== undefined) updateData['address.state'] = state.trim();
+     if (zipCode !== undefined) updateData['address.zipCode'] = zipCode.trim();
+     if (country !== undefined) updateData['address.country'] = country.trim();
+
+     if (zone !== undefined) updateData.zone = zone.trim();
+     if (region !== undefined) updateData.region = region.trim();
+
+     // Contact person fields using dot notation
+     if (contactName !== undefined) updateData['contactPerson.name'] = contactName.trim();
+     if (contactEmail !== undefined) updateData['contactPerson.email'] = contactEmail.trim().toLowerCase();
+     if (contactPhone !== undefined) updateData['contactPerson.phone'] = contactPhone.trim();
+     if (contactPosition !== undefined) updateData['contactPerson.position'] = contactPosition.trim();
+
+     if (servicePackage !== undefined) {
+       const validPackages = ['basic', 'standard', 'premium', 'custom'];
+       if (validPackages.includes(servicePackage)) {
+         updateData.servicePackage = servicePackage;
+       }
+     }
+
+     if (notes !== undefined) {
+       updateData.notes = notes.trim();
+     }
+
+    const updatedSchool = await School.findByIdAndUpdate(
+      schoolId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!updatedSchool) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    res.json({ success: true, school: updatedSchool, message: 'School updated successfully' });
+  } catch (err) {
+    console.error('Update school error:', err);
+    res.status(500).json({ success: false, error: 'Failed to update school' });
   }
 });
 

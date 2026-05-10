@@ -37,7 +37,7 @@
                 <h1>Trainer Dashboard</h1>
                 <div class="user-info" style="display: flex; align-items: center; gap: 1rem;">
                     <div class="notification-bell" id="notificationBell" style="position: relative; cursor: pointer;">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                         </svg>
@@ -48,8 +48,8 @@
             </header>
 
             <section class="dashboard-content">
-                <!-- Notification Panel (hidden by default) -->
-                <div id="notificationPanel" class="notification-panel" style="display: none; position: fixed; top: 4rem; right: 2rem; width: 450px; max-height: calc(100vh - 5rem); background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-card); z-index: 999; overflow: hidden;">
+                <!-- Notification Panel -->
+                <div id="notificationPanel" class="notification-panel">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border); background: var(--card); position: sticky; top: 0; z-index: 1;">
                         <div style="display: flex; gap: 1rem;">
                             <button class="panel-tab active" data-tab="notifications">Notifications</button>
@@ -521,307 +521,6 @@
              document.getElementById('leaveRequestForm').addEventListener('submit', submitLeaveRequest);
          });
 
-        // Load notification badge count
-        async function loadNotificationBadge() {
-            try {
-                const res = await fetch('/api/notifications?limit=1&unreadOnly=true');
-                const data = await res.json();
-                const badge = document.getElementById('notificationBadge');
-                if (data.success && data.unreadCount > 0) {
-                    badge.textContent = data.unreadCount > 99 ? '99+' : data.unreadCount;
-                    badge.style.display = 'flex';
-                } else {
-                    badge.style.display = 'none';
-                }
-            } catch (err) {
-                console.error('Error loading notification count:', err);
-            }
-        }
-
-        // Notification panel handling
-        let notificationPanelOpen = false;
-        let currentTab = 'notifications';
-
-        const tabs = document.querySelectorAll('.panel-tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', function() {
-                tabs.forEach(t => t.classList.remove('active'));
-                this.classList.add('active');
-                currentTab = this.dataset.tab;
-                loadPanelContent(currentTab);
-            });
-        });
-
-        document.getElementById('notificationBell').addEventListener('click', function(e) {
-            e.stopPropagation();
-            const panel = document.getElementById('notificationPanel');
-            notificationPanelOpen = !notificationPanelOpen;
-            panel.style.display = notificationPanelOpen ? 'block' : 'none';
-            if (notificationPanelOpen) {
-                // Reset to notifications tab and load
-                currentTab = 'notifications';
-                tabs.forEach(t => t.classList.remove('active'));
-                tabs[0].classList.add('active');
-                loadPanelContent(currentTab);
-            }
-        });
-
-        document.getElementById('closeNotificationPanel').addEventListener('click', function() {
-            document.getElementById('notificationPanel').style.display = 'none';
-            notificationPanelOpen = false;
-        });
-
-        document.getElementById('markAllReadBtn').addEventListener('click', async function() {
-            try {
-                if (currentTab === 'notifications') {
-                    await fetch('/api/notifications/read-all', { method: 'POST' });
-                } else if (currentTab === 'messages') {
-                    await fetch('/api/messages/mark-all-read', { method: 'POST' });
-                }
-                loadPanelContent(currentTab);
-                loadNotificationBadge();
-                loadDashboardData(); // Refresh all dashboard data
-                showToast('All marked as read', 'success');
-            } catch (err) {
-                console.error('Error:', err);
-                showToast('Failed to mark all as read', 'error');
-            }
-        });
-
-        // Close panel when clicking outside
-        document.addEventListener('click', function(e) {
-            const panel = document.getElementById('notificationPanel');
-            const bell = document.getElementById('notificationBell');
-            if (notificationPanelOpen && !bell.contains(e.target) && !panel.contains(e.target)) {
-                panel.style.display = 'none';
-                notificationPanelOpen = false;
-            }
-        });
-
-        async function loadPanelContent(tab) {
-            switch(tab) {
-                case 'notifications':
-                    await loadNotificationsPanel();
-                    break;
-                case 'messages':
-                    await loadMessagesPanel();
-                    break;
-                case 'announcements':
-                    await loadAnnouncementsPanel();
-                    break;
-            }
-        }
-
-        async function loadNotificationsPanel() {
-            const container = document.getElementById('notificationPanelList');
-            try {
-                const res = await fetch('/api/notifications?limit=50');
-                const data = await res.json();
-                if (data.success && data.notifications.length > 0) {
-                    container.innerHTML = data.notifications.map(notif => {
-                        // For new_message notifications, show a button that opens modal instead of link
-                        const isMessage = notif.type === 'new_message';
-                        const viewButton = isMessage
-                            ? `<button class="btn btn-sm btn-primary" onclick="openMessageModal('${notif.entityId}')">View</button>`
-                            : (notif.actionUrl ? `<a href="${notif.actionUrl}" class="btn btn-sm btn-primary">${notif.actionLabel || 'View'}</a>` : '');
-
-                        return `
-                        <div class="card notification-item ${!notif.isRead ? 'unread' : ''}" style="margin-bottom: 0.5rem;" data-id="${notif._id}">
-                            <div class="card-content" style="padding: 1rem;">
-                                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                                    <span style="font-size: 1.5rem;">${getNotificationIcon(notif.type)}</span>
-                                    <div style="flex: 1; min-width: 0;">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem;">
-                                            <h4 style="margin: 0; font-size: 1rem;">${notif.title}</h4>
-                                            <small style="color: var(--muted-foreground); font-size: 0.75rem;">${new Date(notif.createdAt).toLocaleDateString()}</small>
-                                        </div>
-                                        <p style="margin: 0; font-size: 0.9rem; color: var(--muted-foreground);">${notif.message}</p>
-                                        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                            ${!notif.isRead ? `<button class="btn btn-sm btn-outline" onclick="markNotificationRead('${notif._id}')">Mark Read</button>` : ''}
-                                            ${!notif.dismissed ? `<button class="btn btn-sm btn-outline" onclick="dismissNotification('${notif._id}')">Dismiss</button>` : ''}
-                                            ${viewButton}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `}).join('');
-                } else {
-                    container.innerHTML = '<div class="notification-dropdown-empty">No notifications yet</div>';
-                }
-            } catch (err) {
-                console.error('Error loading notifications:', err);
-                container.innerHTML = '<div class="notification-dropdown-empty">Error loading notifications</div>';
-            }
-        }
-
-        async function loadMessagesPanel() {
-            const container = document.getElementById('notificationPanelList');
-            try {
-                const res = await fetch('/api/messages?folder=inbox&limit=20');
-                const data = await res.json();
-                if (data.success && data.messages.length > 0) {
-                    container.innerHTML = data.messages.map(msg => `
-                        <div class="card notification-item ${msg.recipients?.some(r => r.staffId === '<%= user.id %>' && r.status !== 'read') ? 'unread' : ''}" style="margin-bottom: 0.5rem;" data-id="${msg._id}">
-                            <div class="card-content" style="padding: 1rem;">
-                                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                                    <span style="font-size: 1.5rem;">✉️</span>
-                                    <div style="flex: 1; min-width: 0;">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem;">
-                                            <h4 style="margin: 0; font-size: 1rem;">${msg.subject || '(No Subject)'}</h4>
-                                            <small style="color: var(--muted-foreground); font-size: 0.75rem;">${new Date(msg.sentAt).toLocaleDateString()}</small>
-                                        </div>
-                                        <p style="margin: 0; font-size: 0.9rem; color: var(--muted-foreground);">From: ${msg.senderName} — ${msg.body.substring(0, 80)}${msg.body.length > 80 ? '...' : ''}</p>
-                                        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                            <button class="btn btn-sm btn-primary" onclick="openMessageModal('${msg._id}')">View</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = '<div class="notification-dropdown-empty">No messages</div>';
-                }
-            } catch (err) {
-                console.error('Error loading messages:', err);
-                container.innerHTML = '<div class="notification-dropdown-empty">Error loading messages</div>';
-            }
-        }
-
-        async function openMessageModal(messageId) {
-            try {
-                const res = await fetch(`/api/messages/${messageId}`);
-                const data = await res.json();
-                if (data.success && data.message) {
-                    const msg = data.message;
-                    document.getElementById('modalMessageSubject').textContent = msg.subject || '(No Subject)';
-                    document.getElementById('modalMessageBody').innerHTML = `
-                        <div style="margin-bottom: 1rem;">
-                            <p><strong>From:</strong> ${msg.senderName} (${msg.senderRole})</p>
-                            <p><strong>Sent:</strong> ${new Date(msg.sentAt).toLocaleString()}</p>
-                            ${msg.priority ? `<p><strong>Priority:</strong> ${msg.priority}</p>` : ''}
-                        </div>
-                        <hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;">
-                        <div style="white-space: pre-wrap; line-height: 1.6;">${msg.body}</div>
-                    `;
-                    document.getElementById('messageModal').style.display = 'flex';
-
-                    // Mark as read when opening
-                    await fetch(`/api/messages/${messageId}/read`, { method: 'POST' });
-                    loadNotificationBadge();
-                } else {
-                    showToast('Message not found', 'error');
-                }
-            } catch (err) {
-                console.error('Error loading message:', err);
-                showToast('Failed to load message', 'error');
-            }
-        }
-
-        document.getElementById('closeMessageModal').addEventListener('click', function() {
-            document.getElementById('messageModal').style.display = 'none';
-        });
-
-        // Close modal on background click
-        document.getElementById('messageModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                this.style.display = 'none';
-            }
-        });
-
-        // Load announcements into feed
-        function renderAnnouncementsFeed(announcements) {
-            const container = document.getElementById('announcementsFeed');
-            if (announcements && announcements.length > 0) {
-                container.innerHTML = announcements.map(ann => `
-                    <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${ann.priority === 'urgent' ? 'var(--destructive)' : ann.priority === 'high' ? 'var(--accent)' : 'var(--primary)'};">
-                        <h4 style="margin: 0 0 0.5rem 0;">${ann.title}</h4>
-                        <p style="margin: 0; color: var(--muted-foreground); font-size: 0.9rem;">${ann.content?.substring(0, 120) || ''}${ann.content?.length > 120 ? '...' : ''}</p>
-                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground);">
-                            Posted ${new Date(ann.createdAt).toLocaleDateString()}
-                            ${ann.requiresAcknowledgment ? '<span class="badge badge-warning">Requires Acknowledgment</span>' : ''}
-                        </div>
-                    </div>
-                `).join('');
-            } else {
-                container.innerHTML = '<p class="placeholder-text">No announcements</p>';
-            }
-        }
-
-        async function loadAnnouncementsPanel() {
-            const container = document.getElementById('notificationPanelList');
-            try {
-                const res = await fetch('/api/announcements?limit=20');
-                const data = await res.json();
-                if (data.success && data.announcements.length > 0) {
-                    container.innerHTML = data.announcements.map(ann => `
-                        <div class="card" style="margin-bottom: 0.5rem;">
-                            <div class="card-content" style="padding: 1rem;">
-                                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                                    <span style="font-size: 1.5rem;">📢</span>
-                                    <div style="flex: 1; min-width: 0;">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem;">
-                                            <h4 style="margin: 0; font-size: 1rem;">${ann.title}</h4>
-                                            <small style="color: var(--muted-foreground); font-size: 0.75rem;">${new Date(ann.createdAt).toLocaleDateString()}</small>
-                                        </div>
-                                        <p style="margin: 0; font-size: 0.9rem; color: var(--muted-foreground);">${ann.content?.substring(0, 100) || ''}${ann.content?.length > 100 ? '...' : ''}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = '<div class="notification-dropdown-empty">No announcements</div>';
-                }
-            } catch (err) {
-                console.error('Error loading announcements:', err);
-                container.innerHTML = '<div class="notification-dropdown-empty">Error loading announcements</div>';
-            }
-        }
-
-        function getNotificationIcon(type) {
-            const icons = {
-                assignment: '📌',
-                overdue: '⚠️',
-                upcoming_event: '📅',
-                payment_received: '💰',
-                new_message: '✉️',
-                document_approval: '📄',
-                event_reminder: '🔔',
-                report_reminder: '📊',
-                announcement: '📢',
-                system: '⚙️',
-                feedback: '⭐',
-                approval_required: '✅'
-            };
-            return icons[type] || '🔔';
-        }
-
-        async function markNotificationRead(notificationId) {
-            try {
-                await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' });
-                loadNotificationBadge();
-                loadAllNotifications();
-                loadDashboardData(); // Refresh all data
-            } catch (err) {
-                console.error('Error:', err);
-                showToast('Failed to mark notification as read', 'error');
-            }
-        }
-
-        async function dismissNotification(notificationId) {
-            try {
-                await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' });
-                await fetch(`/api/notifications/${notificationId}/dismiss`, { method: 'POST' });
-                loadAllNotifications();
-                loadNotificationBadge();
-                loadDashboardData(); // Refresh all data
-            } catch (err) {
-                console.error('Error:', err);
-                showToast('Failed to dismiss notification', 'error');
-            }
-        }
 
         function renderTodaySchedule(events) {
             const container = document.getElementById('todaySchedule');
@@ -1024,5 +723,11 @@
         function openMessageCompose() {
             showToast('Message composer coming soon! For now, use the inbox.', 'info');
         }
+
+    <script>
+      window.currentUserId = '<%= user.id %>';
+    </script>
+    <script src="/js/notifications.js"></script>
 </body>
 </html>
+

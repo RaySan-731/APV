@@ -193,135 +193,269 @@ body {
     border: 1px solid var(--border);
 }
 
-/* Notification Bell & Dropdown */
+/* ========== NOTIFICATION BELL & PANEL ========== */
 .notification-bell {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem;
-    border-radius: var(--radius);
-    transition: var(--transition-base);
+    padding: 0.625rem;
+    border-radius: 50%;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    cursor: pointer;
+    background: transparent;
 }
+
 .notification-bell:hover {
     background: var(--muted);
+    transform: scale(1.05);
 }
+
+.notification-bell:active {
+    transform: scale(0.95);
+}
+
 .notification-bell svg {
     width: 1.5rem;
     height: 1.5rem;
     color: var(--foreground);
 }
+
 #notificationBadge {
     position: absolute;
-    top: 0;
-    right: 0;
-    transform: translate(25%, -25%);
-    font-size: 0.7rem;
-    padding: 0.2rem 0.4rem;
-    min-width: 1.2rem;
-    height: 1.2rem;
+    top: -2px;
+    right: -2px;
+    transform: translate(20%, -20%);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.15rem 0.35rem;
+    min-width: 1.25rem;
+    height: 1.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
-}
-.notification-dropdown {
-    display: none;
-    position: absolute;
-    top: 100%;
-    right: 0;
-    width: 320px;
-    max-height: 400px;
-    overflow-y: auto;
-    background: var(--card);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-card);
-    z-index: 1000;
-    margin-top: 0.5rem;
-    animation: slideDown 0.2s ease-out;
-}
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.notification-dropdown .dropdown-header {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    background: var(--card);
-}
-.notification-dropdown-item {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.2s;
-}
-.notification-dropdown-item:hover {
-    background: var(--muted);
-}
-.notification-dropdown-item.unread {
-    background: var(--muted);
-}
-.notification-dropdown-empty {
-    padding: 2rem;
-    text-align: center;
-    color: var(--muted-foreground);
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    border-radius: 999px;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+    animation: badgePulse 0.4s ease-out;
 }
 
-/* Notification Panel (Dashboard) */
+@keyframes badgePulse {
+    0% { transform: translate(20%, -20%) scale(0); }
+    50% { transform: translate(20%, -20%) scale(1.2); }
+    100% { transform: translate(20%, -20%) scale(1); }
+}
+
+/* Notification Panel */
 .notification-panel {
     display: none;
     position: fixed;
     top: 4rem;
     right: 2rem;
-    width: 400px;
+    width: 420px;
     max-height: calc(100vh - 5rem);
     background: var(--card);
     border-radius: var(--radius);
-    box-shadow: var(--shadow-card);
-    z-index: 999;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    z-index: 9999;
     overflow: hidden;
-    animation: slideInRight 0.3s ease-out;
+    animation: slideInRight 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--border);
 }
+
 @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
 }
+
+.notification-panel .card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
 .notification-panel .card-header h3 {
     margin: 0;
     font-size: 1.1rem;
-}
-#notificationPanelList .notification-item {
-    margin-bottom: 0;
-    border-radius: 0;
-}
-#notificationPanelList .notification-item:last-child {
-    border-bottom: none;
+    font-weight: 600;
+    color: var(--foreground);
 }
 
 /* Panel Tabs */
-#notificationPanel .panel-tab {
+.notification-panel .panel-tab {
     background: none;
     border: none;
-    padding: 0.5rem 0.75rem;
+    padding: 0.6rem 1rem;
     cursor: pointer;
     color: var(--muted-foreground);
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     font-weight: 500;
     border-bottom: 2px solid transparent;
-    transition: var(--transition-base);
+    transition: all 0.2s ease;
+    border-radius: 0.5rem 0.5rem 0 0;
 }
-#notificationPanel .panel-tab:hover {
+
+.notification-panel .panel-tab:hover {
     color: var(--foreground);
+    background: rgba(0, 0, 0, 0.04);
     border-bottom-color: var(--border);
 }
-#notificationPanel .panel-tab.active {
+
+.notification-panel .panel-tab.active {
     color: var(--primary);
     border-bottom-color: var(--primary);
+    background: rgba(37, 99, 235, 0.05);
+}
+
+#notificationPanelList {
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+.notification-item {
+    transition: background 0.2s ease;
+}
+
+.notification-item:hover {
+    background: var(--muted);
+}
+
+.notification-item.unread {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0.02) 100%);
+    border-left: 3px solid var(--primary);
+}
+
+.notification-item.unread:hover {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%);
+}
+
+.notification-dropdown-empty {
+    padding: 2.5rem;
+    text-align: center;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.notification-dropdown-empty::before {
+    content: '🔔';
+    font-size: 2.5rem;
+    opacity: 0.5;
+}
+
+/* Message Modal */
+#messageModal .modal-content {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 2rem;
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+#messageModal .card-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+}
+
+#messageModal .card-content {
+    padding: 1.5rem;
+    line-height: 1.7;
+}
+
+/* Badge animation for new notifications */
+@keyframes badgePop {
+    0% { transform: translate(20%, -20%) scale(0); }
+    50% { transform: translate(20%, -20%) scale(1.3); }
+    100% { transform: translate(20%, -20%) scale(1); }
+}
+
+.badge-pop {
+    animation: badgePop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Scrollbar styling for notification panel */
+#notificationPanelList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#notificationPanelList::-webkit-scrollbar-track {
+    background: var(--muted);
+}
+
+#notificationPanelList::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 3px;
+}
+
+#notificationPanelList::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .notification-panel {
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        max-height: 80vh;
+        border-radius: 1rem 1rem 0 0;
+        animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(100%);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    #notificationPanelList {
+        max-height: calc(100vh - 10rem);
+    }
 }
 
 
@@ -2523,4 +2657,338 @@ input:checked + .slider:before {
     .preference-controls {
         align-self: flex-end;
     }
+}
+
+/* ============ Enhanced Event Modal Styles ============ */
+
+/* Modal body padding */
+.modal-body {
+    padding: 1.5rem 2rem 2rem;
+}
+
+/* Form sections with headers */
+.form-section {
+    margin-bottom: 1.5rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary);
+    color: var(--primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.section-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
+.section-subtitle {
+    font-weight: 400;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+}
+
+/* Grid variations for event form */
+.event-form .two-col {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.event-form .full-width {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+    .event-form .two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Required field indicator */
+.required-field > span::after,
+label[class*="required"] span::after {
+    content: " *";
+    color: var(--destructive);
+    font-weight: bold;
+}
+
+/* Field-level help and error */
+.field-help {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.field-error {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--destructive);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Validation states */
+.form-control.error {
+    border-color: var(--destructive) !important;
+    box-shadow: 0 0 0 2px hsl(0, 84%, 60% / 0.15);
+}
+
+.form-control.valid {
+    border-color: #16a34a !important;
+    box-shadow: 0 0 0 2px hsl(142, 76%, 36% / 0.15);
+}
+
+/* Character counter */
+.char-count-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.25rem;
+}
+
+.char-count {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    transition: color 0.2s;
+}
+
+/* Input with clear button */
+.input-with-clear {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-clear input {
+    padding-right: 2.5rem;
+}
+
+.clear-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted-foreground);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    line-height: 1;
+}
+
+.clear-btn:hover {
+    color: var(--foreground);
+}
+
+/* Checkbox label inline */
+.checkbox-label-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: normal;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+/* Dynamic list rows (equipment/prerequisites) */
+.dynamic-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.equipment-row,
+.prerequisite-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding: 0.5rem;
+    background: var(--muted);
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+}
+
+.equipment-row:hover,
+.prerequisite-row:hover {
+    background: hsl(140, 20%, 96%);
+}
+
+.equipment-row {
+    flex-wrap: wrap;
+}
+
+.equipment-row .form-control {
+    flex: 1;
+    min-width: 120px;
+}
+
+.equipment-row .qty-input {
+    flex: 0 0 70px;
+    min-width: 60px;
+}
+
+.equipment-row .provider-select {
+    flex: 0 0 140px;
+    min-width: 130px;
+}
+
+.prerequisite-row {
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.prerequisite-row .form-control {
+    flex: 1;
+    min-width: 200px;
+}
+
+.prerequisite-row .checkbox-label-inline {
+    flex: 0 0 auto;
+    margin-top: 0.35rem;
+}
+
+.btn-remove {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+}
+
+/* Add item button */
+.btn-add-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    width: fit-content;
+}
+
+.btn-add-item svg {
+    flex-shrink: 0;
+}
+
+/* Alert message in modal */
+.modal-body .alert {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    border-left: 4px solid;
+}
+
+.alert-error {
+    background: hsl(0, 84%, 95%);
+    color: hsl(0, 84%, 40%);
+    border-left-color: hsl(0, 84%, 60%);
+}
+
+/* Form layout structure for modal */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.form-grid label > span {
+    font-weight: 500;
+    color: var(--foreground);
+    font-size: 0.95rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .equipment-row,
+    .prerequisite-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .equipment-row .form-control,
+    .equipment-row .qty-input,
+    .equipment-row .provider-select,
+    .prerequisite-row .form-control,
+    .prerequisite-row .checkbox-label-inline {
+        min-width: 100%;
+        width: 100%;
+        flex: none;
+    }
+
+    .equipment-row .btn-remove,
+    .prerequisite-row .btn-remove {
+        align-self: flex-end;
+        margin-top: -0.5rem;
+    }
+
+    .form-actions {
+        flex-direction: column-reverse;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+    }
+}
+
+/* Smaller form controls inside dynamic rows */
+.form-control {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--card);
+    color: var(--foreground);
+    font-size: 0.95rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 2px hsl(140, 45%, 28% / 0.1);
+}
+
+.form-control::placeholder {
+    color: var(--muted-foreground);
+    opacity: 0.7;
+}
+
+/* Label base rule */
+.modal-content label {
+    font-weight: 400;
 }

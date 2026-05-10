@@ -36,7 +36,7 @@
                 <h1>My Events</h1>
                 <div class="user-info" style="display: flex; align-items: center; gap: 1rem;">
                     <div class="notification-bell" id="notificationBell" style="position: relative; cursor: pointer;">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                         </svg>
@@ -48,7 +48,7 @@
 
             <section class="dashboard-content">
                 <!-- Notification Panel -->
-                <div id="notificationPanel" class="notification-panel" style="display: none; position: fixed; top: 4rem; right: 2rem; width: 450px; max-height: calc(100vh - 5rem); background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-card); z-index: 999; overflow: hidden;">
+                <div id="notificationPanel" class="notification-panel">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border); background: var(--card); position: sticky; top: 0; z-index: 1;">
                         <div style="display: flex; gap: 1rem;">
                             <button class="panel-tab active" data-tab="notifications">Notifications</button>
@@ -206,5 +206,9 @@
 
     <!-- Load trainer events JavaScript -->
     <script src="/js/trainer_events.js"></script>
+    <script>
+      window.currentUserId = '<%= user.id %>';
+    </script>
+    <script src="/js/notifications.js"></script>
 </body>
 </html>

@@ -39,6 +39,11 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Price per person at time of booking (snapshot)
+  programPrice: {
+    type: Number,
+    default: 0
+  },
   // Preserve any legacy/third-party ID values from the original JSON store
   // so administrators can cross-reference migrated records with legacy data.
   legacyId: {

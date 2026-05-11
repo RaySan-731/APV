@@ -6,97 +6,987 @@
   <title>Book a Program - Arrow-Park Ventures</title>
   <link rel="stylesheet" href="/css/styles.css">
   <style>
-    .inline-error { color: #b91c1c; font-size: 0.9rem; margin-top: 0.25rem; }
-    .form-group { margin-bottom: 1rem; }
+    .booking-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+      transition: var(--transition-base);
+    }
+
+    .back-link:hover {
+      color: var(--primary-hover);
+      transform: translateX(-4px);
+    }
+
+    .page-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+      text-align: center;
+    }
+
+    .page-subtitle {
+      text-align: center;
+      color: var(--muted-foreground);
+      font-size: 1.125rem;
+      margin-bottom: 2.5rem;
+    }
+
+    /* Programs Grid */
+    .programs-section {
+      margin-bottom: 2.5rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      color: var(--foreground);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .section-title::before {
+      content: '';
+      display: block;
+      width: 4px;
+      height: 1.5rem;
+      background: var(--primary);
+      border-radius: 2px;
+    }
+
+    .programs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .program-card {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      cursor: pointer;
+      transition: var(--transition-base);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .program-card:hover {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-soft);
+      transform: translateY(-2px);
+    }
+
+    .program-card.selected {
+      border-color: var(--primary);
+      background: linear-gradient(135deg, hsl(140, 45%, 28%) 0%, hsl(160, 40%, 35%) 100%);
+      color: var(--primary-foreground);
+      box-shadow: 0 0 0 4px hsl(140, 45%, 28% / 0.1);
+    }
+
+    .program-card:focus {
+      outline: 3px solid var(--ring);
+      outline-offset: 2px;
+    }
+
+    .program-card.selected .program-desc,
+    .program-card.selected .program-meta {
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .program-card.selected .program-price {
+      color: var(--accent);
+    }
+
+    .program-card.selected .duration-badge {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+    }
+
+    .program-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    .program-desc {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+      margin-bottom: 1rem;
+    }
+
+    .program-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+    }
+
+    .duration-badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      background: var(--secondary);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--secondary-foreground);
+    }
+
+    .program-price {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .program-card.selected .price-label {
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .price-label {
+      font-size: 0.85rem;
+      font-weight: normal;
+      color: var(--muted-foreground);
+      margin-right: 0.25rem;
+    }
+
+    /* Form Card */
+    .booking-form {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .form-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--muted);
+    }
+
+    .form-header h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--foreground);
+    }
+
+    .form-body {
+      padding: 2rem;
+    }
+
+    .form-section {
+      margin-bottom: 2rem;
+    }
+
+    .form-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-label {
+      display: block;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted-foreground);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-group label {
+      font-weight: 500;
+      color: var(--foreground);
+      font-size: 0.95rem;
+    }
+
+    .form-group small {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-top: 0.25rem;
+    }
+
+    .form-input,
+    .form-textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      transition: var(--transition-base);
+      background: var(--card);
+      color: var(--foreground);
+    }
+
+    .form-input:focus,
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--ring);
+      box-shadow: 0 0 0 3px hsl(140, 45%, 28% / 0.1);
+    }
+
+    .form-input.error,
+    .form-textarea.error {
+      border-color: var(--destructive);
+      box-shadow: 0 0 0 3px hsl(0, 84%, 60% / 0.1);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    /* Radio Button Group */
+    .radio-group {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.25rem;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      transition: var(--transition-base);
+      flex: 1;
+      justify-content: center;
+    }
+
+    .radio-option:hover {
+      border-color: var(--primary);
+      background: var(--muted);
+    }
+
+    .radio-option.selected {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--primary-foreground);
+    }
+
+    .radio-option:focus {
+      outline: 3px solid var(--ring);
+      outline-offset: 2px;
+    }
+
+    .radio-option input[type="radio"] {
+      display: none;
+    }
+
+    .radio-option .radio-icon {
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .radio-option.selected .radio-icon::after {
+      content: '';
+      width: 0.5rem;
+      height: 0.5rem;
+      background: currentColor;
+      border-radius: 50%;
+    }
+
+    /* Price Summary Card */
+    .price-summary {
+      background: linear-gradient(135deg, var(--secondary) 0%, var(--muted) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .price-label {
+      font-size: 0.95rem;
+      color: var(--muted-foreground);
+    }
+
+    .price-total {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .price-details {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-top: 0.25rem;
+    }
+
+    /* Error Display */
+    .field-errors {
+      margin-top: 0.25rem;
+    }
+
+    .field-error {
+      display: block;
+      color: var(--destructive);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .form-error {
+      background: hsl(0, 84%, 95%);
+      border: 1px solid hsl(0, 84%, 90%);
+      color: hsl(0, 84%, 60%);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .form-error::before {
+      content: '⚠';
+      font-size: 1.1rem;
+    }
+
+    .form-success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+    }
+
+    /* Submit Button */
+    .form-actions {
+      margin-top: 2rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .btn-submit {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: var(--transition-base);
+      min-width: 200px;
+      justify-content: center;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-cancel {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+      color: var(--muted-foreground);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      transition: var(--transition-base);
+    }
+
+    .btn-cancel:hover {
+      background: var(--muted);
+      color: var(--foreground);
+    }
+
+    /* User info display */
+    .user-info-display {
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .user-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .user-details {
+      flex: 1;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 0.125rem;
+    }
+
+    .user-email {
+      font-size: 0.9rem;
+      color: var(--muted-foreground);
+    }
+
+    .user-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .page-title {
+        font-size: 2rem;
+      }
+
+      .programs-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-body {
+        padding: 1.5rem;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .radio-group {
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .price-summary {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .form-actions {
+        flex-direction: column;
+      }
+
+      .btn-submit,
+      .btn-cancel {
+        width: 100%;
+      }
+    }
+
+    /* Spinner for loading state */
+    .spinner {
+      display: inline-block;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Hidden select for program (used for form submission) */
+    #program {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <div class="container" style="padding:2rem 1rem;">
-    <a href="/" style="display:inline-block; margin-bottom:1rem;">← Back</a>
-    <h1>Book a Program</h1>
-    <p>Select a program and provide booking details.</p>
+  <div class="booking-page">
+    <a href="/" class="back-link">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Back to Home
+    </a>
 
-    <section class="card" style="margin-bottom:1.5rem;">
-      <div class="card-header"><h3>Available Programs</h3></div>
-      <div class="card-content">
-        <ul>
-          <% const programsList = ['Leadership Training','Outdoor Education','Team Building','Scout Training Sessions']; %>
-          <% programsList.forEach(function(p){ %>
-            <li style="padding:0.5rem 0;"><strong><%= p %></strong></li>
-          <% }) %>
-        </ul>
+    <h1 class="page-title">Book a Program</h1>
+    <p class="page-subtitle">Choose an adventure and reserve your spot with Arrow-Park Ventures</p>
+
+    <!-- Programs Selection Section -->
+    <section class="programs-section">
+      <h2 class="section-title">Available Programs</h2>
+      <div class="programs-grid">
+        <% programs.forEach(function(program) { %>
+          <div class="program-card" 
+               data-program="<%= program.name %>"
+               data-price="<%= program.price.amount %>"
+               data-max-participants="<%= program.maxParticipants %>"
+               tabindex="0"
+               role="button"
+               aria-pressed="false"
+               aria-label="Select <%= program.name %> program">
+            <h3 class="program-name"><%= program.name %></h3>
+            <p class="program-desc"><%= program.description %></p>
+            <div class="program-meta">
+              <span class="duration-badge"><%= program.duration.replace('-', ' ') %></span>
+              <span>Ages <%= program.ageGroup.min %>-<%= program.ageGroup.max %></span>
+              <span>Max <%= program.maxParticipants %> participants</span>
+            </div>
+            <div class="program-price">
+              <span class="price-label">$<%= program.price.amount.toFixed(2) %> per person</span>
+            </div>
+          </div>
+        <% }) %>
       </div>
     </section>
 
-    <section class="card">
-      <div class="card-header"><h3>Book Now</h3></div>
-      <div class="card-content">
-        <form id="bookingForm" action="/book/submit" method="POST">
-          <div class="form-group">
-            <label for="program">Program</label>
-            <select id="program" name="program" class="form-input" required>
-              <option value="Leadership Training">Leadership Training</option>
-              <option value="Outdoor Education">Outdoor Education</option>
-              <option value="Team Building">Team Building</option>
-              <option value="Scout Training Sessions">Scout Training Sessions</option>
-            </select>
-          </div>
+    <!-- Booking Form -->
+    <section class="booking-form">
+      <div class="form-header">
+        <h3>Complete Your Booking</h3>
+      </div>
 
-          <div class="form-group">
-            <label>For</label>
-            <div>
-              <label style="margin-right:1rem;"><input type="radio" name="type" value="school" checked> School</label>
-              <label><input type="radio" name="type" value="group"> Group</label>
+      <div class="form-body">
+        <% if (user && user.email) { %>
+          <div class="user-info-display">
+            <div class="user-icon">
+              <%= user.name.charAt(0).toUpperCase() %>
+            </div>
+            <div class="user-details">
+              <div class="user-name"><%= user.name %></div>
+              <div class="user-email"><%= user.email %></div>
+            </div>
+            <span class="user-badge">Logged In</span>
+          </div>
+        <% } %>
+
+        <form id="bookingForm" action="/book/submit" method="POST" novalidate>
+          <!-- Hidden field for program selection -->
+          <input type="hidden" id="program" name="program">
+
+          <!-- Form errors container -->
+          <div class="form-error" id="err-form" style="display: none;"></div>
+
+          <div class="form-section">
+            <span class="section-label">Booking Details</span>
+
+            <div class="form-group">
+              <label for="date">Preferred Date *</label>
+              <input id="date" 
+                     name="date" 
+                     type="date" 
+                     class="form-input" 
+                     required
+                     aria-describedby="date-hint">
+              <small id="date-hint">Select a future date. Bookings require at least 7 days notice for groups.</small>
+              <div class="field-errors"><span class="field-error" id="err-date"></span></div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="participants">Number of Participants *</label>
+                <input id="participants" 
+                       name="participants" 
+                       type="number" 
+                       min="1" 
+                       value="20" 
+                       class="form-input" 
+                       required
+                       aria-describedby="participants-hint">
+                <small id="participants-hint">Must be between 1 and program's maximum capacity</small>
+                <div class="field-errors"><span class="field-error" id="err-participants"></span></div>
+              </div>
+
+              <div class="form-group">
+                <label>Booking Type *</label>
+                <div class="radio-group">
+                  <label class="radio-option selected" id="opt-school">
+                    <input type="radio" name="type" value="school" checked>
+                    <span class="radio-icon"></span>
+                    <span>School</span>
+                  </label>
+                  <label class="radio-option" id="opt-group">
+                    <input type="radio" name="type" value="group">
+                    <span class="radio-icon"></span>
+                    <span>Group</span>
+                  </label>
+                </div>
+                <small>School bookings may qualify for educational discounts</small>
+              </div>
             </div>
           </div>
 
-          <div class="form-group">
-            <label for="date">Preferred Date</label>
-            <input id="date" name="date" type="date" class="form-input" required>
+          <div class="form-section">
+            <span class="section-label">Additional Information</span>
+
+            <div class="form-group">
+              <label for="notes">Special Requests or Notes</label>
+              <textarea id="notes" 
+                        name="notes" 
+                        class="form-textarea" 
+                        rows="4"
+                        placeholder="Let us know about any dietary restrictions, accessibility needs, or specific goals for your group..."></textarea>
+            </div>
           </div>
 
-          <div class="form-group">
-            <label for="participants">Number of participants</label>
-            <input id="participants" name="participants" type="number" min="1" value="20" class="form-input" required>
-          </div>
-
-          <div class="form-group">
-            <label for="notes">Notes</label>
-            <textarea id="notes" name="notes" class="form-input" rows="4" placeholder="Any special requests or notes"></textarea>
-          </div>
-
+          <!-- Requester Information -->
           <% if (user && user.email) { %>
-            <div class="form-group">
-              <label>Your Name</label>
-              <input type="text" class="form-input" value="<%= user.name %>" readonly>
-            </div>
-            <div class="form-group">
-              <label>Your Email</label>
-              <input type="email" class="form-input" value="<%= user.email %>" readonly>
-              <input type="hidden" name="userEmail" value="<%= user.email %>">
-            </div>
+            <input type="hidden" name="userEmail" value="<%= user.email %>">
+            <input type="hidden" name="name" value="<%= user.name %>">
           <% } else { %>
-            <div class="form-group">
-              <label for="name">Your Name</label>
-              <input id="name" name="name" type="text" class="form-input" placeholder="Full name" required>
-              <div class="inline-error" id="err-name"></div>
-            </div>
-            <div class="form-group">
-              <label for="email">Your Email</label>
-              <input id="email" name="email" type="email" class="form-input" placeholder="you@example.com" required>
-              <div class="inline-error" id="err-email"></div>
+            <div class="form-section">
+              <span class="section-label">Your Information</span>
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="name">Your Name *</label>
+                  <input id="name" name="name" type="text" class="form-input" placeholder="John Doe" required>
+                  <div class="field-errors"><span class="field-error" id="err-name"></span></div>
+                </div>
+
+                <div class="form-group">
+                  <label for="email">Your Email *</label>
+                  <input id="email" name="email" type="email" class="form-input" placeholder="john@example.com" required>
+                  <div class="field-errors"><span class="field-error" id="err-email"></span></div>
+                </div>
+              </div>
             </div>
           <% } %>
 
-          <input type="hidden" name="userEmail" value="<%= (user && user.email) || '' %>">
+          <!-- Price Summary -->
+          <div class="price-summary" id="priceSummary" style="display: none;">
+            <div>
+              <div class="price-label">Estimated Total (<span id="participantCount">0</span> participants @ <span id="programName">-</span>)</div>
+              <div class="price-details" id="priceDetails">Select a program to see pricing</div>
+            </div>
+            <div class="price-total" id="totalPrice">$0</div>
+          </div>
 
-          <div class="form-group">
-            <div class="inline-error" id="err-form"></div>
-            <button type="submit" class="btn btn-primary">Request Booking</button>
+          <!-- Submit Actions -->
+          <div class="form-actions">
+            <button type="submit" class="btn-submit" id="submitBtn">
+              <span>Request Booking</span>
+            </button>
+            <a href="/" class="btn-cancel">Cancel</a>
           </div>
         </form>
       </div>
     </section>
   </div>
+
+  <script>
+    // DOM Ready
+    document.addEventListener('DOMContentLoaded', function() {
+      // Program cards
+      const programCards = document.querySelectorAll('.program-card');
+      const programInput = document.getElementById('program');
+      const programNameSpan = document.getElementById('programName');
+      const participantCountSpan = document.getElementById('participantCount');
+      const priceDetails = document.getElementById('priceDetails');
+      const totalPriceEl = document.getElementById('totalPrice');
+      const priceSummary = document.getElementById('priceSummary');
+      
+      const participantsInput = document.getElementById('participants');
+      const dateInput = document.getElementById('date');
+
+      let selectedProgram = null;
+      let selectedPrice = null;
+
+      // Set minimum date to tomorrow
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      dateInput.min = tomorrow.toISOString().split('T')[0];
+
+      // Program selection
+      programCards.forEach(card => {
+        card.addEventListener('click', function() {
+          // Deselect all
+          programCards.forEach(c => {
+            c.classList.remove('selected');
+            c.setAttribute('aria-pressed', 'false');
+          });
+          
+          // Select this one
+          this.classList.add('selected');
+          this.setAttribute('aria-pressed', 'true');
+          
+          // Update hidden input
+          selectedProgram = this.dataset.program;
+          selectedPrice = parseFloat(this.dataset.price);
+          programInput.value = selectedProgram;
+          
+          // Update max participants for this program
+          const maxParts = parseInt(this.dataset.maxParticipants) || 999;
+          participantsInput.max = maxParts;
+          participantsInput.setAttribute('title', `Maximum: ${maxParts} participants`);
+          
+          // Update price summary
+          programNameSpan.textContent = selectedProgram;
+          updatePrice();
+          
+          // Clear program error if exists
+          document.getElementById('err-form').style.display = 'none';
+        });
+
+        // Keyboard accessibility - Enter or Space to select
+        card.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.click();
+          }
+        });
+      });
+
+      // Radio button enhancement
+      const radioInputs = document.querySelectorAll('input[name="type"]');
+      const radioLabels = document.querySelectorAll('.radio-option');
+
+      // Make labels focusable and set ARIA
+      radioLabels.forEach(label => {
+        label.setAttribute('tabindex', '0');
+        label.setAttribute('role', 'radio');
+        
+        const radio = label.querySelector('input[type="radio"]');
+        if (radio) {
+          // Sync ARIA state
+          label.setAttribute('aria-checked', radio.checked);
+          
+          // Listen for changes to update visual and ARIA state
+          radio.addEventListener('change', function() {
+            document.querySelectorAll(`input[name="${this.name}"]`).forEach(r => {
+              const lbl = r.closest('.radio-option');
+              lbl.classList.remove('selected');
+              lbl.setAttribute('aria-checked', r.checked);
+            });
+            this.closest('.radio-option').classList.add('selected');
+            this.closest('.radio-option').setAttribute('aria-checked', 'true');
+          });
+        }
+
+        // Keyboard interaction
+        label.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const radio = this.querySelector('input[type="radio"]');
+            if (radio && !radio.checked) {
+              radio.checked = true;
+              radio.dispatchEvent(new Event('change'));
+            }
+          }
+        });
+      });
+
+      // Set initial state (already done via HTML checked, but ensure class)
+      radioInputs.forEach(radio => {
+        if (radio.checked) {
+          radio.closest('.radio-option').classList.add('selected');
+        }
+      });
+
+      // Participants change handler
+      participantsInput.addEventListener('input', updatePrice);
+      participantsInput.addEventListener('change', updatePrice);
+
+      function updatePrice() {
+        const participants = parseInt(participantsInput.value) || 0;
+        participantCountSpan.textContent = participants;
+        
+        if (selectedProgram && selectedPrice && participants > 0) {
+          priceSummary.style.display = 'flex';
+          const total = participants * selectedPrice;
+          totalPriceEl.textContent = `$${total.toFixed(2)}`;
+          priceDetails.textContent = `$${selectedPrice.toFixed(2)} × ${participants} participants`;
+        } else if (selectedProgram) {
+          priceSummary.style.display = 'flex';
+          totalPriceEl.textContent = '$0.00';
+          priceDetails.textContent = 'Enter participant count to see total';
+        } else {
+          priceSummary.style.display = 'none';
+        }
+      }
+
+      // Form validation
+      const bookingForm = document.getElementById('bookingForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const origBtnText = submitBtn.innerHTML;
+
+      bookingForm.addEventListener('submit', function(e) {
+        // Prevent default and stop other handlers (like main.js generic validation)
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        
+        // Clear previous errors
+        clearErrors();
+
+        let invalid = false;
+
+        // Validate program selection
+        if (!selectedProgram) {
+          showFormError('Please select a program.');
+          // Highlight the programs section
+          document.querySelector('.programs-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+          invalid = true;
+        }
+
+        // Validate date
+        const dateValue = dateInput.value;
+        if (!dateValue) {
+          showFieldError('date', 'Please select a date.');
+          invalid = true;
+        } else {
+          const chosen = new Date(dateValue);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (chosen < today) {
+            showFieldError('date', 'Date must be in the future.');
+            invalid = true;
+          }
+        }
+
+        // Validate participants
+        const participants = parseInt(participantsInput.value, 10);
+        if (isNaN(participants) || participants < 1) {
+          showFieldError('participants', 'Participants must be at least 1.');
+          invalid = true;
+        } else if (selectedProgram) {
+          const maxAllowed = parseInt(participantsInput.max) || 999;
+          if (participants > maxAllowed) {
+            showFieldError('participants', `Maximum capacity for this program is ${maxAllowed} participants.`);
+            invalid = true;
+          }
+        }
+
+        // Validate guest info if needed
+        <% if (!user || !user.email) { %>
+          const nameInput = document.getElementById('name');
+          const emailInput = document.getElementById('email');
+
+          if (!nameInput.value.trim()) {
+            showFieldError('name', 'Please enter your name.');
+            invalid = true;
+          }
+
+          const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRe.test(emailInput.value.trim())) {
+            showFieldError('email', 'Please enter a valid email address.');
+            invalid = true;
+          }
+        <% } %>
+
+        if (!invalid) {
+          // Show loading state
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
+
+          // Submit the form manually
+          e.target.submit();
+        }
+      });
+
+      function showFieldError(fieldId, message) {
+        const errorEl = document.getElementById('err-' + fieldId);
+        if (errorEl) {
+          errorEl.textContent = message;
+          errorEl.style.display = 'block';
+        }
+        const input = document.getElementById(fieldId);
+        if (input) {
+          input.classList.add('error');
+        }
+      }
+
+      function showFormError(message) {
+        const errorEl = document.getElementById('err-form');
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+      }
+
+      function clearErrors() {
+        document.querySelectorAll('.field-error').forEach(el => {
+          el.textContent = '';
+          el.style.display = 'none';
+        });
+        document.querySelectorAll('.form-input, .form-textarea').forEach(el => {
+          el.classList.remove('error');
+        });
+        const formError = document.getElementById('err-form');
+        if (formError) {
+          formError.style.display = 'none';
+        }
+      }
+
+      // Real-time validation cleanup
+      ['date', 'participants', 'name', 'email'].forEach(fieldId => {
+        const input = document.getElementById(fieldId);
+        if (input) {
+          input.addEventListener('input', function() {
+            const errorEl = document.getElementById('err-' + fieldId);
+            if (errorEl && errorEl.textContent) {
+              errorEl.style.display = 'none';
+              errorEl.textContent = '';
+            }
+            this.classList.remove('error');
+          });
+        }
+      });
+    });
+  </script>
 </body>
 </html>

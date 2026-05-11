@@ -1613,14 +1613,46 @@ app.get('/api/trainer/events', requireAuth, async (req, res) => {
 
 // Booking routes
 // Allow guests to view and submit bookings; when logged-in, form will pre-fill
-app.get('/book', (req, res) => {
-  res.render('book_program', { user: req.session.user });
+app.get('/book', async (req, res) => {
+  try {
+    // Fetch active programs from database
+    const programs = await Program.find({ status: 'active' }).sort({ name: 1 });
+    res.render('book_program', { 
+      user: req.session.user,
+      programs: programs
+    });
+  } catch (err) {
+    console.error('Error fetching programs:', err);
+    // Fallback to default programs if database fetch fails
+    const defaultPrograms = [
+      { name: 'Leadership Training', description: 'Develop essential leadership skills through hands-on activities and team challenges.', duration: 'full-day', maxParticipants: 30, price: { amount: 45 }, ageGroup: { min: 14, max: 18 } },
+      { name: 'Outdoor Education', description: 'Explore nature while learning about environmental stewardship and outdoor skills.', duration: 'half-day', maxParticipants: 25, price: { amount: 25 }, ageGroup: { min: 10, max: 18 } },
+      { name: 'Team Building', description: 'Build collaboration and communication through interactive group activities.', duration: 'half-day', maxParticipants: 40, price: { amount: 20 }, ageGroup: { min: 8, max: 18 } },
+      { name: 'Scout Training Sessions', description: 'Complete badge requirements and advance through scouting ranks.', duration: 'weekend', maxParticipants: 20, price: { amount: 35 }, ageGroup: { min: 11, max: 18 } }
+    ];
+    res.render('book_program', { 
+      user: req.session.user,
+      programs: defaultPrograms
+    });
+  }
 });
 
 app.post('/book/submit', async (req, res) => {
   const { program, type, date, participants, notes, userEmail, name, email } = req.body;
 
   try {
+    // Look up program price if available
+    let programPrice = 0;
+    try {
+      const programDoc = await Program.findOne({ name: program, status: 'active' });
+      if (programDoc && programDoc.price && programDoc.price.amount) {
+        programPrice = programDoc.price.amount;
+      }
+    } catch (err) {
+      console.warn('Could not fetch program price:', err.message);
+      // Continue without price - will show $0 on success page
+    }
+
     const booking = new Booking({
       program: program || 'Unknown',
       type: type || 'school',
@@ -1630,7 +1662,9 @@ app.post('/book/submit', async (req, res) => {
       // prefer session user email, then hidden userEmail, then posted email (guest), else 'guest'
       userEmail: (req.session.user && req.session.user.email) || userEmail || email || 'guest',
       requesterName: (req.session.user && req.session.user.name) || name || '',
-      status: 'pending'
+      status: 'pending',
+      // Store price snapshot for reference
+      programPrice: programPrice
     });
 
     await booking.save();

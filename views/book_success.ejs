@@ -5,27 +5,372 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Booking Confirmed - Arrow-Park Ventures</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .success-page {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    .success-icon {
+      width: 5rem;
+      height: 5rem;
+      background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .success-icon svg {
+      width: 2.5rem;
+      height: 2.5rem;
+      color: white;
+    }
+
+    @keyframes scaleIn {
+      from { transform: scale(0); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .success-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+    }
+
+    .success-message {
+      font-size: 1.125rem;
+      color: var(--muted-foreground);
+      margin-bottom: 2.5rem;
+      line-height: 1.6;
+    }
+
+    .booking-summary {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      margin-bottom: 2rem;
+      text-align: left;
+    }
+
+    .summary-header {
+      background: linear-gradient(135deg, var(--primary) 0%, hsl(140, 50%, 23%) 100%);
+      color: white;
+      padding: 1.25rem 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .summary-header svg {
+      width: 1.5rem;
+      height: 1.5rem;
+      opacity: 0.9;
+    }
+
+    .summary-body {
+      padding: 1.5rem;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.875rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .summary-row:last-of-type {
+      border-bottom: none;
+    }
+
+    .summary-row.total {
+      border-top: 2px solid var(--border);
+      border-bottom: none;
+      margin-top: 0.5rem;
+      padding-top: 1rem;
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--primary);
+    }
+
+    .summary-label {
+      color: var(--muted-foreground);
+      font-weight: 500;
+    }
+
+    .summary-value {
+      font-weight: 600;
+      color: var(--foreground);
+      text-align: right;
+    }
+
+    .summary-row.total .summary-value {
+      color: var(--primary);
+    }
+
+    .booking-reference {
+      background: var(--muted);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+      display: inline-block;
+    }
+
+    .reference-label {
+      font-size: 0.85rem;
+      color: var(--muted-foreground);
+      margin-bottom: 0.25rem;
+    }
+
+    .reference-id {
+      font-family: monospace;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      letter-spacing: 0.05em;
+    }
+
+    .next-steps {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      text-align: left;
+    }
+
+    .next-steps h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--foreground);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .next-steps ol {
+      margin: 0;
+      padding-left: 1.25rem;
+    }
+
+    .next-steps li {
+      margin-bottom: 0.75rem;
+      color: var(--foreground);
+      line-height: 1.5;
+    }
+
+    .next-steps li:last-child {
+      margin-bottom: 0;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 1.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: var(--radius);
+      transition: var(--transition-base);
+      border: 2px solid transparent;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--primary-foreground);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--foreground);
+      border-color: var(--border);
+    }
+
+    .btn-outline:hover {
+      background: var(--muted);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .btn-success {
+      background: #16a34a;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #15803d;
+      transform: translateY(-2px);
+    }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      .success-page {
+        padding: 1.5rem 1rem;
+      }
+
+      .success-title {
+        font-size: 1.75rem;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="container" style="padding:2rem 1rem;">
-    <a href="/" style="display:inline-block; margin-bottom:1rem;">← Back</a>
-    <h1>Booking Request Received</h1>
-    <p>Thank you. Your booking request has been recorded.</p>
+  <div class="success-page">
+    <div class="success-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
 
-    <section class="card">
-      <div class="card-content">
-        <ul>
-          <li><strong>Program:</strong> <%= booking.program %></li>
-          <li><strong>For:</strong> <%= booking.type %></li>
-          <li><strong>Date:</strong> <%= booking.date %></li>
-          <li><strong>Participants:</strong> <%= booking.participants %></li>
-          <li><strong>Requested by:</strong> <%= booking.userEmail || 'Guest' %></li>
-          <li><strong>Notes:</strong> <%= booking.notes || '-' %></li>
-        </ul>
+    <h1 class="success-title">Booking Request Received!</h1>
+    <p class="success-message">
+      Thank you for booking with Arrow-Park Ventures. We've received your request and will review it shortly.
+    </p>
+
+    <div class="booking-summary">
+      <div class="summary-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        Booking Summary
       </div>
-    </section>
 
-    <p style="margin-top:1rem;"><a href="/book">Make another booking</a></p>
+      <div class="summary-body">
+        <div class="summary-row">
+          <span class="summary-label">Program</span>
+          <span class="summary-value"><%= booking.program %></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Booking Type</span>
+          <span class="summary-value"><%= booking.type.charAt(0).toUpperCase() + booking.type.slice(1) %></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Preferred Date</span>
+          <span class="summary-value"><%= new Date(booking.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Number of Participants</span>
+          <span class="summary-value"><%= booking.participants %></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Requested By</span>
+          <span class="summary-value"><%= booking.requesterName || booking.userEmail || 'Guest' %></span>
+        </div>
+        <% if (booking.notes) { %>
+        <div class="summary-row">
+          <span class="summary-label">Notes</span>
+          <span class="summary-value" style="max-width: 60%; font-weight: normal;"><%= booking.notes %></span>
+        </div>
+        <% } %>
+        <div class="summary-row">
+          <span class="summary-label">Price per Participant</span>
+          <span class="summary-value">$<%= (booking.programPrice || 0).toFixed(2) %></span>
+        </div>
+        <div class="summary-row total">
+          <span class="summary-label">Estimated Total</span>
+          <span class="summary-value">$<%= (booking.participants * (booking.programPrice || 0)).toFixed(2) %></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="booking-reference">
+      <div class="reference-label">Booking Reference</div>
+      <div class="reference-id">APV-<%= String(booking._id).slice(-8).toUpperCase() %></div>
+    </div>
+
+    <div class="next-steps">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        What Happens Next?
+      </h3>
+      <ol>
+        <li><strong>Confirmation Email:</strong> You'll receive an email confirmation within 24 hours with full program details and payment instructions.</li>
+        <li><strong>Availability Check:</strong> Our team will verify availability for your selected date and may contact you with alternatives if needed.</li>
+        <li><strong>Final Invoice:</strong> A detailed invoice will be sent once your booking is confirmed.</li>
+        <li><strong>Preparation Materials:</strong> You'll receive participant waivers, packing lists, and any pre-program guidelines.</li>
+      </ol>
+    </div>
+
+      <div class="action-buttons">
+        <a href="/book" class="btn btn-success">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Book Another Program
+        </a>
+
+        <% if (user && user.role === 'founder') { %>
+          <a href="/admin/bookings" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Manage Bookings
+          </a>
+        <% } %>
+
+        <a href="/" class="btn btn-outline">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          Return Home
+        </a>
+      </div>
   </div>
+
+  <script>
+    // Optional: Track booking confirmation
+    if (typeof gtag !== 'undefined') {
+      gtag('event', 'booking_complete', {
+        program: '<%= booking.program %>',
+        participants: <%= booking.participants %>,
+        type: '<%= booking.type %>'
+      });
+    }
+  </script>
 </body>
 </html>

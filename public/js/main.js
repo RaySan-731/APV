@@ -1,5 +1,5 @@
 // main.js - Arrow-Park Ventures (APV) client-side utilities.
-// Handles: mobile nav toggle, smooth scrolling, form validation, sidebar mobile toggle, resize events.
+// Handles: mobile nav toggle, smooth scrolling, form validation, sidebar mobile toggle, resize events, scroll reveal.
 
 document.addEventListener('DOMContentLoaded', function() {
     // Mobile navigation toggle - toggles .open class for responsive nav visibility
@@ -30,9 +30,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Form validation
-    const forms = document.querySelectorAll('form');
+    // Scroll Reveal Animation
+    const revealElements = document.querySelectorAll('.reveal');
+
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('active');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, {
+        root: null,
+        threshold: 0.12,
+        rootMargin: '0px 0px -50px 0px'
+    });
+
+    revealElements.forEach(el => revealObserver.observe(el));
+
     // Form validation and submit loading state
+    const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function(e) {
             const requiredFields = form.querySelectorAll('[required]');

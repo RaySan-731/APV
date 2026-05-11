@@ -5,19 +5,20 @@
  */
 
 const mongoose = require('mongoose');
+const PDFDocument = require('pdfkit');
 
-const School = require('../models/School');
-const Staff = require('../models/Staff');
-const Student = require('../models/Student');
-const ScoutGroup = require('../models/ScoutGroup');
-const Event = require('../models/Event');
-const Invoice = require('../models/Invoice');
-const SchoolDocument = require('../models/SchoolDocument');
-const Message = require('../models/Message');
-const Notification = require('../models/Notification');
-const VisitLog = require('../models/VisitLog');
-const AuditLog = require('../models/AuditLog');
-const logAudit = require('../server').logAudit;
+const School = require('../../models/School');
+const Staff = require('../../models/Staff');
+const Student = require('../../models/Student');
+const ScoutGroup = require('../../models/ScoutGroup');
+const Event = require('../../models/Event');
+const Invoice = require('../../models/Invoice');
+const SchoolDocument = require('../../models/SchoolDocument');
+const Message = require('../../models/Message');
+const Notification = require('../../models/Notification');
+const VisitLog = require('../../models/VisitLog');
+const AuditLog = require('../../models/AuditLog');
+const logAudit = require('../../server').logAudit;
 
 // GET: School admin dashboard homepage data
 exports.getDashboardData = async (req, res) => {
@@ -366,14 +367,12 @@ exports.addScout = async (req, res) => {
         email: parentEmail.trim().toLowerCase(),
         relationship: 'Parent'
       },
-      scoutSection,
-      school: req.schoolId,
-      addedBy: {
-        type: 'school_admin',
-        id: req.staff._id,
-        name: req.staff.name
-      },
-      status: 'active'
+       scoutSection,
+       school: req.schoolId,
+       addedBy: {
+         trainerId: req.staff._id
+       },
+       status: 'active'
     });
 
     await newScout.save();
@@ -617,7 +616,7 @@ exports.getInvoices = async (req, res) => {
   }
 };
 
-// GET: Download invoice/receipt PDF
+// GET: Download invoice as PDF
 exports.downloadInvoice = async (req, res) => {
   try {
     const { invoiceId } = req.params;
@@ -626,24 +625,93 @@ exports.downloadInvoice = async (req, res) => {
     const invoice = await Invoice.findOne({
       _id: invoiceId,
       schoolId
-    });
+    }).populate('schoolId', 'name email address contactPerson billingAddress').lean();
 
     if (!invoice) {
-      return res.status(404).json({ success: false, error: 'Invoice not found' });
+      return res.status(404).send('Invoice not found');
     }
 
-    // In a full implementation, generate PDF using pdfkit
-    // For now, return JSON with invoice data for frontend to handle
-    res.json({
-      success: true,
-      data: {
-        invoice,
-        downloadUrl: `/api/invoices/${invoiceId}/pdf`
+    const doc = new PDFDocument({ margin: 50 });
+    const filename = `invoice_${invoice.invoiceNumber}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).text('INVOICE', { align: 'center' });
+    doc.moveDown();
+
+    // Invoice details
+    doc.fontSize(12);
+    doc.text(`Invoice Number: ${invoice.invoiceNumber}`);
+    doc.text(`Issue Date: ${new Date(invoice.issueDate).toLocaleDateString()}`);
+    doc.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`);
+    doc.moveDown();
+
+    // Bill To
+    doc.fontSize(14).text('Bill To:');
+    doc.fontSize(12);
+    const school = invoice.schoolId;
+    doc.text(school?.name || 'Unknown');
+    if (school?.billingAddress) {
+      doc.text(school.billingAddress.address || '');
+      doc.text(`${school.billingAddress.city || ''}, ${school.billingAddress.country || ''}`);
+    }
+    doc.moveDown();
+
+    // Items table
+    doc.fontSize(12);
+    let y = doc.y;
+    // Table header
+    doc.font('Helvetica-Bold');
+    doc.text('Description', 50, y);
+    doc.text('Qty', 350, y, { width: 50, align: 'right' });
+    doc.text('Unit Price', 420, y, { width: 80, align: 'right' });
+    doc.text('Total', 500, y, { width: 80, align: 'right' });
+    doc.font('Helvetica');
+    y += 20;
+    doc.moveTo(50, y).lineTo(570, y).stroke();
+
+    // Items
+    y += 10;
+    invoice.items.forEach(item => {
+      if (y > 700) {
+        doc.addPage();
+        y = 50;
       }
+      doc.text(item.description.substring(0, 50), 50, y, { width: 280, height: 20 });
+      doc.text(item.quantity.toString(), 350, y, { width: 50, align: 'right' });
+      doc.text(`KES ${item.unitPrice.toFixed(2)}`, 420, y, { width: 80, align: 'right' });
+      doc.text(`KES ${item.total.toFixed(2)}`, 500, y, { width: 80, align: 'right' });
+      y += 20;
     });
+
+    // Totals
+    y += 10;
+    doc.moveTo(400, y).lineTo(570, y).stroke();
+    y += 20;
+    doc.font('Helvetica-Bold');
+    doc.text(`Subtotal: KES ${invoice.subtotal.toFixed(2)}`, 420, y, { width: 140, align: 'right' });
+    y += 20;
+    doc.text(`Total: KES ${invoice.totalAmount.toFixed(2)}`, 420, y, { width: 140, align: 'right' });
+    y += 20;
+    doc.text(`Balance Due: KES ${invoice.balance.toFixed(2)}`, 420, y, { width: 140, align: 'right' });
+
+    // Payment instructions
+    doc.moveDown(2);
+    doc.font('Helvetica');
+    doc.text('Payment Instructions:', { underline: true });
+    doc.text(`Bank: ${invoice.bankDetails?.bankName || 'APV Ventures Ltd'}`);
+    doc.text(`Account: ${invoice.bankDetails?.accountName || 'Arrow-Park Ventures'}`);
+    doc.text(`Account No: ${invoice.bankDetails?.accountNumber || ''}`);
+    doc.text(`M-Pesa Till: ${invoice.bankDetails?.mpesaTillNumber || ''}`);
+
+    doc.end();
   } catch (err) {
     console.error('Download invoice error:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch invoice' });
+    res.status(500).send('Failed to generate PDF');
   }
 };
 
@@ -665,7 +733,7 @@ exports.raisePaymentQuery = async (req, res) => {
     const founders = await Staff.find({ role: { $in: ['admin', 'founder'] } }).select('_id').lean();
     const founderIds = founders.map(f => f._id);
 
-    const message = new Message({
+    const newMessage = new Message({
       senderId: req.staff._id,
       senderName: req.staff.name,
       senderRole: 'school_admin',
@@ -676,7 +744,7 @@ exports.raisePaymentQuery = async (req, res) => {
       priority: 'normal'
     });
 
-    await message.save();
+    await newMessage.save();
 
     // Update invoice notes
     await Invoice.findByIdAndUpdate(invoiceId, {
@@ -1011,14 +1079,14 @@ async function calculatePendingActions(schoolId, staffId) {
     'recipients.deleted': { $ne: true }
   });
 
-  if (unreadMessages > 0) {
-    actions.push({
-      type: 'message',
-      count: unreadMessages,
-      message: `${unreadMessages} unread message${unreadMessages > 1 ? 's' : ''}`,
-      actionUrl: '/school/communication'
-    });
-  }
+   if (unreadMessages > 0) {
+     actions.push({
+       type: 'message',
+       count: unreadMessages,
+       message: `${unreadMessages} unread message${unreadMessages > 1 ? 's' : ''}`,
+       actionUrl: '/school/messages'
+     });
+   }
 
   const unreadNotifications = await Notification.countDocuments({
     recipientId: staffId,

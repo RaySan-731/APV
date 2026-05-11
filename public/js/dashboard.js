@@ -2407,10 +2407,67 @@ function initFilters() {
 
 let currentOnboardingStep = 0;
 let schoolFormData = {};
+let isEditingMode = false;
+let editingSchoolId = null;
 
-function openOnboardingModal() {
+async function openOnboardingModal(schoolId = null) {
     currentOnboardingStep = 0;
     schoolFormData = {};
+
+    // Reset modal to creation mode by default
+    isEditingMode = false;
+    editingSchoolId = null;
+    document.getElementById('onboardingModalTitle').textContent = 'Onboard New School';
+
+    // Clear any previous messages and reset form
+    const messageEl = document.getElementById('onboardingMessage');
+    messageEl.style.display = 'none';
+    messageEl.textContent = '';
+    document.getElementById('onboardingForm').reset();
+
+    if (schoolId) {
+        // Edit mode: load school data
+        isEditingMode = true;
+        editingSchoolId = schoolId;
+        document.getElementById('onboardingModalTitle').textContent = 'Edit School';
+
+        try {
+            const response = await fetch(`/api/schools/${schoolId}/onboard-data`);
+            const result = await response.json();
+
+            if (result.success) {
+                const data = result.data;
+                // Populate form fields
+                document.getElementById('onboardingForm').name.value = data.name || '';
+                document.getElementById('onboardingForm').street.value = data.street || '';
+                document.getElementById('onboardingForm').city.value = data.city || '';
+                document.getElementById('onboardingForm').state.value = data.state || '';
+                document.getElementById('onboardingForm').zipCode.value = data.zipCode || '';
+                document.getElementById('onboardingForm').country.value = data.country || 'Kenya';
+                document.getElementById('onboardingForm').zone.value = data.zone || '';
+                document.getElementById('onboardingForm').region.value = data.region || '';
+                document.getElementById('onboardingForm').contactName.value = data.contactName || '';
+                document.getElementById('onboardingForm').contactEmail.value = data.contactEmail || '';
+                document.getElementById('onboardingForm').contactPhone.value = data.contactPhone || '';
+                document.getElementById('onboardingForm').contactPosition.value = data.contactPosition || '';
+                document.getElementById('onboardingForm').studentCount.value = data.studentCount || 0;
+                document.getElementById('onboardingForm').servicePackage.value = data.servicePackage || 'standard';
+                document.getElementById('onboardingForm').paymentMethod.value = data.paymentMethod || 'bank_transfer';
+                document.getElementById('onboardingForm').billingCycle.value = data.billingCycle || 'per_event';
+                document.getElementById('onboardingForm').ratePerStudent.value = data.ratePerStudent || '';
+                document.getElementById('onboardingForm').primaryTrainerId.value = data.primaryTrainerId || '';
+                document.getElementById('onboardingForm').notes.value = data.notes || '';
+            } else {
+                showToast('Failed to load school data: ' + (result.error || 'Unknown error'), 'error');
+                return;
+            }
+        } catch (error) {
+            console.error('Error fetching school data:', error);
+            showToast('Network error loading school data', 'error');
+            return;
+        }
+    }
+
     document.getElementById('onboardingModal').style.display = 'flex';
     showOnboardingStep(0);
     updateOnboardingUI();
@@ -2434,6 +2491,9 @@ function closeOnboardingModal() {
     document.getElementById('onboardingForm').reset();
     currentOnboardingStep = 0;
     schoolFormData = {};
+    isEditingMode = false;
+    editingSchoolId = null;
+    document.getElementById('onboardingModalTitle').textContent = 'Onboard New School';
 }
 
 function changeOnboardingStep(delta) {
@@ -2477,7 +2537,7 @@ function updateOnboardingUI() {
     const nextBtn = document.getElementById('nextStepBtn');
     if (prevBtn) prevBtn.style.display = currentOnboardingStep === 0 ? 'none' : 'inline-block';
     if (nextBtn) {
-        nextBtn.textContent = currentOnboardingStep === 3 ? 'Complete Onboarding' : 'Next Step';
+        nextBtn.textContent = currentOnboardingStep === 3 ? (isEditingMode ? 'Save Changes' : 'Complete Onboarding') : 'Next Step';
     }
 
     // Update summary on last step
@@ -2530,8 +2590,25 @@ async function submitOnboarding() {
     const messageEl = document.getElementById('onboardingMessage');
 
     try {
-        const response = await fetch('/dashboard/schools/onboard', {
-            method: 'POST',
+        let endpoint, method;
+        let successMessage, redirectUrl;
+
+        if (isEditingMode && editingSchoolId) {
+            // Edit mode: update existing school
+            endpoint = `/api/schools/${editingSchoolId}/update`;
+            method = 'POST';
+            successMessage = '✓ School updated successfully! Redirecting...';
+            redirectUrl = `/dashboard/schools/${editingSchoolId}`;
+        } else {
+            // Create mode: onboard new school
+            endpoint = '/dashboard/schools/onboard';
+            method = 'POST';
+            successMessage = '✓ School onboarded successfully! Redirecting...';
+            redirectUrl = '/dashboard/schools';
+        }
+
+        const response = await fetch(endpoint, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
@@ -2539,24 +2616,24 @@ async function submitOnboarding() {
         const result = await response.json();
 
         if (result.success) {
-            messageEl.textContent = '✓ School onboarded successfully! Redirecting...';
+            messageEl.textContent = successMessage;
             messageEl.style.backgroundColor = '#d4edda';
             messageEl.style.color = '#155724';
             messageEl.style.borderLeft = '4px solid #28a745';
             messageEl.style.display = 'block';
 
             setTimeout(() => {
-                window.location.href = '/dashboard/schools';
+                window.location.href = redirectUrl;
             }, 1500);
         } else {
-            messageEl.textContent = '✗ ' + (result.error || 'Failed to onboard school');
+            messageEl.textContent = '✗ ' + (result.error || 'Failed to save school');
             messageEl.style.backgroundColor = '#f8d7da';
             messageEl.style.color = '#721c24';
             messageEl.style.borderLeft = '4px solid #f5c6cb';
             messageEl.style.display = 'block';
         }
     } catch (error) {
-        console.error('Error onboarding school:', error);
+        console.error('Error saving school:', error);
         messageEl.textContent = '✗ Network error: ' + error.message;
         messageEl.style.backgroundColor = '#f8d7da';
         messageEl.style.color = '#721c24';

@@ -31,13 +31,18 @@ const schoolSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  contactPerson: {
-    name: String,
-    email: String,
-    phone: String,
-    position: String
-  },
-  studentCount: {
+   contactPerson: {
+     name: String,
+     email: String,
+     phone: String,
+     position: String
+   },
+   // URL to school logo image
+   logoUrl: {
+     type: String,
+     trim: true
+   },
+   studentCount: {
     type: Number,
     default: 0
   },

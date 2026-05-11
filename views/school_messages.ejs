@@ -56,11 +56,11 @@
                         <% if (!messages || messages.length === 0) { %>
                             <p class="placeholder-text" style="padding:1rem;">No conversations yet.</p>
                         <% } else { %>
-                            <% messages.forEach(msg => { %>
-                                <div class="conversation-item <%= msg.senderId === '<%= user.id %>' ? 'active' : '' %>">
-                                    <div class="conversation-subject">
-                                        <% if (msg.senderId !== '<%= user.id %>') { %><span class="unread-indicator"></span><% } %>
-                                        <%= msg.subject || 'No subject' %>
+                        <% messages.forEach(msg => { %>
+                            <div class="conversation-item <%= (msg.senderId && msg.senderId.toString() === user.id) ? 'active' : '' %>">
+                                <div class="conversation-subject">
+                                    <% if (!msg.senderId || msg.senderId.toString() !== user.id) { %><span class="unread-indicator"></span><% } %>
+                                    <%= msg.subject || 'No subject' %>
                                     </div>
                                     <div class="conversation-snippet"><%= msg.body.substring(0, 60) %>...</div>
                                     <div class="conversation-time"><%= new Date(msg.sentAt).toLocaleDateString() %></div>

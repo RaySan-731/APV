@@ -95,12 +95,13 @@ const studentSchema = new mongoose.Schema({
     }
   },
 
-  // Additional notes
-  medicalNotes: String,
-  specialNeeds: String,
-  notes: String,
-
-  // Status
+   // Additional notes
+   medicalNotes: String,
+   specialNeeds: String,
+   notes: String,
+   // Advancement tracking
+   advancementNotes: String,
+   // Status
   status: {
     type: String,
     enum: ['active', 'inactive', 'graduated', 'transferred'],

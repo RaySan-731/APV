@@ -59,7 +59,7 @@
                                 </div>
                                 <p><%= event.description || '' %></p>
 
-                                <% const invitation = event.targetSchools?.find(s => s.schoolId.toString() === '<%= schoolId %>'); %>
+                                <% const invitation = event.targetSchools?.find(s => s.schoolId.toString() === schoolId.toString()); %>
                                 <% if (invitation) { %>
                                     <div class="rsvp-section">
                                         <span class="rsvp-status">Your RSVP: <span class="badge badge-<%= invitation.rsvpStatus %>"><%= invitation.rsvpStatus %></span></span>

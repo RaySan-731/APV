@@ -687,7 +687,7 @@
                                                 <td>
                                                     <button class="btn btn-sm btn-outline" onclick="window.location.href='/dashboard/schools/<%= school._id %>'">View Profile</button>
                                                     <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
-                                                        <button class="btn btn-sm btn-outline" onclick="window.location.href='/dashboard/schools/<%= school._id %>/edit'">Edit</button>
+                                                        <button class="btn btn-sm btn-outline" onclick="openOnboardingModal('<%= school._id %>')">Edit</button>
                                                     <% } %>
                                                 </td>
                                             </tr>
@@ -1877,7 +1877,7 @@
      <div id="onboardingModal" class="modal" style="display: none; z-index: 9999;">
         <div class="modal-content large-modal" style="max-width: 900px;">
             <div class="modal-header">
-                <h3>Onboard New School</h3>
+                <h3 id="onboardingModalTitle">Onboard New School</h3>
                 <button type="button" class="close-btn" onclick="closeOnboardingModal()">×</button>
             </div>
             <div class="modal-body">

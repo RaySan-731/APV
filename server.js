@@ -90,6 +90,38 @@ const uploadLogo = multer({
   }
 });
 
+// Multer for document uploads
+const docStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, 'public', 'uploads', 'documents');
+    const fs = require('fs');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'doc-' + uniqueSuffix + ext);
+  }
+});
+
+const uploadDocument = multer({
+  storage: docStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt|zip|rar/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
+
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
@@ -2326,13 +2358,13 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
    // API: Get school profile
-   app.get('/api/school/profile', requireAuth, requireSchoolEditAccess, async (req, res) => {
+   app.get('/api/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
      const schoolController = require('./backend/controllers/schoolController');
      schoolController.getSchoolProfile(req, res);
    });
 
    // API: Update school profile
-   app.post('/api/school/profile', requireAuth, requireSchoolEditAccess, async (req, res) => {
+   app.post('/api/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
      const schoolController = require('./backend/controllers/schoolController');
      schoolController.updateSchoolProfile(req, res);
    });
@@ -2398,7 +2430,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
   // API: Upload document
-  app.post('/api/school/documents', requireAuth, requireSchoolAdmin, upload.single('document'), async (req, res) => {
+   app.post('/api/school/documents', requireAuth, requireSchoolAdmin, uploadDocument.single('document'), async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.uploadDocument(req, res);
   });
@@ -4542,7 +4574,7 @@ app.get('/dashboard/schools/:schoolId/edit', requireAuth, requirePermission('can
   }
 });
 
-// POST: Update school details (full edit for admins/founders)
+// POST: Update school details (full edit for admins/founders) - supports onboarding-style data
 app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
   try {
     const { schoolId } = req.params;
@@ -4551,62 +4583,157 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
       return res.status(400).json({ success: false, error: 'Invalid school ID' });
     }
 
+    // Fetch the existing school
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
     const {
       name,
       street, city, state, zipCode, country,
       zone, region,
       contactName, contactEmail, contactPhone, contactPosition,
       servicePackage,
-      notes
+      notes,
+      studentCount,
+      paymentMethod,
+      billingCycle,
+      ratePerStudent,
+      primaryTrainerId
     } = req.body;
 
-     const updateData = {};
-
-     if (name !== undefined && name.trim() !== '') {
-       updateData.name = name.trim();
-     }
-
-     // Address fields using dot notation to merge
-     if (street !== undefined) updateData['address.street'] = street.trim();
-     if (city !== undefined) updateData['address.city'] = city.trim();
-     if (state !== undefined) updateData['address.state'] = state.trim();
-     if (zipCode !== undefined) updateData['address.zipCode'] = zipCode.trim();
-     if (country !== undefined) updateData['address.country'] = country.trim();
-
-     if (zone !== undefined) updateData.zone = zone.trim();
-     if (region !== undefined) updateData.region = region.trim();
-
-     // Contact person fields using dot notation
-     if (contactName !== undefined) updateData['contactPerson.name'] = contactName.trim();
-     if (contactEmail !== undefined) updateData['contactPerson.email'] = contactEmail.trim().toLowerCase();
-     if (contactPhone !== undefined) updateData['contactPerson.phone'] = contactPhone.trim();
-     if (contactPosition !== undefined) updateData['contactPerson.position'] = contactPosition.trim();
-
-     if (servicePackage !== undefined) {
-       const validPackages = ['basic', 'standard', 'premium', 'custom'];
-       if (validPackages.includes(servicePackage)) {
-         updateData.servicePackage = servicePackage;
-       }
-     }
-
-     if (notes !== undefined) {
-       updateData.notes = notes.trim();
-     }
-
-    const updatedSchool = await School.findByIdAndUpdate(
-      schoolId,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    ).lean();
-
-    if (!updatedSchool) {
-      return res.status(404).json({ success: false, error: 'School not found' });
+    // Basic info
+    if (name !== undefined && name.trim() !== '') {
+      school.name = name.trim();
     }
 
-    res.json({ success: true, school: updatedSchool, message: 'School updated successfully' });
+    // Address - ensure address object exists
+    if (!school.address) school.address = {};
+    if (street !== undefined) school.address.street = street.trim();
+    if (city !== undefined) school.address.city = city.trim();
+    if (state !== undefined) school.address.state = state.trim();
+    if (zipCode !== undefined) school.address.zipCode = zipCode.trim();
+    if (country !== undefined) school.address.country = country.trim();
+
+    // Geographic
+    if (zone !== undefined) school.zone = zone.trim();
+    if (region !== undefined) school.region = region.trim();
+
+    // Contact person - ensure object exists
+    if (!school.contactPerson) school.contactPerson = {};
+    if (contactName !== undefined) school.contactPerson.name = contactName.trim();
+    if (contactEmail !== undefined) school.contactPerson.email = contactEmail.trim().toLowerCase();
+    if (contactPhone !== undefined) school.contactPerson.phone = contactPhone.trim();
+    if (contactPosition !== undefined) school.contactPerson.position = contactPosition.trim();
+
+    // Service package
+    if (servicePackage !== undefined) {
+      const validPackages = ['basic', 'standard', 'premium', 'custom'];
+      if (validPackages.includes(servicePackage)) {
+        school.servicePackage = servicePackage;
+      }
+    }
+
+    // Notes
+    if (notes !== undefined) {
+      school.notes = notes.trim();
+    }
+
+    // Student count
+    if (studentCount !== undefined) {
+      school.studentCount = parseInt(studentCount) || 0;
+    }
+
+    // Payment terms - ensure object exists
+    if (!school.paymentTerms) school.paymentTerms = {};
+    if (paymentMethod !== undefined) {
+      school.paymentTerms.method = paymentMethod;
+    }
+    if (billingCycle !== undefined) {
+      school.paymentTerms.billingCycle = billingCycle;
+    }
+    if (ratePerStudent !== undefined) {
+      school.paymentTerms.ratePerStudent = ratePerStudent ? parseFloat(ratePerStudent) : null;
+    }
+
+    // Primary trainer assignment - preserve other assignments
+    if (primaryTrainerId) {
+      if (!mongoose.Types.ObjectId.isValid(primaryTrainerId)) {
+        return res.status(400).json({ success: false, error: 'Invalid trainer ID' });
+      }
+      const trainerObjectId = new mongoose.Types.ObjectId(primaryTrainerId);
+      // Ensure assignedStaff is an array
+      if (!Array.isArray(school.assignedStaff)) {
+        school.assignedStaff = [];
+      }
+      const primaryIndex = school.assignedStaff.findIndex(a => a.assignmentType === 'primary');
+      const newAssignment = {
+        staffId: trainerObjectId,
+        assignmentType: 'primary',
+        assignedDate: primaryIndex >= 0 ? school.assignedStaff[primaryIndex].assignedDate : new Date(),
+        status: 'active'
+      };
+      if (primaryIndex >= 0) {
+        school.assignedStaff[primaryIndex] = newAssignment;
+      } else {
+        school.assignedStaff.push(newAssignment);
+      }
+    }
+
+    // Save the updated school
+    await school.save();
+
+    // Return updated school as plain object
+    res.json({ success: true, school: school.toObject(), message: 'School updated successfully' });
   } catch (err) {
     console.error('Update school error:', err);
     res.status(500).json({ success: false, error: 'Failed to update school' });
+  }
+});
+
+// GET: Fetch school data for onboarding edit mode
+app.get('/api/schools/:schoolId/onboard-data', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(404).json({ success: false, error: 'Invalid school identifier' });
+    }
+
+    const school = await School.findById(schoolId).lean();
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    // Transform school data to match onboarding form field names
+    const primaryTrainer = school.assignedStaff && school.assignedStaff.find(a => a.assignmentType === 'primary');
+    const onboardData = {
+      name: school.name,
+      street: school.address?.street || '',
+      city: school.address?.city || '',
+      state: school.address?.state || '',
+      zipCode: school.address?.zipCode || '',
+      country: school.address?.country || 'Kenya',
+      zone: school.zone || '',
+      region: school.region || '',
+      contactName: school.contactPerson?.name || '',
+      contactEmail: school.contactPerson?.email || '',
+      contactPhone: school.contactPerson?.phone || '',
+      contactPosition: school.contactPerson?.position || '',
+      studentCount: school.studentCount || 0,
+      servicePackage: school.servicePackage || 'standard',
+      paymentMethod: school.paymentTerms?.method || 'bank_transfer',
+      billingCycle: school.paymentTerms?.billingCycle || 'per_event',
+      ratePerStudent: school.paymentTerms?.ratePerStudent || '',
+      primaryTrainerId: primaryTrainer?.staffId?.toString() || '',
+      notes: school.notes || ''
+    };
+
+    res.json({ success: true, data: onboardData });
+  } catch (err) {
+    console.error('Error fetching school onboard data:', err);
+    res.status(500).json({ success: false, error: 'Failed to load school data' });
   }
 });
 
@@ -8563,6 +8690,9 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+// Export logAudit for use in other modules (e.g., schoolController)
+module.exports.logAudit = logAudit;
 
 startServer();
 

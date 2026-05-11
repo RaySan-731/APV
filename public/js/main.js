@@ -179,4 +179,40 @@ document.addEventListener('DOMContentLoaded', function() {
             if (navToggle) navToggle.classList.remove('open');
         }
     });
+
+    // ============ Dynamic Organization Logo Replacement ============
+    (async function() {
+        try {
+            const response = await fetch('/api/organization/profile');
+            const data = await response.json();
+            if (data.success && data.profile && data.profile.logoUrl) {
+                const logoUrl = data.profile.logoUrl;
+                const replaceSvgWithImg = (selector, size) => {
+                    const svg = document.querySelector(selector);
+                    if (!svg) return;
+                    const img = document.createElement('img');
+                    img.src = logoUrl;
+                    img.alt = 'Arrow-Park Ventures logo';
+                    img.style.width = size;
+                    img.style.height = size;
+                    img.style.objectFit = 'contain';
+                    // Preserve any existing classes for styling
+                    img.className = svg.className;
+                    svg.replaceWith(img);
+                };
+                // Sidebar logo
+                replaceSvgWithImg('.sidebar-logo', '2rem');
+                // Navbar logo (in header)
+                replaceSvgWithImg('.nav-brand .logo-icon', '2rem');
+                // Footer logo
+                replaceSvgWithImg('.footer-brand .logo-icon', '2rem');
+                // Hero logo (landing page)
+                replaceSvgWithImg('.hero-logo svg', '4rem');
+                // Login page logo
+                replaceSvgWithImg('.login-logo svg', '3rem');
+            }
+        } catch (err) {
+            console.error('Failed to load organization logo:', err);
+        }
+    })();
 });

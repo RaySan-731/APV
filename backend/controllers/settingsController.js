@@ -52,7 +52,6 @@ exports.updateOrganizationProfile = async (req, res) => {
     const {
       organizationName,
       tagline,
-      logoUrl,
       logoWidth,
       primaryColor,
       contactEmail,
@@ -72,12 +71,33 @@ exports.updateOrganizationProfile = async (req, res) => {
       settings.type = 'combined';
     }
 
-    // Update organization fields
+    // Handle logo: uploaded file takes precedence, then URL, else keep existing
+    let newLogoUrl;
+    if (req.file) {
+      // New file uploaded
+      newLogoUrl = '/uploads/logos/' + req.file.filename;
+      // Delete old logo if it's a local file in our uploads
+      if (settings.organization.logoUrl && settings.organization.logoUrl.startsWith('/uploads/logos/')) {
+        try {
+          const oldPath = path.join(__dirname, '..', '..', 'public', settings.organization.logoUrl);
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
+        } catch (e) {
+          console.error('Error deleting old logo:', e);
+        }
+      }
+    } else if (req.body.logoUrl !== undefined) {
+      // URL provided
+      newLogoUrl = req.body.logoUrl;
+    }
+    // If neither provided, logoUrl remains unchanged
+
     const orgUpdates = {};
     if (organizationName !== undefined) orgUpdates.organizationName = organizationName;
     if (tagline !== undefined) orgUpdates.tagline = tagline;
-    if (logoUrl !== undefined) orgUpdates.logoUrl = logoUrl;
-    if (logoWidth !== undefined) orgUpdates.logoWidth = logoWidth;
+    if (newLogoUrl !== undefined) orgUpdates.logoUrl = newLogoUrl;
+    if (logoWidth !== undefined) orgUpdates.logoWidth = parseInt(logoWidth, 10);
     if (primaryColor !== undefined) orgUpdates.primaryColor = primaryColor;
     if (contactEmail !== undefined) orgUpdates.contactEmail = contactEmail;
     if (contactPhone !== undefined) orgUpdates.contactPhone = contactPhone;
@@ -97,10 +117,10 @@ exports.updateOrganizationProfile = async (req, res) => {
 
     await settings.save();
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       settings: settings.organization,
-      message: 'Organization profile updated successfully' 
+      message: 'Organization profile updated successfully'
     });
   } catch (error) {
     console.error('Error updating organization profile:', error);

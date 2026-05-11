@@ -519,7 +519,7 @@
                         <!-- ==================== ORGANIZATION PROFILE TAB ==================== -->
                         <% if (permission.canManageSystem) { %>
                         <div id="organization" class="tab-content">
-                            <form id="orgProfileForm">
+                            <form id="orgProfileForm" enctype="multipart/form-data">
                                 <div class="form-section">
                                     <h4>Basic Information</h4>
                                     <div class="form-grid">
@@ -529,9 +529,15 @@
                                         <label>Tagline
                                             <input type="text" name="tagline" placeholder="Short tagline for the organization">
                                         </label>
-                                        <label>Logo URL
+                                        <label>Upload Logo
+                                            <input type="file" name="logoFile" accept="image/*">
+                                        </label>
+                                        <label>Or Logo URL (optional)
                                             <input type="url" name="logoUrl" placeholder="https://example.com/logo.png">
                                         </label>
+                                        <div id="logoPreviewContainer" style="grid-column: 1 / -1; margin-top: 0.5rem;">
+                                            <img id="currentLogoPreview" src="" alt="Current Logo" style="max-height: 80px; object-fit: contain; display: none;">
+                                        </div>
                                         <label>Logo Display Width (px)
                                             <input type="number" name="logoWidth" min="20" max="200" value="40">
                                         </label>
@@ -975,6 +981,16 @@
                     document.querySelector('[name="fiscalYearStart"]').value = s.fiscalYearStart || '01-01';
                     document.querySelector('[name="emailHeader"]').value = s.emailHeader || '';
                     document.querySelector('[name="emailFooter"]').value = s.emailFooter || '';
+
+                    // Update logo preview
+                    const previewImg = document.getElementById('currentLogoPreview');
+                    if (s.logoUrl) {
+                        previewImg.src = s.logoUrl + (s.logoUrl.includes('?') ? '&t=' : '?t=') + Date.now();
+                        previewImg.style.display = 'block';
+                    } else {
+                        previewImg.style.display = 'none';
+                        previewImg.src = '';
+                    }
                 }
             } catch (err) { console.error('Error loading organization profile:', err); }
         }
@@ -982,33 +998,29 @@
         async function saveOrganizationProfile() {
             const form = document.getElementById('orgProfileForm');
             const formData = new FormData(form);
-            const payload = {
-                organizationName: formData.get('organizationName'),
-                tagline: formData.get('tagline'),
-                logoUrl: formData.get('logoUrl'),
-                logoWidth: parseInt(formData.get('logoWidth')),
-                primaryColor: formData.get('primaryColor'),
-                contactEmail: formData.get('contactEmail'),
-                contactPhone: formData.get('contactPhone'),
-                address: {
-                    street: formData.get('street'),
-                    city: formData.get('city'),
-                    state: formData.get('state'),
-                    zipCode: formData.get('zipCode'),
-                    country: formData.get('country')
-                },
-                timezone: formData.get('timezone'),
-                dateFormat: formData.get('dateFormat'),
-                currency: formData.get('currency'),
-                fiscalYearStart: formData.get('fiscalYearStart'),
-                emailHeader: formData.get('emailHeader'),
-                emailFooter: formData.get('emailFooter')
-            };
             try {
-                const res = await fetch('/api/settings/organization', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const res = await fetch('/api/settings/organization', {
+                    method: 'POST',
+                    body: formData
+                });
                 const data = await res.json();
                 showMessage('orgMessage', data.success ? 'Organization profile saved successfully!' : 'Error: ' + data.error, data.success ? 'success' : 'error');
-                if (data.success) orgSettings = data.settings;
+                if (data.success) {
+                    orgSettings = data.settings;
+                    // Update logo preview if a new file was uploaded
+                    const fileInput = document.querySelector('[name="logoFile"]');
+                    if (fileInput && fileInput.files.length > 0) {
+                        const newLogoUrl = data.settings.logoUrl;
+                        const previewImg = document.getElementById('currentLogoPreview');
+                        if (previewImg) {
+                            previewImg.src = newLogoUrl;
+                            previewImg.style.display = 'block';
+                        }
+                        document.querySelector('[name="logoUrl"]').value = newLogoUrl;
+                        // Clear file input
+                        fileInput.value = '';
+                    }
+                }
             } catch (err) { showMessage('orgMessage', 'Failed to save profile', 'error'); }
         }
 
@@ -1271,6 +1283,22 @@
                     loadHolidays(),
                     loadBackupHistory()
                 ]);
+                // Attach file input preview listener
+                const fileInput = document.querySelector('[name="logoFile"]');
+                if (fileInput) {
+                    fileInput.addEventListener('change', function() {
+                        const file = this.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                const previewImg = document.getElementById('currentLogoPreview');
+                                previewImg.src = e.target.result;
+                                previewImg.style.display = 'block';
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                }
             }
         });
     </script>

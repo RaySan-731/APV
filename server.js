@@ -58,6 +58,38 @@ const upload = multer({
   }
 });
 
+// Multer for logo image uploads
+const logoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, 'public', 'uploads', 'logos');
+    const fs = require('fs');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'logo-' + uniqueSuffix + ext);
+  }
+});
+
+const uploadLogo = multer({
+  storage: logoStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for logos
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images are allowed.'));
+    }
+  }
+});
+
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
@@ -7037,7 +7069,7 @@ app.get('/api/settings/backup', requireAuth, requirePermission('canManageSystem'
 });
 
 // Update organization profile
-app.post('/api/settings/organization', requireAuth, requirePermission('canManageSystem'), settingsController.updateOrganizationProfile);
+app.post('/api/settings/organization', requireAuth, requirePermission('canManageSystem'), uploadLogo.single('logoFile'), settingsController.updateOrganizationProfile);
 
 // Update system defaults
 app.post('/api/settings/system', requireAuth, requirePermission('canManageSystem'), settingsController.updateSystemDefaults);

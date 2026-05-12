@@ -28,7 +28,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <%- include('../partials/sidebar') %>
+        <%- include('partials/sidebar') %>
 
         <main class="main-content">
             <header class="dashboard-header">
@@ -117,17 +117,17 @@
                                             </div>
                                             <div>
                                                 <div class="doc-name"><%= doc.name %></div>
-                                                <div class="doc-meta">
-                                                    Uploaded <%= new Date(doc.uploadedAt).toLocaleDateString() %> by <%= doc.uploadedBy?.name || 'System' %> • <%= doc.mimeType %> • <%= (doc.fileSize / 1024).toFixed(1) %> KB
-                                                </div>
-                                                <div style="margin-top:0.25rem;">
-                                                    <span class="badge badge-<%= doc.documentType %>"><%= doc.documentType.replace('_',' ') %></span>
-                                                </div>
+                                                 <div class="doc-meta">
+                                                     Uploaded <%= doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A' %> by <%= doc.uploadedBy?.name || 'System' %> • <%= doc.mimeType || 'unknown' %> • <%= doc.fileSize ? (doc.fileSize / 1024).toFixed(1) : '0' %> KB
+                                                 </div>
+                                                 <div style="margin-top:0.25rem;">
+                                                     <span class="badge badge-<%= doc.documentType || 'other' %>"><%= doc.documentType ? doc.documentType.replace('_',' ') : 'Other' %></span>
+                                                 </div>
                                             </div>
                                         </div>
                                         <div class="doc-actions">
-                                            <a href="<%= doc.url %>" class="btn btn-outline btn-sm" target="_blank">View</a>
-                                            <a href="<%= doc.url %>" class="btn btn-primary btn-sm" download>Download</a>
+                                            <a href="<%= doc.url || '#' %>" class="btn btn-outline btn-sm" target="_blank">View</a>
+                                            <a href="<%= doc.url || '#' %>" class="btn btn-primary btn-sm" download>Download</a>
                                         </div>
                                     </li>
                                 <% }) %>

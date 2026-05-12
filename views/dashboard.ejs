@@ -203,6 +203,20 @@
                 <% if (page === 'dashboard') { %>
                     <!-- Dashboard Stats -->
                     <div class="stats-grid">
+                        <!-- Total Schools -->
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
+                                    <path d="M2 12h20"></path>
+                                    <path d="M6 12v8"></path>
+                                    <path d="M18 12v8"></path>
+                                </svg>
+                            </div>
+                            <div class="stat-number" id="totalSchools">0</div>
+                            <div class="stat-label">Total Schools</div>
+                        </div>
+
                         <!-- Active Schools -->
                         <div class="stat-card">
                             <div class="stat-icon">
@@ -217,6 +231,32 @@
                             <div class="stat-label">Active Schools</div>
                         </div>
 
+                        <!-- New Schools This Month -->
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </div>
+                            <div class="stat-number" id="newSchoolsThisMonth">0</div>
+                            <div class="stat-label">New This Month</div>
+                        </div>
+
+                        <!-- Total Students -->
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                            <div class="stat-number" id="totalStudents">0</div>
+                            <div class="stat-label">Total Students</div>
+                        </div>
+
                         <!-- Events This Month -->
                         <div class="stat-card">
                             <div class="stat-icon">
@@ -229,34 +269,6 @@
                             </div>
                             <div class="stat-number" id="eventsThisMonth">0</div>
                             <div class="stat-label">Events This Month</div>
-                        </div>
-
-                        <!-- Trainers Deployed -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="9" cy="7" r="4"></circle>
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="trainersDeployed">0</div>
-                            <div class="stat-label">Trainers Deployed</div>
-                        </div>
-
-                        <!-- Total Scouts Reached -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="8.5" cy="7" r="4"></circle>
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4h-2"></path>
-                                    <circle cx="15.5" cy="7" r="4"></circle>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="totalScoutsReached">0</div>
-                            <div class="stat-label">Scouts Reached</div>
                         </div>
 
                         <!-- Revenue Collected -->
@@ -285,7 +297,7 @@
                             <div class="stat-label">Outstanding Payments</div>
                         </div>
 
-                        <!-- Report Submission Rate -->
+                        <!-- Active Service Schools -->
                         <div class="stat-card">
                             <div class="stat-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -293,8 +305,8 @@
                                     <polyline points="22,4 12,14.01 9,11.01"></polyline>
                                 </svg>
                             </div>
-                            <div class="stat-number" id="reportSubmissionRate">0%</div>
-                            <div class="stat-label">Reports Submitted</div>
+                            <div class="stat-number" id="activeServiceSchools">0</div>
+                            <div class="stat-label">Active Service</div>
                         </div>
                     </div>
 

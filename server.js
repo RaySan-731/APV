@@ -161,9 +161,12 @@ app.set('views', path.join(__dirname, 'views'));
 // Content Security Policy
 app.use((req, res, next) => {
   const isProduction = process.env.NODE_ENV === 'production';
+  const port = process.env.PORT || 3000;
+  const origin = `http://127.0.0.1:${port}`;
+  const localhost = `http://localhost:${port}`;
   const csp = isProduction
     ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self';"
-    : "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:3000 http://localhost:3000; font-src 'self';";
+    : `default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${origin} ${localhost} http://127.0.0.1:3000 http://localhost:3000; font-src 'self';`;
   res.setHeader('Content-Security-Policy', csp);
   next();
 });
@@ -327,12 +330,20 @@ const requireSchoolAdmin = async (req, res, next) => {
       });
     }
 
-    // Attach staff and school info to request
+    // Validate schoolId format before querying
+    if (!mongoose.Types.ObjectId.isValid(staff.schoolId)) {
+      return res.status(403).render('404', {
+        user: req.session.user,
+        error: 'Invalid school identifier assigned. Please contact founder.'
+      });
+    }
+
+    // Attach staff info to request
     req.staff = staff;
     req.schoolId = staff.schoolId;
 
-    // Verify school exists and is active
-    const school = await School.findById(staff.schoolId).select('name status serviceStatus').lean();
+    // Fetch full school document (all fields needed by views)
+    const school = await School.findById(staff.schoolId).lean();
     if (!school) {
       return res.status(403).render('404', {
         user: req.session.user,
@@ -356,7 +367,7 @@ const requireSchoolAdmin = async (req, res, next) => {
       error: 'Authentication error. Please try again.'
     });
   }
- };
+};
 
 // School data isolation filter (for queries)
 const schoolFilter = (req, res, next) => {
@@ -731,98 +742,190 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  res.render('login', { user: req.session.user, next: req.query.next || '' });
+  res.render('login', { user: req.session.user, next: req.query.next || '', portal: req.query.portal || '' });
 });
+
+async function loginUserByCredentials(email, password) {
+  const normalizedEmail = email?.toLowerCase?.() || '';
+  const user = await User.findOne({ email: normalizedEmail });
+  const bcrypt = require('bcryptjs');
+  const isUserValid = user && await bcrypt.compare(password, user.password);
+
+  // Trainer fallback using default password 0000
+  const trainerFallback = await Staff.findOne({ email: normalizedEmail, role: 'trainer' });
+  if (trainerFallback && password === '0000' && !isUserValid) {
+    return {
+      type: 'trainer',
+      profile: trainerFallback,
+      session: {
+        id: trainerFallback._id.toString(),
+        email: trainerFallback.email,
+        role: 'trainer',
+        name: trainerFallback.name || 'Trainer'
+      },
+      redirect: '/trainer/dashboard'
+    };
+  }
+
+  // School admin fallback using default password 0000
+  let schoolFallback = await Staff.findOne({ email: normalizedEmail, role: 'school_admin' });
+  if (!schoolFallback && password === '0000') {
+    const school = await School.findOne({ 'contactPerson.email': normalizedEmail, status: 'active' });
+    if (school) {
+      schoolFallback = await Staff.findOneAndUpdate(
+        { email: normalizedEmail, role: 'school_admin' },
+        {
+          $setOnInsert: {
+            name: school.contactPerson?.name || school.name || 'School Admin',
+            email: normalizedEmail,
+            role: 'school_admin',
+            status: 'Active',
+            department: 'Administration',
+            phone: school.contactPerson?.phone || '',
+            schoolId: school._id,
+            permissions: {
+              canManageOwnSchool: true,
+              canManageScouts: true,
+              canViewEvents: true,
+              canOwnViewPayments: true,
+              canManageDocuments: true,
+              canSendMessages: true,
+              canViewMessages: true
+            }
+          }
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+    }
+  }
+
+  if (schoolFallback && password === '0000' && !isUserValid) {
+    return {
+      type: 'school_admin',
+      profile: schoolFallback,
+      session: {
+        id: schoolFallback._id.toString(),
+        email: schoolFallback.email,
+        role: 'school_admin',
+        name: schoolFallback.name || 'School Admin'
+      },
+      redirect: '/school/dashboard'
+    };
+  }
+
+  if (!isUserValid) {
+    return { type: 'invalid' };
+  }
+
+  // Update last login for standard users
+  user.lastLogin = new Date();
+  await user.save();
+
+  // Ensure Staff record exists for admin/founder roles
+  if (['admin', 'founder', 'commissioner', 'supervisor', 'training_officer', 'medical', 'coordinator'].includes(user.role)) {
+    let staff = await Staff.findOne({ email: user.email.toLowerCase() });
+    if (!staff) {
+      const staffRole = user.role === 'founder' ? 'admin' : user.role;
+      const isAdminRole = ['admin', 'founder'].includes(user.role);
+      staff = new Staff({
+        name: user.name,
+        email: user.email,
+        role: staffRole,
+        status: 'Active',
+        department: 'Administration',
+        employmentStartDate: new Date(),
+        permissions: isAdminRole ? {
+          canViewFinancials: true,
+          canApproveReports: true,
+          canScheduleEvents: true,
+          canManageStaff: true,
+          canViewAnalytics: true,
+          canManageSchools: true,
+          canSendInvitations: true
+        } : {}
+      });
+      await staff.save();
+      console.log(`[Login] Created Staff profile for ${user.email} (role: ${staff.role})`);
+    } else if (user.role === 'founder' && staff.role !== 'admin') {
+      staff.role = 'admin';
+      await staff.save();
+      console.log(`[Login] Updated founder Staff role to admin: ${user.email}`);
+    }
+  }
+
+  return {
+    type: 'user',
+    profile: user,
+    session: {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role || 'rover',
+      name: user.name || 'Member'
+    },
+    redirect: (user.role === 'trainer' ? '/trainer/dashboard' : '/dashboard')
+  };
+}
 
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Try to authenticate against MongoDB user store
-    const user = await User.findOne({ email: email.toLowerCase() });
-
-    // Trainer fallback from Staff collection using default trainer password 0000
-    const trainerFallback = await Staff.findOne({ email: email.toLowerCase(), role: 'trainer' });
-    const isTrainerFallback = trainerFallback && password === '0000';
-    const isUserValid = user && await require('bcryptjs').compare(password, user.password);
-
-    if (isTrainerFallback && !isUserValid) {
-      // Regenerate session for trainer login
-      req.session.regenerate(err => {
-        if (err) {
-          console.error('Session regeneration error:', err);
-          return res.render('login', { error: 'Login failed', user: null });
-        }
-        req.session.user = {
-          id: trainerFallback._id.toString(),
-          email: trainerFallback.email,
-          role: 'trainer',
-          name: trainerFallback.name || 'Trainer'
-        };
-        return res.redirect('/trainer/dashboard');
-      });
-      return;
+    const loginResult = await loginUserByCredentials(email, password);
+    if (loginResult.type === 'invalid') {
+      return res.render('login', { error: 'Invalid credentials', user: req.session.user, next: req.body.next || req.query.next || '', portal: '' });
     }
 
-    if (!isUserValid) {
-      return res.render('login', { error: 'Invalid credentials', user: req.session.user });
-    }
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
-    // Ensure Staff record exists for admin/founder roles (for messaging/notifications)
-    if (['admin', 'founder', 'commissioner', 'supervisor', 'training_officer', 'medical', 'coordinator'].includes(user.role)) {
-      let staff = await Staff.findOne({ email: user.email.toLowerCase() });
-      if (!staff) {
-        const staffRole = user.role === 'founder' ? 'admin' : user.role;
-        const isAdminRole = ['admin', 'founder'].includes(user.role);
-        staff = new Staff({
-          name: user.name,
-          email: user.email,
-          role: staffRole,
-          status: 'Active',
-          department: 'Administration',
-          employmentStartDate: new Date(),
-          permissions: isAdminRole ? {
-            canViewFinancials: true,
-            canApproveReports: true,
-            canScheduleEvents: true,
-            canManageStaff: true,
-            canViewAnalytics: true,
-            canManageSchools: true,
-            canSendInvitations: true
-          } : {}
-        });
-        await staff.save();
-        console.log(`[Login] Created Staff profile for ${user.email} (role: ${staff.role})`);
-      } else if (user.role === 'founder' && staff.role !== 'admin') {
-        staff.role = 'admin';
-        await staff.save();
-        console.log(`[Login] Updated founder Staff role to admin: ${user.email}`);
-      }
-    }
-
-    // Regenerate session to prevent fixation
     req.session.regenerate(err => {
       if (err) {
         console.error('Session regeneration error:', err);
-        return res.render('login', { error: 'Login failed', user: null });
+        return res.render('login', { error: 'Login failed', user: null, next: req.body.next || req.query.next || '', portal: '' });
       }
-      req.session.user = {
-        id: user._id.toString(),
-        email: user.email,
-        role: user.role || 'rover',
-        name: user.name || 'Member'
-      };
-      const nextUrl = req.body.next || req.query.next || (user.role === 'trainer' ? '/trainer/dashboard' : '/dashboard');
+      req.session.user = loginResult.session;
+      const nextUrl = req.body.next || req.query.next || loginResult.redirect;
       return res.redirect(nextUrl);
     });
-   } catch (err) {
-     console.error('Login error:', err);
-     return res.render('login', { error: 'Internal error', user: null });
-   }
+  } catch (err) {
+    console.error('Login error:', err);
+    return res.render('login', { error: 'Internal error', user: null, next: req.body.next || req.query.next || '', portal: '' });
+  }
+});
+
+app.get('/school', (req, res) => {
+  if (req.session.user && req.session.user.role === 'school_admin') {
+    return res.redirect('/school/dashboard');
+  }
+  res.render('login', {
+    user: req.session.user,
+    next: '/school/dashboard',
+    portal: 'school'
+  });
+});
+
+app.post('/school', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const loginResult = await loginUserByCredentials(email, password);
+    if (loginResult.type === 'invalid') {
+      return res.render('login', { error: 'Invalid credentials', user: req.session.user, portal: 'school' });
+    }
+
+    if (loginResult.type !== 'school_admin') {
+      return res.render('login', { error: 'Please use a school admin account for the school portal', user: req.session.user, portal: 'school' });
+    }
+
+    req.session.regenerate(err => {
+      if (err) {
+        console.error('Session regeneration error:', err);
+        return res.render('login', { error: 'Login failed', user: null, portal: 'school' });
+      }
+      req.session.user = loginResult.session;
+      return res.redirect('/school/dashboard');
+    });
+  } catch (err) {
+    console.error('School portal login error:', err);
+    return res.render('login', { error: 'Internal error', user: null, portal: 'school' });
+  }
 });
 
 app.get('/logout', (req, res) => {
@@ -2291,65 +2394,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
 
   // ============ SCHOOL ADMIN ROUTES ============
 
-  // School Admin Dashboard Page
-  app.get('/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
-    try {
-      // Fetch initial data for server-side rendering
-      const schoolId = req.schoolId;
-      const school = req.school;
-
-      const [
-        totalScouts,
-        activeGroupsCount,
-        upcomingEvents,
-        pendingInvoices,
-        unreadNotificationsCount,
-        unreadMessagesCount
-      ] = await Promise.all([
-        Student.countDocuments({ school: schoolId, status: 'active' }),
-        ScoutGroup.countDocuments({ schoolId, status: 'active' }),
-        Event.find({
-          'targetSchools.schoolId': schoolId,
-          startDate: { $gte: new Date(), $lte: new Date(Date.now() + 30*24*60*60*1000) },
-          status: { $in: ['confirmed', 'in_progress', 'scheduled'] }
-        }).sort({ startDate: 1 }).limit(1).lean(),
-        Invoice.countDocuments({
-          schoolId,
-          status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
-        }),
-        Notification.countDocuments({
-          recipientId: req.staff._id,
-          isRead: false,
-          dismissed: false
-        }),
-        Message.countDocuments({
-          'recipients.staffId': req.staff._id,
-          'recipients.status': 'sent',
-          'recipients.deleted': { $ne: true }
-        })
-      ]);
-
-      const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
-
-      res.render('school_dashboard', {
-        user: req.session.user,
-        school,
-        stats: {
-          totalScouts,
-          activeGroupsCount,
-          upcomingEventsCount: upcomingEvents.length,
-          pendingInvoices,
-          unreadNotifications: unreadNotificationsCount,
-          unreadMessages: unreadMessagesCount
-        },
-        nextEvent,
-        page: 'school_dashboard'
-      });
-    } catch (err) {
-      console.error('School dashboard error:', err);
-      res.status(500).render('404', { user: req.session.user, error: 'Failed to load dashboard' });
-    }
-  });
+  // (Duplicate /school/dashboard route removed - using the more complete version below)
 
   // API: School Dashboard Data (JSON)
   app.get('/api/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
@@ -2521,10 +2566,20 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
         },
         page: 'school_dashboard'
       });
-    } catch (err) {
-      console.error('School dashboard error:', err);
-      res.status(500).render('404', { user: req.session.user, error: 'Failed to load dashboard' });
-    }
+  } catch (err) {
+    console.error('School dashboard error:', err);
+    // Log more details for debugging
+    console.error('Error details:', {
+      schoolId: req.schoolId,
+      staffId: req.staff?._id,
+      errorMessage: err.message,
+      errorStack: err.stack
+    });
+    res.status(500).render('404', {
+      user: req.session.user,
+      error: `Failed to load dashboard: ${err.message}`
+    });
+  }
   });
 
   // School Profile Page
@@ -2558,6 +2613,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
       ]);
       res.render('school_scouts', {
         user: req.session.user,
+        school: req.school,
         groups,
         scouts,
         schoolId,
@@ -2577,6 +2633,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
       }).sort({ startDate: -1 }).lean();
       res.render('school_events', {
         user: req.session.user,
+        school: req.school,
         events,
         schoolId: req.schoolId,
         page: 'school_events'
@@ -2613,6 +2670,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
       ]);
       res.render('school_payments', {
         user: req.session.user,
+        school: req.school,
         invoices,
         stats: stats[0] || { totalInvoiced: 0, totalPaid: 0, overdueCount: 0 },
         page: 'school_payments'
@@ -2632,6 +2690,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
         .lean();
       res.render('school_documents', {
         user: req.session.user,
+        school: req.school,
         documents,
         page: 'school_documents'
       });
@@ -2655,6 +2714,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
 
       res.render('school_messages', {
         user: req.session.user,
+        school: req.school,
         messages,
         page: 'school_messages'
       });
@@ -2673,6 +2733,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
         .lean();
       res.render('school_notifications', {
         user: req.session.user,
+        school: req.school,
         notifications,
         page: 'school_notifications'
       });
@@ -2709,7 +2770,8 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     }
     const unreadNotifications = await Notification.countDocuments({
       recipientId: staffId,
-      isRead: false, dismissed: false
+      isRead: false,
+      dismissed: false
     });
     if (unreadNotifications > 0) {
       actions.push({ type: 'notification', count: unreadNotifications, message: `${unreadNotifications} notification${unreadNotifications > 1 ? 's' : ''}`, actionUrl: '/school/notifications' });

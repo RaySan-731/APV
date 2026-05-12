@@ -24,6 +24,16 @@
         <!-- School Admin Navigation -->
         <div class="nav-section">
             <h3 class="nav-section-title">School Dashboard</h3>
+            <% if (school) { %>
+            <div class="sidebar-school-info" style="margin-bottom:1rem;padding:0.75rem;background:var(--surface);border-radius:0.75rem;">
+                <strong style="display:block;font-size:0.95rem;margin-bottom:0.25rem;"><%= school.name %></strong>
+                <% if (school.serviceStatus) { %>
+                <span class="status-badge status-<%= school.serviceStatus %>" style="font-size:0.75rem;"> <%= school.serviceStatus.replace('_',' ') %> </span>
+                <% } else { %>
+                <span class="status-badge" style="font-size:0.75rem;"> Active </span>
+                <% } %>
+            </div>
+            <% } %>
             <ul class="nav-list">
                 <li class="nav-item">
                     <a href="/school/dashboard" class="nav-link <%= page === 'school_dashboard' ? 'active' : '' %>">

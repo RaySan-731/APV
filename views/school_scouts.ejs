@@ -29,7 +29,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <%- include('../partials/sidebar') %>
+        <%- include('partials/sidebar') %>
 
         <main class="main-content">
             <header class="dashboard-header">
@@ -47,11 +47,11 @@
             <div class="dashboard-content">
                 <div class="stats-section" style="margin-bottom: 1.5rem;">
                     <div class="stat-card" style="flex:1;max-width:200px;">
-                        <span class="stat-value" id="totalScouts"><%= scouts.length %></span>
+                        <span class="stat-value" id="totalScouts"><%= scouts ? scouts.length : 0 %></span>
                         <span class="stat-label">Total Scouts</span>
                     </div>
                     <div class="stat-card" style="flex:1;max-width:200px;">
-                        <span class="stat-value"><%= groups.length %></span>
+                        <span class="stat-value"><%= groups ? groups.length : 0 %></span>
                         <span class="stat-label">Active Groups</span>
                     </div>
                 </div>
@@ -62,7 +62,7 @@
                 </div>
 
                 <div id="groupsTab" class="tab-panel active">
-                    <% if (groups.length === 0) { %>
+                    <% if (!groups || groups.length === 0) { %>
                         <div class="empty-state">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -74,42 +74,51 @@
                         </div>
                     <% } else { %>
                         <div class="groups-list">
-                            <% groups.forEach(group => { %>
+                            <% if (groups && groups.length > 0) { %>
+                                <% groups.forEach(group => { %>
                                 <div class="scout-card">
                                     <div class="group-header">
                                         <div>
                                             <h3 class="scout-name"><%= group.name %></h3>
-                                            <div class="scout-meta">
-                                                Leader: <%= group.leaderName || 'Not assigned' %> • <%= group.memberCount %> members • <%= group.advancementLevel %>
-                                            </div>
-                                            <% if (group.meetingSchedule) { %>
-                                                <div class="scout-meta">Meets: <%= group.meetingSchedule.day %> at <%= group.meetingSchedule.time %> (<%= group.meetingSchedule.location %>)</div>
-                                            <% } %>
+                                             <div class="scout-meta">
+                                                 Leader: <%= group.leaderName || 'Not assigned' %> • <%= group.memberCount || 0 %> members • <%= group.advancementLevel || 'N/A' %>
+                                             </div>
+                                             <% if (group.meetingSchedule) { %>
+                                                 <div class="scout-meta">Meets: <%= group.meetingSchedule.day || 'TBD' %> at <%= group.meetingSchedule.time || 'TBD' %> (<%= group.meetingSchedule.location || 'TBD' %>)</div>
+                                             <% } %>
                                         </div>
                                         <div class="group-stats">
-                                            <span class="badge badge-primary"><%= group.memberCount %> scouts</span>
-                                            <span class="badge badge-secondary"><%= group.advancementLevel %></span>
+                                            <span class="badge badge-primary"><%= group.memberCount || 0 %> scouts</span>
+                                            <span class="badge badge-secondary"><%= group.advancementLevel || 'N/A' %></span>
                                         </div>
                                     </div>
                                 </div>
-                            <% }) %>
-                        </div>
+                        <% }) %>
+                        <% } else { %>
+                            <div class="empty-state">
+                                <p>No scouts found.</p>
+                            </div>
+                        <% } %>
+                    </div>
+                        <% } %>
+                    </div>
                     <% } %>
                 </div>
 
                 <div id="scoutsTab" class="tab-panel">
                     <div class="scouts-list" id="scoutsList">
-                        <% scouts.forEach(scout => { %>
+                        <% if (scouts && scouts.length > 0) { %>
+                            <% scouts.forEach(scout => { %>
                             <div class="scout-card" data-id="<%= scout._id %>">
                                 <div class="scout-header">
-                                    <h3 class="scout-name"><%= scout.fullName %></h3>
-                                    <span class="badge badge-primary"><%= scout.scoutSection %></span>
+                                    <h3 class="scout-name"><%= scout.fullName || 'Unnamed Scout' %></h3>
+                                    <span class="badge badge-primary"><%= scout.scoutSection || 'Unassigned' %></span>
                                 </div>
                                 <div class="scout-meta">
-                                    Gender: <%= scout.gender %> • DOB: <%= new Date(scout.dateOfBirth).toLocaleDateString() %> • Age: <%= Math.floor((new Date() - new Date(scout.dateOfBirth)) / (365.25*24*60*60*1000)) %>
+                                    Gender: <%= scout.gender || 'N/A' %> • DOB: <%= scout.dateOfBirth ? new Date(scout.dateOfBirth).toLocaleDateString() : 'N/A' %> • Age: <%= scout.dateOfBirth ? Math.floor((new Date() - new Date(scout.dateOfBirth)) / (365.25*24*60*60*1000)) : 'N/A' %>
                                 </div>
                                 <div class="scout-meta">
-                                    Parent: <%= scout.parentContact.name %> (<a href="tel:<%= scout.parentContact.phone %>"><%= scout.parentContact.phone %></a>)
+                                    Parent: <%= scout.parentContact?.name || 'Unknown' %> (<a href="tel:<%= scout.parentContact?.phone || '' %>"><%= scout.parentContact?.phone || 'N/A' %></a>)
                                 </div>
                                 <div class="action-btns">
                                     <button class="btn btn-sm btn-outline edit-scout-btn" data-id="<%= scout._id %>" data-name="<%= scout.fullName %>" data-section="<%= scout.scoutSection %>">Edit</button>

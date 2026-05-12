@@ -9,7 +9,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <%- include('../partials/sidebar') %>
+        <%- include('partials/sidebar') %>
 
         <main class="main-content">
             <header class="dashboard-header">
@@ -44,7 +44,7 @@
                                         <dt>Phone</dt>
                                         <dd><a href="tel:<%= school?.contactPerson?.phone %>"><%= school?.contactPerson?.phone %></a></dd>
                                         <dt>Address</dt>
-                                        <dd><%= school?.address?.street %>, <%= school?.address?.city %>, <%= school?.address?.country %></dd>
+                                        <dd><%= school?.address?.street || 'N/A' %>, <%= school?.address?.city || 'N/A' %>, <%= school?.address?.country || 'N/A' %></dd>
                                     </dl>
                                 </div>
                                 <div class="profile-section">
@@ -55,9 +55,9 @@
                                         <dt>Region</dt>
                                         <dd><%= school?.region || 'Not set' %></dd>
                                         <dt>Onboarding Date</dt>
-                                        <dd><%= new Date(school?.onboardingDate).toLocaleDateString() %></dd>
+                                        <dd><%= school?.onboardingDate ? new Date(school.onboardingDate).toLocaleDateString() : 'Not set' %></dd>
                                         <dt>Service Status</dt>
-                                        <dd><span class="status-badge status-<%= school?.serviceStatus %>"><%= school?.serviceStatus.replace('_',' ') %></span></dd>
+                                        <dd><span class="status-badge status-<%= school?.serviceStatus || 'active' %>"><%= school?.serviceStatus ? school.serviceStatus.replace('_',' ') : 'Active' %></span></dd>
                                         <dt>Assigned Trainer</dt>
                                         <dd><%= trainer?.name || 'Not assigned' %> (<%= trainer?.email || '' %>)</dd>
                                     </dl>

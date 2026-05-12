@@ -190,23 +190,28 @@ async function loadDashboardData() {
         // Use fallback data
         const fallbackData = {
             totalSchools: 25,
-            activeStudents: 523,
-            upcomingEvents: 8,
-            growthRate: 24,
+            activeSchools: 23,
+            newSchoolsThisMonth: 2,
+            totalStudents: 1200,
+            activeServiceSchools: 20,
+            eventsThisMonth: 15,
+            revenueCollected: 150000,
+            outstandingPayments: 25000,
+            avgEngagementScore: 78,
             recentActivities: [
                 {
-                    title: 'New trainer onboarded',
-                    description: 'John Smith joined as Rover Scout',
+                    title: 'New school onboarded',
+                    description: 'Greenwood Elementary joined our program',
                     time: '2 hours ago'
                 },
                 {
-                    title: 'Summer Camp registration opened',
-                    description: '15 students already registered',
+                    title: 'School service activated',
+                    description: 'St. Mary\'s School upgraded to premium package',
                     time: '1 day ago'
                 },
                 {
                     title: 'New school partnership',
-                    description: 'Greenwood Elementary joined our program',
+                    description: 'Kenyatta High School registered on the platform',
                     time: '3 days ago'
                 }
             ]
@@ -218,33 +223,24 @@ async function loadDashboardData() {
 }
 
 function updateStats(data) {
+    // School-focused metrics
     const totalSchoolsEl = document.getElementById('totalSchools');
-    const activeStudentsEl = document.getElementById('activeStudents');
-    const upcomingEventsEl = document.getElementById('upcomingEvents');
-    const growthRateEl = document.getElementById('growthRate');
-    // New KPI elements
     const activeSchoolsEl = document.getElementById('activeSchools');
+    const newSchoolsThisMonthEl = document.getElementById('newSchoolsThisMonth');
+    const totalStudentsEl = document.getElementById('totalStudents');
+    const activeServiceSchoolsEl = document.getElementById('activeServiceSchools');
     const eventsThisMonthEl = document.getElementById('eventsThisMonth');
-    const trainersDeployedEl = document.getElementById('trainersDeployed');
-    const totalScoutsReachedEl = document.getElementById('totalScoutsReached');
     const revenueCollectedEl = document.getElementById('revenueCollected');
     const outstandingPaymentsEl = document.getElementById('outstandingPayments');
-    const reportSubmissionRateEl = document.getElementById('reportSubmissionRate');
 
-    // Existing ones
     if (totalSchoolsEl) totalSchoolsEl.textContent = data.totalSchools || 0;
-    if (activeStudentsEl) activeStudentsEl.textContent = data.activeStudents || 0;
-    if (upcomingEventsEl) upcomingEventsEl.textContent = data.upcomingEvents || 0;
-    if (growthRateEl) growthRateEl.textContent = `+${data.growthRate || 0}%`;
-
-    // New KPIs
     if (activeSchoolsEl) activeSchoolsEl.textContent = data.activeSchools || 0;
+    if (newSchoolsThisMonthEl) newSchoolsThisMonthEl.textContent = data.newSchoolsThisMonth || 0;
+    if (totalStudentsEl) totalStudentsEl.textContent = data.totalStudents || 0;
+    if (activeServiceSchoolsEl) activeServiceSchoolsEl.textContent = data.activeServiceSchools || 0;
     if (eventsThisMonthEl) eventsThisMonthEl.textContent = data.eventsThisMonth || 0;
-    if (trainersDeployedEl) trainersDeployedEl.textContent = data.trainersDeployed || 0;
-    if (totalScoutsReachedEl) totalScoutsReachedEl.textContent = data.totalScoutsReached || 0;
     if (revenueCollectedEl) revenueCollectedEl.textContent = `KES ${(data.revenueCollected || 0).toLocaleString()}`;
     if (outstandingPaymentsEl) outstandingPaymentsEl.textContent = `KES ${(data.outstandingPayments || 0).toLocaleString()}`;
-    if (reportSubmissionRateEl) reportSubmissionRateEl.textContent = `${data.reportSubmissionRate || 0}%`;
 }
 
 function updateActivities(activities) {

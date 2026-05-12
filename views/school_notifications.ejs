@@ -17,7 +17,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <%- include('../partials/sidebar') %>
+        <%- include('partials/sidebar') %>
 
         <main class="main-content">
             <header class="dashboard-header">
@@ -39,10 +39,10 @@
                                 <% notifications.forEach(n => { %>
                                     <li class="notif-item <%= !n.isRead ? 'unread' : '' %>">
                                         <div class="notif-content">
-                                            <h4><%= n.title %></h4>
-                                            <p><%= n.message %></p>
+                                            <h4><%= n.title || 'No title' %></h4>
+                                            <p><%= n.message || '' %></p>
                                         </div>
-                                        <div class="notif-time"><%= new Date(n.createdAt).toLocaleString() %></div>
+                                        <div class="notif-time"><%= n.createdAt ? new Date(n.createdAt).toLocaleString() : 'N/A' %></div>
                                     </li>
                                 <% }) %>
                             </ul>

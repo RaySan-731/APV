@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Not Found - Arrow-Park Ventures</title>
+    <title>Error - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
 </head>
@@ -17,12 +17,17 @@
                     <path d="M9 9l6 6"></path>
                 </svg>
             </div>
-            <h1 class="error-title">404</h1>
-            <h2 class="error-subtitle">Page Not Found</h2>
-            <p class="error-message">The page you're looking for doesn't exist or has been moved.</p>
+            <h1 class="error-title">Error</h1>
+            <h2 class="error-subtitle"><%= typeof error !== 'undefined' && error ? error : 'Something went wrong' %></h2>
+            <% if (typeof error !== 'undefined' && error && error.includes('Failed to load dashboard')) { %>
+                <p class="error-message">The dashboard could not be loaded. Please try logging in again or contact support.</p>
+            <% } else { %>
+                <p class="error-message">The page you're looking for doesn't exist or has been moved.</p>
+            <% } %>
             <div class="error-actions">
                 <a href="/" class="btn btn-primary">Go Home</a>
                 <a href="/dashboard" class="btn btn-outline">Go to Dashboard</a>
+                <a href="/logout" class="btn btn-outline">Logout</a>
             </div>
         </div>
     </div>

@@ -58,12 +58,13 @@ class ReportScheduler {
 
       const metrics = [
         ['Total Schools', data.totalSchools || 'N/A'],
+        ['Active Schools', data.activeSchools || 'N/A'],
+        ['New Schools This Month', data.newSchoolsThisMonth || 'N/A'],
+        ['Total Students', data.totalStudents || 'N/A'],
         ['Events This Month', data.eventsThisMonth || 'N/A'],
-        ['Trainers Deployed', data.trainersDeployed || 'N/A'],
-        ['Total Scouts Reached', data.totalScoutsReached || 'N/A'],
         ['Revenue Collected', `KES ${data.revenueCollected ? data.revenueCollected.toLocaleString() : 'N/A'}`],
         ['Outstanding Payments', `KES ${data.outstandingPayments ? data.outstandingPayments.toLocaleString() : 'N/A'}`],
-        ['Report Submission Rate', `${data.reportSubmissionRate || 'N/A'}%`]
+        ['Active Service Schools', data.activeServiceSchools || 'N/A']
       ];
 
       metrics.forEach(([label, value]) => {

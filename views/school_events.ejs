@@ -25,7 +25,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <%- include('../partials/sidebar') %>
+        <%- include('partials/sidebar') %>
 
         <main class="main-content">
             <header class="dashboard-header">
@@ -44,22 +44,22 @@
                 </div>
 
                 <div id="upcomingEvents">
-                    <h2>Upcoming Events (<%= events.filter(e => e.status !== 'completed' && e.startDate >= new Date()).length %>)</h2>
-                    <% const upcoming = events.filter(e => e.status !== 'completed' && e.startDate >= new Date()); %>
-                    <% if (upcoming.length === 0) { %>
+                    <% const upcoming = events && events.filter(e => e.status !== 'completed' && e.startDate && e.startDate >= new Date()) || []; %>
+                    <h2>Upcoming Events (<%= upcoming.length %>)</h2>
+                    <% if (!upcoming || upcoming.length === 0) { %>
                         <p class="placeholder-text">No upcoming events scheduled.</p>
                     <% } else { %>
                         <% upcoming.forEach(event => { %>
                             <div class="event-card" data-event-id="<%= event._id %>">
-                                <h3><%= event.name %></h3>
+                                <h3><%= event.name || 'Unnamed Event' %></h3>
                                 <div class="event-meta">
-                                    <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> <%= new Date(event.startDate).toLocaleDateString() %> - <%= new Date(event.endDate).toLocaleDateString() %></div>
+                                    <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> <%= event.startDate ? new Date(event.startDate).toLocaleDateString() : 'TBD' %> - <%= event.endDate ? new Date(event.endDate).toLocaleDateString() : 'TBD' %></div>
                                     <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> <%= event.location?.name || 'TBD' %></div>
-                                    <div><span class="badge badge-primary"><%= event.eventType.replace('_',' ') %></span></div>
+                                    <div><span class="badge badge-primary"><%= event.eventType ? event.eventType.replace('_',' ') : 'Other' %></span></div>
                                 </div>
                                 <p><%= event.description || '' %></p>
 
-                                <% const invitation = event.targetSchools?.find(s => s.schoolId.toString() === schoolId.toString()); %>
+                                <% const invitation = event.targetSchools?.find(s => schoolId && s.schoolId.toString() === schoolId.toString()); %>
                                 <% if (invitation) { %>
                                     <div class="rsvp-section">
                                         <span class="rsvp-status">Your RSVP: <span class="badge badge-<%= invitation.rsvpStatus %>"><%= invitation.rsvpStatus %></span></span>
@@ -79,17 +79,17 @@
 
                 <div id="pastEvents" style="display:none;">
                     <h2>Past Events</h2>
-                    <% const past = events.filter(e => e.status === 'completed' || e.endDate < new Date()); %>
-                    <% if (past.length === 0) { %>
+                    <% const past = events && events.filter(e => e.status === 'completed' || (e.endDate && e.endDate < new Date())) || []; %>
+                    <% if (!past || past.length === 0) { %>
                         <p class="placeholder-text">No past events.</p>
                     <% } else { %>
                         <% past.forEach(event => { %>
                             <div class="event-card">
-                                <h3><%= event.name %></h3>
+                                <h3><%= event.name || 'Unnamed Event' %></h3>
                                 <div class="event-meta">
-                                    <div><%= new Date(event.startDate).toLocaleDateString() %> - <%= new Date(event.endDate).toLocaleDateString() %></div>
+                                    <div><%= event.startDate ? new Date(event.startDate).toLocaleDateString() : 'N/A' %> - <%= event.endDate ? new Date(event.endDate).toLocaleDateString() : 'N/A' %></div>
                                     <div><%= event.location?.name || 'TBD' %></div>
-                                    <div><span class="badge badge-secondary"><%= event.eventType.replace('_',' ') %></span></div>
+                                    <div><span class="badge badge-secondary"><%= event.eventType ? event.eventType.replace('_',' ') : 'Other' %></span></div>
                                 </div>
                             </div>
                         <% }) %>

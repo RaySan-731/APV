@@ -25,7 +25,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <%- include('../partials/sidebar') %>
+        <%- include('partials/sidebar') %>
 
         <main class="main-content">
             <header class="dashboard-header">
@@ -80,20 +80,20 @@
                                 <div class="invoice-info">
                                     <h3>Invoice <%= invoice.invoiceNumber %></h3>
                                     <div class="invoice-meta">
-                                        Issued: <%= new Date(invoice.issueDate).toLocaleDateString() %> • Due: <%= new Date(invoice.dueDate).toLocaleDateString() %>
+                                        Issued: <%= invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString() : 'N/A' %> • Due: <%= invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A' %>
                                     </div>
                                     <div class="invoice-meta">
-                                        Type: <%= invoice.invoiceType.replace('_',' ') %> • Items: <%= invoice.items.length %>
+                                        Type: <%= invoice.invoiceType ? invoice.invoiceType.replace('_',' ') : 'Other' %> • Items: <%= invoice.items ? invoice.items.length : 0 %>
                                     </div>
                                 </div>
                                 <div style="text-align:right;">
-                                    <div class="invoice-total">KES <%= invoice.totalAmount.toLocaleString() %></div>
+                                    <div class="invoice-total">KES <%= invoice.totalAmount ? invoice.totalAmount.toLocaleString() : '0' %></div>
                                     <div style="margin:0.5rem 0;">
-                                        <span class="status-badge status-<%= invoice.status %>"><%= invoice.status %></span>
+                                        <span class="status-badge status-<%= invoice.status || 'unknown' %>"><%= invoice.status || 'unknown' %></span>
                                     </div>
                                     <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem;">
                                         <a href="/api/school/invoices/<%= invoice._id %>/download" class="btn btn-outline btn-sm" target="_blank">Download Receipt</a>
-                                        <% if (['issued','sent','partial','overdue'].includes(invoice.status)) { %>
+                                        <% if (invoice.status && ['issued','sent','partial','overdue'].includes(invoice.status)) { %>
                                             <button class="btn btn-outline btn-sm raise-query-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>">Raise Query</button>
                                         <% } %>
                                     </div>

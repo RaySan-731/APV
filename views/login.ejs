@@ -29,8 +29,8 @@
                 </svg>
             </div>
 
-            <h1 class="login-title">Member Login</h1>
-            <p class="login-subtitle">Access your Arrow-Park Ventures dashboard</p>
+            <h1 class="login-title"><%= portal === 'school' ? 'School Portal Login' : 'Member Login' %></h1>
+            <p class="login-subtitle"><%= portal === 'school' ? 'Use the school email and default password 0000' : 'Access your Arrow-Park Ventures dashboard' %></p>
 
             <% if (typeof error !== 'undefined') { %>
                 <div class="alert alert-error">
@@ -38,9 +38,11 @@
                 </div>
             <% } %>
 
-                    <form class="login-form" action="/login" method="POST">
+                    <form class="login-form" action="<%= portal === 'school' ? '/school' : '/login' %>" method="POST">
                         <% if (typeof next !== 'undefined' && next) { %>
                             <input type="hidden" name="next" value="<%= next %>">
+                        <% } else if (portal === 'school') { %>
+                            <input type="hidden" name="next" value="/school/dashboard">
                         <% } %>
                 <div class="form-group">
                     <label for="email" class="form-label">Email</label>

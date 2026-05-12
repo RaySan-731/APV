@@ -12,34 +12,39 @@ const Feedback = require('../../models/Feedback');
 const VisitLog = require('../../models/VisitLog');
 
 /**
- * Get KPI dashboard metrics
+ * Get KPI dashboard metrics - School focused for admin/founder dashboard
  */
 async function getKPIMetrics(dateRange = '30d') {
   const now = new Date();
   const daysAgo = dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 365;
   const startDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Total schools
+  const totalSchools = await School.countDocuments();
 
   // Active schools (status: active)
   const activeSchools = await School.countDocuments({ status: 'active' });
 
-  // Events this month
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  // New schools this month
+  const newSchoolsThisMonth = await School.countDocuments({
+    createdAt: { $gte: thisMonthStart }
+  });
+
+  // Total students across all schools
+  const totalStudentsPipeline = await School.aggregate([
+    { $group: { _id: null, total: { $sum: '$studentCount' } } }
+  ]);
+  const totalStudents = totalStudentsPipeline[0]?.total || 0;
+
+  // Service status breakdown
+  const activeServiceSchools = await School.countDocuments({ serviceStatus: 'active' });
+  const onHoldSchools = await School.countDocuments({ serviceStatus: 'on_hold' });
+
+  // Events this month (school-related events)
   const eventsThisMonth = await Event.countDocuments({
     startDate: { $gte: thisMonthStart }
   });
-
-  // Trainers deployed (active staff with trainer role)
-  const trainersDeployed = await Staff.countDocuments({
-    role: { $in: ['trainer', 'senior trainer'] },
-    status: 'Active'
-  });
-
-  // Total scouts reached (sum of actualAttendeeCount from completed events)
-  const scoutsReachedPipeline = await Event.aggregate([
-    { $match: { status: 'completed', 'review.actualAttendeeCount': { $exists: true, $ne: null } } },
-    { $group: { _id: null, total: { $sum: '$review.actualAttendeeCount' } } }
-  ]);
-  const totalScoutsReached = scoutsReachedPipeline[0]?.total || 0;
 
   // Revenue collected (sum of amountPaid)
   const revenuePipeline = await Payment.aggregate([
@@ -54,24 +59,24 @@ async function getKPIMetrics(dateRange = '30d') {
   ]);
   const outstandingPayments = outstandingPipeline[0]?.total || 0;
 
-  // Report submission rate
-  const totalCompletedEvents = await Event.countDocuments({ status: 'completed' });
-  const reportedEvents = await Event.countDocuments({
-    status: 'completed',
-    'review.reportSubmittedAt': { $exists: true, $ne: null }
-  });
-  const reportSubmissionRate = totalCompletedEvents > 0
-    ? Math.round((reportedEvents / totalCompletedEvents) * 100)
-    : 0;
+  // Average school engagement score
+  const avgEngagementPipeline = await School.aggregate([
+    { $match: { status: 'active' } },
+    { $group: { _id: null, avg: { $avg: '$participationMetrics.engagementScore' } } }
+  ]);
+  const avgEngagementScore = Math.round(avgEngagementPipeline[0]?.avg || 0);
 
   return {
+    totalSchools,
     activeSchools,
+    newSchoolsThisMonth,
+    totalStudents,
+    activeServiceSchools,
+    onHoldSchools,
     eventsThisMonth,
-    trainersDeployed,
-    totalScoutsReached,
     revenueCollected,
     outstandingPayments,
-    reportSubmissionRate
+    avgEngagementScore
   };
 }
 

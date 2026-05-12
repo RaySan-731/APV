@@ -6,6 +6,58 @@
     <title>School Dashboard - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
+    <style>
+        .recent-students-section .recent-students-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .recent-student-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--background);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+        .recent-student-item .student-info h4 {
+            margin: 0 0 0.25rem 0;
+            font-size: 0.95rem;
+            color: var(--foreground);
+        }
+        .recent-student-item .student-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.85rem;
+            color: var(--muted-foreground);
+        }
+        .recent-student-item .trainer-name {
+            font-weight: 500;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .section-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+        .view-all {
+            font-size: 0.85rem;
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .view-all:hover {
+            text-decoration: underline;
+        }
+        .stat-icon.students {
+            /* Add specific styling if needed */
+        }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -112,7 +164,7 @@
                 <!-- Stats Grid -->
                 <section class="stats-section">
                     <div class="stat-card">
-                        <div class="stat-icon scouts">
+                         <div class="stat-icon students">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="9" cy="7" r="4"></circle>
@@ -121,8 +173,8 @@
                             </svg>
                         </div>
                         <div class="stat-info">
-                            <span class="stat-value"><%= stats?.totalScouts || 0 %></span>
-                            <span class="stat-label">Active Scouts</span>
+                             <span class="stat-value"><%= stats?.totalStudents || 0 %></span>
+                             <span class="stat-label">Active Students</span>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -136,7 +188,7 @@
                         </div>
                         <div class="stat-info">
                             <span class="stat-value"><%= stats?.activeGroupsCount || 0 %></span>
-                            <span class="stat-label">Scout Groups</span>
+                             <span class="stat-label">Student Groups</span>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -218,37 +270,62 @@
                     </section>
                 </div>
 
-                <!-- Recent Notifications -->
-                <section class="card notifications-section">
-                    <div class="section-header">
-                        <h3>Recent Notifications</h3>
-                        <a href="/school/notifications" class="view-all">View All</a>
-                    </div>
-                    <% if (notifications && notifications.recent && notifications.recent.length > 0) { %>
-                        <ul class="notification-list">
-                            <% notifications.recent.forEach(n => { %>
-                                <li class="notification-item <%= n.type || '' %> <%= n.isRead ? '' : 'unread' %>">
-                                    <div class="notification-content">
-                                        <h4><%= n.title || '' %></h4>
-                                        <p><%= n.message || '' %></p>
-                                        <small><%= n.createdAt ? new Date(n.createdAt).toLocaleString() : '' %></small>
-                                    </div>
-                                </li>
-                            <% }) %>
-                        </ul>
-                    <% } else { %>
-                        <p class="placeholder-text">No notifications</p>
-                    <% } %>
-                </section>
+                 <!-- Recent Notifications -->
+                 <section class="card notifications-section">
+                     <div class="section-header">
+                         <h3>Recent Notifications</h3>
+                         <a href="/school/notifications" class="view-all">View All</a>
+                     </div>
+                     <% if (notifications && notifications.recent && notifications.recent.length > 0) { %>
+                         <ul class="notification-list">
+                             <% notifications.recent.forEach(n => { %>
+                                 <li class="notification-item <%= n.type || '' %> <%= n.isRead ? '' : 'unread' %>">
+                                     <div class="notification-content">
+                                         <h4><%= n.title || '' %></h4>
+                                         <p><%= n.message || '' %></p>
+                                         <small><%= n.createdAt ? new Date(n.createdAt).toLocaleString() : '' %></small>
+                                     </div>
+                                 </li>
+                             <% }) %>
+                         </ul>
+                     <% } else { %>
+                         <p class="placeholder-text">No notifications</p>
+                     <% } %>
+                 </section>
+
+                 <!-- Recent Students -->
+                 <% if (recentStudents && recentStudents.length > 0) { %>
+                 <section class="card recent-students-section">
+                     <div class="section-header">
+                         <h3>Recently Onboarded Students</h3>
+                         <a href="/school/students" class="view-all">View All</a>
+                     </div>
+                     <div class="recent-students-list">
+                         <% recentStudents.forEach(student => { %>
+                             <div class="recent-student-item">
+                                 <div class="student-info">
+                                      <h4><%= student.fullName || 'Unnamed Student' %></h4>
+                                     <div class="student-meta">
+                                         <span class="badge badge-secondary"><%= student.scoutSection || 'Unassigned' %></span>
+                                         <span class="trainer-name">Trainer: <%= student.assignedTrainerName || 'Unassigned' %></span>
+                                         <small>Added: <%= student.createdAt ? new Date(student.createdAt).toLocaleDateString() : '' %></small>
+                                     </div>
+                                 </div>
+                                  <a href="/school/students" class="btn btn-outline btn-sm">View</a>
+                             </div>
+                         <% }) %>
+                     </div>
+                 </section>
+                 <% } %>
 
                 <!-- Quick Links -->
                 <section class="quick-links">
-                    <a href="/school/scouts" class="quick-link-card">
+                     <a href="/school/students" class="quick-link-card">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                             <circle cx="9" cy="7" r="4"></circle>
                         </svg>
-                        <span>Manage Scouts</span>
+                         <span>Manage Students</span>
                     </a>
                     <a href="/school/events" class="quick-link-card">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

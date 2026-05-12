@@ -980,30 +980,36 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     return res.redirect('/trainer/dashboard');
   }
 
-  try {
-    // Fetch real statistics
-    const totalStaff = await Staff.countDocuments();
-    const activeStaff = await Staff.countDocuments({ status: 'Active' });
-    const onLeaveStaff = await Staff.countDocuments({ status: 'On Leave' });
-    
-    // Fetch staff list for compose dropdown (active non-inactive staff)
-    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
-      .select('_id name email role')
-      .sort({ name: 1 })
-      .lean();
+   try {
+     // Fetch real statistics
+     const totalStaff = await Staff.countDocuments();
+     const activeStaff = await Staff.countDocuments({ status: 'Active' });
+     const onLeaveStaff = await Staff.countDocuments({ status: 'On Leave' });
+     
+     // Fetch staff list for compose dropdown (active non-inactive staff)
+     const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
+       .select('_id name email role')
+       .sort({ name: 1 })
+       .lean();
 
-    // Calculate average performance metrics
-    const performanceStats = await Staff.aggregate([
-      {
-        $group: {
-          _id: null,
-          avgAttendance: { $avg: '$performanceMetrics.averageAttendanceRate' },
-          avgFeedback: { $avg: '$performanceMetrics.averageFeedbackRating' },
-          totalEvents: { $sum: '$performanceMetrics.eventsCompleted' },
-          totalReports: { $sum: '$performanceMetrics.reportsSubmitted' }
-        }
-      }
-    ]);
+     // Fetch active programs for onboarding dropdown
+     const programs = await Program.find({ status: 'active' })
+       .select('_id name price duration')
+       .sort({ name: 1 })
+       .lean();
+     
+     // Calculate average performance metrics
+     const performanceStats = await Staff.aggregate([
+       {
+         $group: {
+           _id: null,
+           avgAttendance: { $avg: '$performanceMetrics.averageAttendanceRate' },
+           avgFeedback: { $avg: '$performanceMetrics.averageFeedbackRating' },
+           totalEvents: { $sum: '$performanceMetrics.eventsCompleted' },
+           totalReports: { $sum: '$performanceMetrics.reportsSubmitted' }
+         }
+       }
+     ]);
 
     const stats = performanceStats[0] || {
       avgAttendance: 0,
@@ -1012,37 +1018,44 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       totalReports: 0
     };
 
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'dashboard',
-      staffList,
-      stats: {
-        totalStaff,
-        activeStaff,
-        onLeaveStaff,
-        avgAttendance: Math.round(stats.avgAttendance || 0),
-        avgFeedback: Math.round(stats.avgFeedback || 0),
-        totalEvents: stats.totalEvents || 0,
-        totalReports: stats.totalReports || 0
-      }
-    });
-  } catch (err) {
-    console.error('Dashboard stats error:', err);
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'dashboard',
-      staffList: [],
-      stats: {
-        totalStaff: 0,
-        activeStaff: 0,
-        onLeaveStaff: 0,
-        avgAttendance: 0,
-        avgFeedback: 0,
-        totalEvents: 0,
-        totalReports: 0
-      }
-    });
-  }
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'dashboard',
+       staffList,
+       allPrograms: programs,
+       stats: {
+         totalStaff,
+         activeStaff,
+         onLeaveStaff,
+         avgAttendance: Math.round(stats.avgAttendance || 0),
+         avgFeedback: Math.round(stats.avgFeedback || 0),
+         totalEvents: stats.totalEvents || 0,
+         totalReports: stats.totalReports || 0
+       }
+     });
+   } catch (err) {
+     console.error('Dashboard stats error:', err);
+     // Fetch programs even on error to prevent undefined in view
+     const programsFallback = await Program.find({ status: 'active' })
+       .select('_id name price duration')
+       .sort({ name: 1 })
+       .lean();
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'dashboard',
+       staffList: [],
+       allPrograms: programsFallback,
+       stats: {
+         totalStaff: 0,
+         activeStaff: 0,
+         onLeaveStaff: 0,
+         avgAttendance: 0,
+         avgFeedback: 0,
+         totalEvents: 0,
+         totalReports: 0
+       }
+     });
+   }
 });
 
 app.get('/trainer/dashboard', requireAuth, (req, res) => {
@@ -2414,25 +2427,28 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
      schoolController.updateSchoolProfile(req, res);
    });
 
-  // API: Get scouts data
-  app.get('/api/school/scouts', requireAuth, requireSchoolAdmin, async (req, res) => {
-    const schoolController = require('./backend/controllers/schoolController');
-    schoolController.getScoutsData(req, res);
-  });
+   // API: Get students data
+    app.get('/api/school/students', requireAuth, requireSchoolAdmin, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.getStudentsData(req, res);
+   });
 
-  // API: Add scout
-  app.post('/api/school/scouts', requireAuth, requireSchoolAdmin, async (req, res) => {
-    const schoolController = require('./backend/controllers/schoolController');
-    schoolController.addScout(req, res);
-  });
+   app.post('/api/school/students', requireAuth, requireSchoolAdmin, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.addStudent(req, res);
+   });
 
-  // API: Update scout
-  app.put('/api/school/scouts/:scoutId', requireAuth, requireSchoolAdmin, async (req, res) => {
-    const schoolController = require('./backend/controllers/schoolController');
-    schoolController.updateScout(req, res);
-  });
+   app.put('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.updateStudent(req, res);
+   });
 
-  // API: Get events
+    app.put('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, async (req, res) => {
+      const schoolController = require('./backend/controllers/schoolController');
+      schoolController.updateStudent(req, res);
+    });
+
+    // API: Get events
   app.get('/api/school/events', requireAuth, requireSchoolAdmin, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.getEvents(req, res);
@@ -2505,67 +2521,103 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
   // School Admin Dashboard Page
-  app.get('/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
-    try {
-      const schoolId = req.schoolId;
-      const school = req.school;
+   app.get('/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
+     try {
+       const schoolId = req.schoolId;
+       const school = req.school;
 
-      const [
-        totalScouts,
-        activeGroupsCount,
-        upcomingEvents,
-        pendingInvoices,
-        unreadNotificationsCount,
-        unreadMessagesCount
-      ] = await Promise.all([
-        Student.countDocuments({ school: schoolId, status: 'active' }),
-        ScoutGroup.countDocuments({ schoolId, status: 'active' }),
-        Event.find({
-          'targetSchools.schoolId': schoolId,
-          startDate: { $gte: new Date(), $lte: new Date(Date.now() + 30*24*60*60*1000) },
-          status: { $in: ['confirmed', 'in_progress', 'scheduled'] }
-        }).sort({ startDate: 1 }).limit(1).lean(),
-        Invoice.countDocuments({
-          schoolId,
-          status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
-        }),
-        Notification.countDocuments({
-          recipientId: req.staff._id,
-          isRead: false,
-          dismissed: false
-        }),
-        Message.countDocuments({
-          'recipients.staffId': req.staff._id,
-          'recipients.status': 'sent',
-          'recipients.deleted': { $ne: true }
-        })
-      ]);
+       const [
+         totalScouts,
+         activeGroupsCount,
+         upcomingEvents,
+         pendingInvoices,
+         unreadNotificationsCount,
+         unreadMessagesCount,
+         recentStudents,
+         totalPaidThisYear
+       ] = await Promise.all([
+         Student.countDocuments({ school: schoolId, status: 'active' }),
+         ScoutGroup.countDocuments({ schoolId, status: 'active' }),
+         Event.find({
+           'targetSchools.schoolId': schoolId,
+           startDate: { $gte: new Date(), $lte: new Date(Date.now() + 30*24*60*60*1000) },
+           status: { $in: ['confirmed', 'in_progress', 'scheduled'] }
+         }).sort({ startDate: 1 }).limit(1).lean(),
+         Invoice.countDocuments({
+           schoolId,
+           status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
+         }),
+         Notification.countDocuments({
+           recipientId: req.staff._id,
+           isRead: false,
+           dismissed: false
+         }),
+         Message.countDocuments({
+           'recipients.staffId': req.staff._id,
+           'recipients.status': 'sent',
+           'recipients.deleted': { $ne: true }
+         }),
+         // Recent students with trainer info
+         Student.find({ school: schoolId, status: 'active' })
+           .sort({ createdAt: -1 })
+           .limit(5)
+           .populate('assignedTrainer', 'name')
+           .lean(),
+         // Total paid this year
+         Invoice.aggregate([
+           {
+             $match: {
+               schoolId: new mongoose.Types.ObjectId(schoolId),
+               status: 'paid',
+               paidDate: { $gte: new Date(new Date().getFullYear(), 0, 1) }
+             }
+           },
+           {
+             $group: {
+               _id: null,
+               totalPaid: { $sum: '$totalAmount' }
+             }
+           }
+         ])
+       ]);
 
-      const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+       const totalPaid = totalPaidThisYear[0]?.totalPaid || 0;
 
-      res.render('school_dashboard', {
-        user: req.session.user,
-        school,
-        stats: {
-          totalScouts,
-          activeGroupsCount,
-          upcomingEventsCount: upcomingEvents.length,
-          pastEventsCount: null, // not needed on dashboard
-          pendingInvoices,
-          totalPaidThisYear: 0, // compute separately if needed
-          daysSinceLastVisit: await calculateDaysSinceLastVisit(schoolId),
-          unreadNotifications: unreadNotificationsCount,
-          unreadMessages: unreadMessagesCount
-        },
-        nextEvent,
-        pendingActions: await buildPendingActions(schoolId, req.staff._id),
-        notifications: {
-          unreadCount: unreadNotificationsCount,
-          recent: await Notification.find({ recipientId: req.staff._id, isRead: false, dismissed: false })
-            .sort({ createdAt: -1 }).limit(5).lean()
-        },
-        page: 'school_dashboard'
-      });
+       // Transform recent students to include readable names
+       const transformedRecentStudents = recentStudents.map(s => ({
+         _id: s._id,
+         fullName: s.fullName,
+         scoutSection: s.scoutSection,
+         assignedTrainerName: s.assignedTrainer?.name || 'Unassigned',
+         createdAt: s.createdAt
+       }));
+
+       const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+
+       res.render('school_dashboard', {
+         user: req.session.user,
+         school,
+         stats: {
+           totalScouts,
+           activeGroupsCount,
+           upcomingEventsCount: upcomingEvents.length,
+           pastEventsCount: null, // not needed on dashboard
+           pendingInvoices,
+           totalPaidThisYear: totalPaid,
+           daysSinceLastVisit: await calculateDaysSinceLastVisit(schoolId),
+           unreadNotifications: unreadNotificationsCount,
+           unreadMessages: unreadMessagesCount
+         },
+         nextEvent,
+         pendingActions: await buildPendingActions(schoolId, req.staff._id),
+         notifications: {
+           unreadCount: unreadNotificationsCount,
+           recent: await Notification.find({ recipientId: req.staff._id, isRead: false, dismissed: false })
+             .sort({ createdAt: -1 }).limit(5).lean()
+         },
+         recentStudents: transformedRecentStudents,
+         page: 'school_dashboard'
+       });
   } catch (err) {
     console.error('School dashboard error:', err);
     // Log more details for debugging
@@ -2603,29 +2655,53 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     }
   });
 
-  // Scouts & Groups Page
-  app.get('/school/scouts', requireAuth, requireSchoolAdmin, async (req, res) => {
-    try {
-      const schoolId = req.schoolId;
-      const [groups, scouts] = await Promise.all([
-        ScoutGroup.find({ schoolId }).sort({ name: 1 }).lean(),
-        Student.find({ school: schoolId, status: 'active' }).sort({ fullName: 1 }).lean()
-      ]);
-      res.render('school_scouts', {
-        user: req.session.user,
-        school: req.school,
-        groups,
-        scouts,
-        schoolId,
-        page: 'school_scouts'
-      });
-    } catch (err) {
-      console.error('School scouts error:', err);
-      res.status(500).render('404', { user: req.session.user, error: err.message });
-    }
-  });
+   // Students & Groups Page
+    app.get('/school/students', requireAuth, requireSchoolAdmin, async (req, res) => {
+      try {
+       const schoolId = req.schoolId;
+        const [groups, students, schoolWithStaff] = await Promise.all([
+          ScoutGroup.find({ schoolId }).sort({ name: 1 }).lean(),
+          Student.find({ school: schoolId, status: 'active' })
+            .sort({ fullName: 1 })
+            .populate('assignedTrainer', 'name')
+            .populate('addedBy.trainerId', 'name')
+            .lean(),
+          School.findById(schoolId)
+            .populate('assignedStaff.staffId', 'name')
+            .lean()
+        ]);
 
-  // Events Page
+        // Transform students to include readable trainer names
+        const transformedStudents = students.map(student => ({
+          ...student,
+          assignedTrainerName: student.assignedTrainer?.name || 'Unassigned',
+          addedByName: student.addedBy?.trainerId?.name || 'Unknown'
+        }));
+
+       // Extract trainers array from assignedStaff
+       const trainers = (schoolWithStaff?.assignedStaff || [])
+         .filter(assignment => assignment.status === 'active')
+         .map(assignment => ({
+           _id: assignment.staffId._id,
+           name: assignment.staffId.name
+         }));
+
+         res.render('school_students', {
+           user: req.session.user,
+           school: req.school,
+           groups,
+           students: transformedStudents,
+           trainers,
+           schoolId,
+           page: 'school_students'
+         });
+      } catch (err) {
+        console.error('School students error:', err);
+        res.status(500).render('404', { user: req.session.user, error: err.message });
+      }
+    });
+
+   // Events Page
   app.get('/school/events', requireAuth, requireSchoolAdmin, async (req, res) => {
     try {
       const events = await Event.find({
@@ -3200,23 +3276,30 @@ app.get('/dashboard/audit-logs', requireAuth, requirePermission('canViewAuditLog
     const totalLogs = await AuditLog.countDocuments(query);
     const totalPages = Math.ceil(totalLogs / limit);
 
-    // Fetch staff list for compose dropdown
-    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
-      .select('_id name email role')
-      .sort({ name: 1 })
-      .lean();
+     // Fetch staff list for compose dropdown
+     const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
+       .select('_id name email role')
+       .sort({ name: 1 })
+       .lean();
 
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'audit-logs',
-      staffList,
-      auditLogs: logs,
-      currentPage: page,
-      totalPages,
-      auditActionFilter: actionFilter,
-      auditEntityFilter: entityFilter,
-      auditSearch: search
-    });
+     // Fetch all active programs for onboarding modal
+     const allPrograms = await Program.find({ status: 'active' })
+       .select('_id name price duration')
+       .sort({ name: 1 })
+       .lean();
+
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'audit-logs',
+       staffList,
+       allPrograms,
+       auditLogs: logs,
+       currentPage: page,
+       totalPages,
+       auditActionFilter: actionFilter,
+       auditEntityFilter: entityFilter,
+       auditSearch: search
+     });
   } catch (err) {
     console.error('Audit logs error:', err);
     res.status(500).render('404', { user: req.session.user });
@@ -4401,17 +4484,24 @@ app.get('/dashboard/schools', requireAuth, requirePermission('canViewSchools'), 
         }).filter(Boolean);
       });
 
-    // Fetch all trainers for onboarding modal
-    const staffList = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor', 'coordinator'] } }).select('name email idNumber status role').sort({ name: 1 }).lean();
+     // Fetch all trainers for onboarding modal
+     const staffList = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor', 'coordinator'] } }).select('name email idNumber status role').sort({ name: 1 }).lean();
 
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'schools',
-      schoolList,
-      staffList,
-      filters: { status, serviceStatus, zone, region, search },
-      sortBy, order
-    });
+     // Fetch all active programs for onboarding modal
+     const allPrograms = await Program.find({ status: 'active' })
+       .select('_id name price duration')
+       .sort({ name: 1 })
+       .lean();
+
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'schools',
+       schoolList,
+       staffList,
+       allPrograms,
+       filters: { status, serviceStatus, zone, region, search },
+       sortBy, order
+     });
   } catch (err) {
     console.error('Error loading schools page:', err);
     res.status(500).render('404', { user: req.session.user });
@@ -4424,9 +4514,21 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
     const {
       name, street, city, state, zipCode, country, zone, region,
       contactName, contactEmail, contactPhone, contactPosition,
-      studentCount, servicePackage, paymentMethod, billingCycle,
+      studentCount, programId, paymentMethod, billingCycle,
       primaryTrainerId, notes
     } = req.body;
+
+    // Validate required program selection
+    if (!programId) {
+      return res.status(400).json({ success: false, error: 'Please select a program' });
+    }
+
+    // Validate program exists and get its price
+    const program = await Program.findById(programId);
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Selected program not found' });
+    }
+    const ratePerStudent = program.price.amount || 0;
 
     const trainerObjectId = primaryTrainerId ? new mongoose.Types.ObjectId(primaryTrainerId) : null;
 
@@ -4449,10 +4551,12 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
         position: contactPosition?.trim()
       },
       studentCount: parseInt(studentCount) || 0,
-      servicePackage: servicePackage || 'standard',
+      servicePackage: 'standard', // default since program determines pricing
+      programsEnrolled: programId ? [new mongoose.Types.ObjectId(programId)] : [],
       paymentTerms: {
         method: paymentMethod || 'bank_transfer',
-        billingCycle: billingCycle || 'per_event'
+        billingCycle: billingCycle || 'weekly',
+        ratePerStudent: ratePerStudent > 0 ? ratePerStudent : null
       },
       assignedStaff: trainerObjectId ? [{
         staffId: trainerObjectId,
@@ -4574,37 +4678,44 @@ app.get('/dashboard/schools/:schoolId', requireAuth, requirePermission('canViewS
       ? Math.round(schoolEvents.reduce((sum, se) => sum + (se.targetSchools?.[0]?.attendancePercentage || 0), 0) / schoolEvents.length)
       : 0;
 
-    // Fetch staff list for compose dropdown
-    const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
-      .select('_id name email role')
-      .sort({ name: 1 })
-      .lean();
+     // Fetch staff list for compose dropdown
+     const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
+       .select('_id name email role')
+       .sort({ name: 1 })
+       .lean();
 
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'school-profile',
-      school,
-      scoutGroups,
-      schoolEvents: schoolEvents.map(event => ({
-        ...event,
-        eventName: event.name,
-        eventDate: event.startDate,
-        location: event.location,
-        status: event.targetSchools?.[0]?.status || 'invited'
-      })),
-      payments,
-      documents,
-      visitLogs,
-      programs,
-      staffList,
-      participationAnalytics: {
-        totalEvents,
-        totalAttended,
-        avgAttendance,
-        lastEventDate: school.participationMetrics?.lastEventDate,
-        nextScheduledVisit: school.nextScheduledVisit
-      }
-    });
+     // Fetch all active programs for onboarding modal
+     const allPrograms = await Program.find({ status: 'active' })
+       .select('_id name price duration')
+       .sort({ name: 1 })
+       .lean();
+
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'school-profile',
+       school,
+       scoutGroups,
+       schoolEvents: schoolEvents.map(event => ({
+         ...event,
+         eventName: event.name,
+         eventDate: event.startDate,
+         location: event.location,
+         status: event.targetSchools?.[0]?.status || 'invited'
+       })),
+       payments,
+       documents,
+       visitLogs,
+       programs,
+       allPrograms,
+       staffList,
+       participationAnalytics: {
+         totalEvents,
+         totalAttended,
+         avgAttendance,
+         lastEventDate: school.participationMetrics?.lastEventDate,
+         nextScheduledVisit: school.nextScheduledVisit
+       }
+     });
   } catch (err) {
     console.error('Error loading school profile:', err);
     res.status(500).render('404', { user: req.session.user, error: 'Error loading school profile' });
@@ -4620,16 +4731,23 @@ app.get('/dashboard/schools/:schoolId/edit', requireAuth, requirePermission('can
       return res.status(404).render('404', { user: req.session.user, error: 'Invalid school identifier' });
     }
 
-    const school = await School.findById(schoolId).lean();
-    if (!school) {
-      return res.status(404).render('404', { user: req.session.user, error: 'School not found' });
-    }
+     const school = await School.findById(schoolId).lean();
+     if (!school) {
+       return res.status(404).render('404', { user: req.session.user, error: 'School not found' });
+     }
 
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'school-edit',
-      school
-    });
+     // Fetch all active programs for onboarding modal
+     const allPrograms = await Program.find({ status: 'active' })
+       .select('_id name price duration')
+       .sort({ name: 1 })
+       .lean();
+
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'school-edit',
+       school,
+       allPrograms
+     });
   } catch (err) {
     console.error('Error loading school edit form:', err);
     res.status(500).render('404', { user: req.session.user, error: 'Failed to load edit form' });
@@ -4656,7 +4774,7 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
       street, city, state, zipCode, country,
       zone, region,
       contactName, contactEmail, contactPhone, contactPosition,
-      servicePackage,
+      programId,
       notes,
       studentCount,
       paymentMethod,
@@ -4682,42 +4800,60 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
     if (zone !== undefined) school.zone = zone.trim();
     if (region !== undefined) school.region = region.trim();
 
-    // Contact person - ensure object exists
-    if (!school.contactPerson) school.contactPerson = {};
-    if (contactName !== undefined) school.contactPerson.name = contactName.trim();
-    if (contactEmail !== undefined) school.contactPerson.email = contactEmail.trim().toLowerCase();
-    if (contactPhone !== undefined) school.contactPerson.phone = contactPhone.trim();
-    if (contactPosition !== undefined) school.contactPerson.position = contactPosition.trim();
+     // Contact person - ensure object exists
+     if (!school.contactPerson) school.contactPerson = {};
+     if (contactName !== undefined) school.contactPerson.name = contactName.trim();
+     if (contactEmail !== undefined) school.contactPerson.email = contactEmail.trim().toLowerCase();
+     if (contactPhone !== undefined) school.contactPerson.phone = contactPhone.trim();
+     if (contactPosition !== undefined) school.contactPerson.position = contactPosition.trim();
 
-    // Service package
-    if (servicePackage !== undefined) {
-      const validPackages = ['basic', 'standard', 'premium', 'custom'];
-      if (validPackages.includes(servicePackage)) {
-        school.servicePackage = servicePackage;
+     // Program enrollment - if programId provided, fetch program price and update enrollment
+     if (programId) {
+       if (!mongoose.Types.ObjectId.isValid(programId)) {
+         return res.status(400).json({ success: false, error: 'Invalid program ID' });
+       }
+       const program = await Program.findById(programId);
+       if (!program) {
+         return res.status(404).json({ success: false, error: 'Program not found' });
+       }
+       // Set rate from program price if not explicitly provided
+       if (ratePerStudent === undefined || ratePerStudent === '' || ratePerStudent === null) {
+         ratePerStudent = program.price.amount;
+       }
+       // Replace programsEnrolled with this single program (or could add to array, but requirement says "register for a program")
+       school.programsEnrolled = [new mongoose.Types.ObjectId(programId)];
+     }
+
+      // Service package - only update if explicitly provided
+      if (servicePackage !== undefined) {
+        const validPackages = ['basic', 'standard', 'premium', 'custom'];
+        if (validPackages.includes(servicePackage)) {
+          school.servicePackage = servicePackage;
+        }
       }
-    }
+      // If not provided, leave existing value unchanged (do not reset to default)
 
-    // Notes
-    if (notes !== undefined) {
-      school.notes = notes.trim();
-    }
+     // Notes
+     if (notes !== undefined) {
+       school.notes = notes.trim();
+     }
 
-    // Student count
-    if (studentCount !== undefined) {
-      school.studentCount = parseInt(studentCount) || 0;
-    }
+     // Student count
+     if (studentCount !== undefined) {
+       school.studentCount = parseInt(studentCount) || 0;
+     }
 
-    // Payment terms - ensure object exists
-    if (!school.paymentTerms) school.paymentTerms = {};
-    if (paymentMethod !== undefined) {
-      school.paymentTerms.method = paymentMethod;
-    }
-    if (billingCycle !== undefined) {
-      school.paymentTerms.billingCycle = billingCycle;
-    }
-    if (ratePerStudent !== undefined) {
-      school.paymentTerms.ratePerStudent = ratePerStudent ? parseFloat(ratePerStudent) : null;
-    }
+     // Payment terms - ensure object exists
+     if (!school.paymentTerms) school.paymentTerms = {};
+     if (paymentMethod !== undefined) {
+       school.paymentTerms.method = paymentMethod;
+     }
+     if (billingCycle !== undefined) {
+       school.paymentTerms.billingCycle = billingCycle;
+     }
+     if (ratePerStudent !== undefined) {
+       school.paymentTerms.ratePerStudent = ratePerStudent ? parseFloat(ratePerStudent) : null;
+     }
 
     // Primary trainer assignment - preserve other assignments
     if (primaryTrainerId) {
@@ -4770,6 +4906,10 @@ app.get('/api/schools/:schoolId/onboard-data', requireAuth, requirePermission('c
 
     // Transform school data to match onboarding form field names
     const primaryTrainer = school.assignedStaff && school.assignedStaff.find(a => a.assignmentType === 'primary');
+    // Get first enrolled program (if any)
+    const programId = school.programsEnrolled && school.programsEnrolled.length > 0
+      ? school.programsEnrolled[0].toString()
+      : '';
     const onboardData = {
       name: school.name,
       street: school.address?.street || '',
@@ -4784,9 +4924,9 @@ app.get('/api/schools/:schoolId/onboard-data', requireAuth, requirePermission('c
       contactPhone: school.contactPerson?.phone || '',
       contactPosition: school.contactPerson?.position || '',
       studentCount: school.studentCount || 0,
-      servicePackage: school.servicePackage || 'standard',
+      programId: programId,
       paymentMethod: school.paymentTerms?.method || 'bank_transfer',
-      billingCycle: school.paymentTerms?.billingCycle || 'per_event',
+      billingCycle: school.paymentTerms?.billingCycle || 'weekly',
       ratePerStudent: school.paymentTerms?.ratePerStudent || '',
       primaryTrainerId: primaryTrainer?.staffId?.toString() || '',
       notes: school.notes || ''
@@ -5309,7 +5449,7 @@ app.get('/api/schools/:schoolId/visit-logs', requireAuth, async (req, res) => {
 
 // ============ REPORTS DASHBOARD ROUTES ============
 
-// Trainer Performance Report page
+// Trainer Performance Report page now redirects into analytics
 app.get('/dashboard/reports/trainers', requireAuth, async (req, res) => {
   try {
     if (req.session.user && req.session.user.role === 'trainer') {
@@ -5319,18 +5459,14 @@ app.get('/dashboard/reports/trainers', requireAuth, async (req, res) => {
     if (!perm || !perm.permissions.canViewAnalytics) {
       return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
     }
-    const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } })
-      .select('name email idNumber role status')
-      .sort({ name: 1 })
-      .lean();
-    return res.render('reports/trainer_performance', { user: req.session.user, trainers, page: 'reports-trainers' });
+    return res.redirect('/dashboard/analytics#trainer-performance');
   } catch (err) {
-    console.error('Trainer performance report error:', err);
+    console.error('Trainer performance redirect error:', err);
     res.status(500).render('404', { user: req.session.user });
   }
 });
 
-// Event Effectiveness Report page
+// Event Effectiveness Report page now redirects into analytics
 app.get('/dashboard/reports/events', requireAuth, async (req, res) => {
   try {
     if (req.session.user && req.session.user.role === 'trainer') {
@@ -5340,16 +5476,14 @@ app.get('/dashboard/reports/events', requireAuth, async (req, res) => {
     if (!perm || !perm.permissions.canViewAnalytics) {
       return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
     }
-    const Event = require('./models/Event');
-    const eventTypes = await Event.distinct('eventType');
-    return res.render('reports/event_effectiveness', { user: req.session.user, eventTypes, page: 'reports-events' });
+    return res.redirect('/dashboard/analytics#event-engagement');
   } catch (err) {
-    console.error('Event effectiveness report error:', err);
+    console.error('Event effectiveness redirect error:', err);
     res.status(500).render('404', { user: req.session.user });
   }
 });
 
-// School Engagement Report page
+// School Engagement Report page now redirects into analytics
 app.get('/dashboard/reports/schools', requireAuth, async (req, res) => {
   try {
     if (req.session.user && req.session.user.role === 'trainer') {
@@ -5359,10 +5493,9 @@ app.get('/dashboard/reports/schools', requireAuth, async (req, res) => {
     if (!perm || !perm.permissions.canViewAnalytics) {
       return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
     }
-    const schools = await School.find({}).select('name').sort({ name: 1 }).lean();
-    return res.render('reports/school_engagement', { user: req.session.user, schools, page: 'reports-schools' });
+    return res.redirect('/dashboard/analytics#school-participation');
   } catch (err) {
-    console.error('School engagement report error:', err);
+    console.error('School engagement redirect error:', err);
     res.status(500).render('404', { user: req.session.user });
   }
 });
@@ -5422,8 +5555,8 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
       return res.redirect('/trainer/dashboard');
     }
 
-    // Handle new report pages directly with permission checks
-    if (page === 'reports-trainers' || page === 'reports-events' || page === 'reports-schools') {
+    // Handle analytics and report pages with permission checks
+    if (page === 'analytics' || page === 'reports-trainers' || page === 'reports-events' || page === 'reports-schools') {
       const perm = await Permission.findOne({ role: req.session.user.role });
       if (!perm || !perm.permissions.canViewAnalytics) {
         return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
@@ -5549,9 +5682,15 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
       modelData.eventList = await Event.find().sort({ startDate: 1 }).lean();
     }
 
-    if (page === 'programs') {
-      modelData.programList = await Program.find().sort({ updatedAt: -1 }).lean();
-    }
+     if (page === 'programs') {
+       modelData.programList = await Program.find().sort({ updatedAt: -1 }).lean();
+     }
+
+    // Fetch available active programs for onboarding modal (all pages)
+    modelData.allPrograms = await Program.find({ status: 'active' })
+      .select('_id name price duration')
+      .sort({ name: 1 })
+      .lean();
 
     res.render('dashboard', {
       user: req.session.user,
@@ -5565,6 +5704,64 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
 });
 
 app.get('/api/dashboard-data', requireAuth, analyticsController.getDashboardData);
+
+app.get('/api/analytics/trainers', requireAuth, requirePermission('canViewAnalytics'), async (req, res) => {
+  try {
+    const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] }, status: 'Active' })
+      .select('name email role status')
+      .sort({ name: 1 })
+      .lean();
+    res.json({ success: true, trainers });
+  } catch (err) {
+    console.error('Error fetching analytics trainers:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch trainers' });
+  }
+});
+
+app.get('/api/analytics/programs', requireAuth, requirePermission('canViewAnalytics'), async (req, res) => {
+  try {
+    const programs = await Program.find({}).populate('assignedTrainer', 'name role').sort({ name: 1 }).lean();
+    res.json({ success: true, programs });
+  } catch (err) {
+    console.error('Error fetching analytics programs:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch programs' });
+  }
+});
+
+app.post('/api/analytics/programs/:programId/assign-trainer', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+  try {
+    const { programId } = req.params;
+    const { trainerId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(programId) || !mongoose.Types.ObjectId.isValid(trainerId)) {
+      return res.status(400).json({ success: false, error: 'Invalid program or trainer identifier' });
+    }
+
+    const trainer = await Staff.findOne({
+      _id: trainerId,
+      role: { $in: ['trainer', 'senior trainer', 'supervisor'] },
+      status: 'Active'
+    }).lean();
+
+    if (!trainer) {
+      return res.status(404).json({ success: false, error: 'Trainer not found or inactive' });
+    }
+
+    const program = await Program.findById(programId);
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    program.assignedTrainer = trainer._id;
+    await program.save();
+
+    const populatedProgram = await Program.findById(programId).populate('assignedTrainer', 'name role').lean();
+    res.json({ success: true, program: populatedProgram });
+  } catch (err) {
+    console.error('Error assigning trainer to program:', err);
+    res.status(500).json({ success: false, error: 'Failed to assign trainer to program' });
+  }
+});
 
 // GET events list with filters
 app.get('/api/events', requireAuth, requirePermission('canViewEvents'), async (req, res) => {

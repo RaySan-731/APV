@@ -323,12 +323,61 @@
                     </div>
                 <% } else if (page === 'analytics') { %>
                     <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-icon">📊</div><div><div class="stat-number">96%</div><div class="stat-label">Platform Uptime</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">⏱</div><div><div class="stat-number">0.28s</div><div class="stat-label">Avg Response Time</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">📈</div><div><div class="stat-number">128</div><div class="stat-label">Reports Generated</div></div></div>
-                        <div class="stat-card"><div class="stat-icon">💬</div><div><div class="stat-number">72</div><div class="stat-label">Active Communications</div></div></div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⚡</div>
+                            <div>
+                                <div class="stat-number" id="kpiStaffProductivity">0</div>
+                                <div class="stat-label">Events per Trainer</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🏫</div>
+                            <div>
+                                <div class="stat-number" id="kpiSchoolParticipation">0</div>
+                                <div class="stat-label">School Participation</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🎯</div>
+                            <div>
+                                <div class="stat-number" id="kpiEventEngagement">0</div>
+                                <div class="stat-label">Event Engagement</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱</div>
+                            <div>
+                                <div class="stat-number" id="kpiBookingLeadTime">0</div>
+                                <div class="stat-label">Avg Booking Lead Days</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="content-card"><div class="card-header"><h3>Analytics Insights</h3></div><div class="card-content"><p>Real-time KPIs include staff productivity, school participation, and event engagement. Use this dashboard to identify bottlenecks and improve turn-around time for program booking.</p></div></div>
+                    <div class="content-card">
+                        <div class="card-header"><h3>Analytics Insights</h3></div>
+                        <div class="card-content">
+                            <p>Real-time KPIs include staff productivity, school participation, and event engagement. Use this dashboard to identify bottlenecks and improve turn-around time for program booking.</p>
+                        </div>
+                    </div>
+                    <div class="content-card" id="trainer-performance">
+                        <div class="card-header">
+                            <h3 id="trainerSectionTitle">Trainer Productivity</h3>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <button class="btn btn-secondary" type="button" onclick="refreshAnalytics()">Refresh</button>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <canvas id="trainerProductivityChart" height="260"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="content-card" id="event-engagement">
+                            <div class="card-header"><h3>Event Engagement</h3></div>
+                            <div class="card-content"><canvas id="eventEngagementChart" height="220"></canvas></div>
+                        </div>
+                        <div class="content-card" id="school-participation">
+                            <div class="card-header"><h3>School Participation</h3></div>
+                            <div class="card-content"><canvas id="schoolParticipationChart" height="220"></canvas></div>
+                        </div>
                 <% } else if (page === 'staff') { %>
                     <div class="stats-grid">
                         <div class="stat-card"><div class="stat-icon">👥</div><div><div class="stat-number"><%= stats ? stats.totalStaff : 0 %></div><div class="stat-label">Total Staff</div></div></div>
@@ -1897,7 +1946,7 @@
                     <!-- Progress indicator -->
                     <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; position: relative;">
                         <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border); z-index: 0;"></div>
-                        <% ['Basic Info', 'Contact', 'Service', 'Trainer'].forEach((step, i) => { %>
+                        <% ['Basic Info', 'Contact', 'Program', 'Trainer'].forEach((step, i) => { %>
                             <div id="step-indicator-<%= i %>" style="position: relative; z-index: 1; background: white; padding: 0.5rem 1rem; border-radius: 1rem; font-size: 0.85rem; font-weight: <%= i === 0 ? 'bold' : 'normal' %>; color: <%= i === 0 ? 'var(--primary)' : 'var(--muted-foreground)' %>;">
                                 <%= step %>
                             </div>
@@ -1941,15 +1990,20 @@
 
                         <!-- Step 3: Service & Payment -->
                         <div id="step-2" class="onboarding-step" style="display: none; grid;">
-                            <h4>Service Configuration</h4>
-                            <label>Service Package
-                                <select name="servicePackage">
-                                    <option value="basic">Basic - Essential programs</option>
-                                    <option value="standard" selected>Standard - Most common</option>
-                                    <option value="premium">Premium - Full suite</option>
-                                    <option value="custom">Custom - Tailored</option>
+                            <h4>Program & Billing</h4>
+                            <label>Select Program*
+                                <select name="programId" id="programSelect" required>
+                                    <option value="">-- Select a Program --</option>
+                                    <% allPrograms && allPrograms.forEach(program => { %>
+                                        <option value="<%= program._id %>" data-price="<%= program.price.amount %>">
+                                            <%= program.name %> - KES <%= program.price.amount %> (<%= program.duration %>)
+                                        </option>
+                                    <% }) %>
                                 </select>
                             </label>
+                            <div style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--muted-foreground);">
+                                <span id="selectedProgramPrice"></span>
+                            </div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                                 <label>Payment Method
                                     <select name="paymentMethod">
@@ -1961,6 +2015,7 @@
                                 </label>
                                 <label>Billing Cycle
                                     <select name="billingCycle">
+                                        <option value="weekly">Weekly</option>
                                         <option value="per_event">Per Event</option>
                                         <option value="monthly">Monthly</option>
                                         <option value="quarterly">Quarterly</option>
@@ -1968,6 +2023,9 @@
                                     </select>
                                 </label>
                             </div>
+                            <label>Rate per Student (KES) <input type="number" name="ratePerStudent" id="ratePerStudent" min="0" step="0.01" placeholder="Auto-filled from program" readonly style="background: var(--muted);"></label>
+                            <p style="font-size: 0.85rem; color: var(--muted-foreground);">Rate is automatically set based on the selected program and cannot be changed.</p>
+                        </div>
                             <label>Rate per Student (optional) <input type="number" name="ratePerStudent" min="0" step="0.01" placeholder="0.00"></label>
                         </div>
 
@@ -2089,15 +2147,16 @@
                                      </div>
                                   </div>
 
-      <script>
-        // Expose current user to client-side scripts (JSON serialized for safety)
-        window.currentUser = <%- JSON.stringify({
-          id: user.id,
-          role: user.role,
-          name: user.name,
-          email: user.email
-        }) %>;
-      </script>
+       <script>
+         // Expose current user and programs to client-side scripts
+         window.currentUser = <%- JSON.stringify({
+           id: user.id,
+           role: user.role,
+           name: user.name,
+           email: user.email
+         }) %>;
+         window.allPrograms = <%- JSON.stringify(allPrograms || []) %>;
+       </script>
 
       <!-- Notifications Dropdown JavaScript -->
       <script>
@@ -2671,6 +2730,10 @@
 
         })();
       </script>
+      <% if (page === 'analytics') { %>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="/js/analytics_dashboard.js"></script>
+      <% } %>
       <script src="/js/dashboard.js"></script>
 
       <!-- Announcement Detail Modal -->

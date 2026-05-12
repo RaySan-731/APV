@@ -86,14 +86,20 @@ const studentSchema = new mongoose.Schema({
     notes: String
   }],
 
-  // Trainer who added this student
-  addedBy: {
-    trainerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
-    addedDate: {
-      type: Date,
-      default: Date.now
-    }
-  },
+   // Trainer who added this student
+   addedBy: {
+     trainerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
+     addedDate: {
+       type: Date,
+       default: Date.now
+     }
+   },
+
+   // Currently assigned trainer (responsible for this student)
+   assignedTrainer: {
+     type: mongoose.Schema.Types.ObjectId,
+     ref: 'Staff'
+   },
 
    // Additional notes
    medicalNotes: String,
@@ -222,6 +228,7 @@ studentSchema.index({ fullName: 1 });
 studentSchema.index({ school: 1 });
 studentSchema.index({ scoutSection: 1 });
 studentSchema.index({ 'addedBy.trainerId': 1 });
+studentSchema.index({ assignedTrainer: 1 });
 studentSchema.index({ status: 1 });
 studentSchema.index({ createdAt: -1 });
 

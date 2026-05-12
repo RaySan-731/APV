@@ -28,7 +28,7 @@ exports.getDashboardData = async (req, res) => {
 
     // Parallel fetch all dashboard data
     const [
-      totalScouts,
+      totalStudents,
       activeGroupsCount,
       upcomingEvents,
       pastEventsCount,
@@ -37,11 +37,12 @@ exports.getDashboardData = async (req, res) => {
       unreadNotificationsCount,
       unreadMessagesCount,
       lastVisit,
-      pendingActions
+      pendingActions,
+      recentStudents
     ] = await Promise.all([
-      // Total scouts
+      // Total students
       Student.countDocuments({ school: schoolId, status: 'active' }),
-      // Active scout groups
+      // Active student groups
       ScoutGroup.countDocuments({ schoolId, status: 'active' }),
       // Upcoming events (next 30 days, status confirmed/in_progress)
       Event.find({
@@ -90,10 +91,25 @@ exports.getDashboardData = async (req, res) => {
       // Last visit date
       VisitLog.findOne({ schoolId }).sort({ date: -1 }).select('date').lean(),
       // Pending actions summary
-      calculatePendingActions(schoolId, req.staff._id)
+      calculatePendingActions(schoolId, req.staff._id),
+      // Recent students (last 5) with trainer info
+      Student.find({ school: schoolId, status: 'active' })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate('assignedTrainer', 'name')
+        .lean()
     ]);
 
     const totalPaid = totalPaidThisYear[0]?.totalPaid || 0;
+
+    // Transform recent students to include trainer names
+    const transformedRecentStudents = recentStudents.map(s => ({
+      _id: s._id,
+      fullName: s.fullName,
+      scoutSection: s.scoutSection,
+      assignedTrainerName: s.assignedTrainer?.name || 'Unassigned',
+      createdAt: s.createdAt
+    }));
 
     // Days since last visit
     let daysSinceLastVisit = null;
@@ -124,9 +140,9 @@ exports.getDashboardData = async (req, res) => {
           status: school.status,
           onboardingDate: school.onboardingDate
         },
-        stats: {
-          totalScouts,
-          activeGroupsCount,
+         stats: {
+           totalStudents,
+           activeGroupsCount,
           upcomingEventsCount: upcomingEvents.length,
           pastEventsCount,
           pendingInvoices,
@@ -156,6 +172,7 @@ exports.getDashboardData = async (req, res) => {
           unreadCount: unreadMessagesCount
         },
         pendingActions: pendingActionsList,
+        recentStudents: transformedRecentStudents,
         serviceStatusIndicator: {
           status: school.serviceStatus,
           lastVisit: daysSinceLastVisit
@@ -257,49 +274,74 @@ exports.updateSchoolProfile = async (req, res) => {
   }
 };
 
-// GET: Scout groups and scouts
-exports.getScoutsData = async (req, res) => {
+// GET: Scout groups and students
+exports.getStudentsData = async (req, res) => {
   try {
     const schoolId = req.schoolId;
 
     const [
       groups,
-      scouts
+      students
     ] = await Promise.all([
       ScoutGroup.find({ schoolId }).sort({ name: 1 }).lean(),
       Student.find({ school: schoolId, status: 'active' })
         .sort({ fullName: 1 })
+        .populate('assignedTrainer', 'name email')
+        .populate('addedBy.trainerId', 'name')
         .lean()
     ]);
+
+    // Transform students to include readable trainer names
+    const transformedStudents = students.map(student => ({
+      ...student,
+      assignedTrainerName: student.assignedTrainer?.name || 'Unassigned',
+      addedByName: student.addedBy?.trainerId?.name || 'Unknown'
+    }));
 
     res.json({
       success: true,
       data: {
         groups,
-        scouts,
-        totalScouts: scouts.length
+        students: transformedStudents,
+        totalStudents: transformedStudents.length
       }
     });
   } catch (err) {
-    console.error('Get scouts error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load scouts data' });
+    console.error('Get students error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load students data' });
   }
 };
 
-// POST: Update scout record (requires approval - creates pending change)
-exports.updateScout = async (req, res) => {
+// POST: Update student record
+exports.updateStudent = async (req, res) => {
   try {
-    const { scoutId } = req.params;
-    const { fullName, scoutSection, advancementNotes } = req.body;
+    const { studentId } = req.params;
+    const { fullName, scoutSection, advancementNotes, assignedTrainer } = req.body;
 
-    const scout = await Student.findOne({
-      _id: scoutId,
+    const student = await Student.findOne({
+      _id: studentId,
       school: req.schoolId,
       status: 'active'
     });
 
-    if (!scout) {
-      return res.status(404).json({ success: false, error: 'Scout not found' });
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    // Validate assignedTrainer if provided
+    if (assignedTrainer) {
+      const trainerExists = await Staff.findById(assignedTrainer);
+      if (!trainerExists) {
+        return res.status(400).json({ success: false, error: 'Invalid trainer selected' });
+      }
+      // Ensure trainer is assigned to this school
+      const school = await School.findById(req.schoolId);
+      const isTrainerAssigned = school.assignedStaff?.some(
+        a => a.staffId.equals(assignedTrainer) && a.status === 'active'
+      );
+      if (!isTrainerAssigned) {
+        return res.status(400).json({ success: false, error: 'Selected trainer is not assigned to this school' });
+      }
     }
 
     // Store changes for approval (could create a pending update model)
@@ -308,24 +350,25 @@ exports.updateScout = async (req, res) => {
     if (fullName !== undefined) updateData.fullName = fullName.trim();
     if (scoutSection !== undefined) updateData.scoutSection = scoutSection;
     if (advancementNotes !== undefined) updateData.advancementNotes = advancementNotes;
+    if (assignedTrainer !== undefined) updateData.assignedTrainer = assignedTrainer || null;
 
-    const oldScout = scout.toObject();
+    const oldStudent = student.toObject();
 
-    const updatedScout = await Student.findByIdAndUpdate(
-      scoutId,
+    const updatedStudent = await Student.findByIdAndUpdate(
+      studentId,
       { $set: updateData },
       { new: true, runValidators: true }
     ).lean();
 
     // Log audit
     await logAudit(
-      'scout_updated',
+      'student_updated',
       'student',
-      scoutId,
-      oldScout.fullName,
+      studentId,
+      oldStudent.fullName,
       {
-        oldValues: { ...oldScout },
-        newValues: { ...updatedScout }
+        oldValues: { ...oldStudent },
+        newValues: { ...updatedStudent }
       },
       {
         userId: req.staff._id,
@@ -339,25 +382,39 @@ exports.updateScout = async (req, res) => {
 
     res.json({
       success: true,
-      data: updatedScout,
-      message: 'Scout updated successfully. Changes will be reviewed by trainer.'
+      data: updatedStudent
     });
   } catch (err) {
-    console.error('Update scout error:', err);
-    res.status(500).json({ success: false, error: 'Failed to update scout' });
+    console.error('Update student error:', err);
+    res.status(500).json({ success: false, error: 'Failed to update student' });
   }
 };
 
-// POST: Add new scout
-exports.addScout = async (req, res) => {
+// POST: Add new student
+exports.addStudent = async (req, res) => {
   try {
-    const { fullName, dateOfBirth, gender, parentName, parentPhone, parentEmail, scoutSection } = req.body;
+    const { fullName, dateOfBirth, gender, parentName, parentPhone, parentEmail, scoutSection, assignedTrainer } = req.body;
 
     if (!fullName || !dateOfBirth || !gender || !parentPhone || !parentEmail || !scoutSection) {
       return res.status(400).json({ success: false, error: 'All fields are required' });
     }
 
-    const newScout = new Student({
+    // Validate assignedTrainer if provided
+    if (assignedTrainer) {
+      const trainerExists = await Staff.findById(assignedTrainer);
+      if (!trainerExists) {
+        return res.status(400).json({ success: false, error: 'Invalid trainer selected' });
+      }
+      const school = await School.findById(req.schoolId);
+      const isTrainerAssigned = school.assignedStaff?.some(
+        a => a.staffId.equals(assignedTrainer) && a.status === 'active'
+      );
+      if (!isTrainerAssigned) {
+        return res.status(400).json({ success: false, error: 'Selected trainer is not assigned to this school' });
+      }
+    }
+
+    const newStudent = new Student({
       fullName: fullName.trim(),
       dateOfBirth: new Date(dateOfBirth),
       gender,
@@ -367,15 +424,56 @@ exports.addScout = async (req, res) => {
         email: parentEmail.trim().toLowerCase(),
         relationship: 'Parent'
       },
-       scoutSection,
-       school: req.schoolId,
-       addedBy: {
-         trainerId: req.staff._id
-       },
-       status: 'active'
+      scoutSection,
+      school: req.schoolId,
+      addedBy: {
+        trainerId: req.staff._id
+      },
+      assignedTrainer: assignedTrainer || null,
+      status: 'active'
     });
 
-    await newScout.save();
+    await newStudent.save();
+
+    // Return saved student with populated names
+    const savedStudent = await Student.findById(newStudent._id)
+      .populate('assignedTrainer', 'name')
+      .populate('addedBy.trainerId', 'name')
+      .lean();
+
+    const result = {
+      ...savedStudent,
+      assignedTrainerName: savedStudent.assignedTrainer?.name || 'Unassigned',
+      addedByName: savedStudent.addedBy?.trainerId?.name || 'Unknown'
+    };
+
+    // Log audit
+    await logAudit(
+      'student_created',
+      'student',
+      newStudent._id,
+      newStudent.fullName,
+      { newValues: result },
+      {
+        userId: req.staff._id,
+        userName: req.staff.name,
+        userEmail: req.staff.email,
+        userRole: req.staff.role,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }
+    );
+
+    res.status(201).json({
+      success: true,
+      data: result,
+      message: 'Student added successfully'
+    });
+  } catch (err) {
+    console.error('Add student error:', err);
+    res.status(500).json({ success: false, error: 'Failed to add student' });
+  }
+};
 
     // Log audit
     await logAudit(
@@ -383,23 +481,25 @@ exports.addScout = async (req, res) => {
       'student',
       newScout._id,
       newScout.fullName,
-      { newValues: newScout },
+      { newValues: result },
       {
         userId: req.staff._id,
         userName: req.staff.name,
         userEmail: req.staff.email,
-        userRole: req.staff.role
+        userRole: req.staff.role,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
       }
     );
 
     res.status(201).json({
       success: true,
-      data: newScout,
+      data: result,
       message: 'Scout added successfully'
     });
   } catch (err) {
-    console.error('Add scout error:', err);
-    res.status(500).json({ success: false, error: 'Failed to add scout' });
+    console.error('Add student error:', err);
+    res.status(500).json({ success: false, error: 'Failed to Add student' });
   }
 };
 
@@ -1110,3 +1210,4 @@ async function calculatePendingActions(schoolId, staffId) {
 async function buildPendingActions(schoolId, staffId) {
   return await calculatePendingActions(schoolId, staffId);
 }
+

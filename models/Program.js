@@ -60,6 +60,10 @@ const programSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  assignedTrainer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Staff'
+  },
   status: {
     type: String,
     enum: ['active', 'inactive', 'draft'],

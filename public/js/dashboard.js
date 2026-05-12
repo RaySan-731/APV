@@ -2420,6 +2420,11 @@ async function openOnboardingModal(schoolId = null) {
     messageEl.style.display = 'none';
     messageEl.textContent = '';
     document.getElementById('onboardingForm').reset();
+    // Clear program price display
+    document.getElementById('selectedProgramPrice').textContent = '';
+
+    // Reset program price display
+    updateProgramPriceDisplay();
 
     if (schoolId) {
         // Edit mode: load school data
@@ -2447,9 +2452,23 @@ async function openOnboardingModal(schoolId = null) {
                 document.getElementById('onboardingForm').contactPhone.value = data.contactPhone || '';
                 document.getElementById('onboardingForm').contactPosition.value = data.contactPosition || '';
                 document.getElementById('onboardingForm').studentCount.value = data.studentCount || 0;
-                document.getElementById('onboardingForm').servicePackage.value = data.servicePackage || 'standard';
+                // Program selection
+                if (data.programId) {
+                    document.getElementById('onboardingForm').programId.value = data.programId;
+                    // Update rate field from saved data; also update price label
+                    const rateValue = data.ratePerStudent || '';
+                    document.getElementById('ratePerStudent').value = rateValue;
+                    const priceDisplay = document.getElementById('selectedProgramPrice');
+                    if (priceDisplay) {
+                        priceDisplay.textContent = rateValue ? `Rate: KES ${Number(rateValue).toFixed(2)} per student` : '';
+                    }
+                } else {
+                    document.getElementById('onboardingForm').programId.value = '';
+                    document.getElementById('onboardingForm').ratePerStudent.value = '';
+                    document.getElementById('selectedProgramPrice').textContent = '';
+                }
                 document.getElementById('onboardingForm').paymentMethod.value = data.paymentMethod || 'bank_transfer';
-                document.getElementById('onboardingForm').billingCycle.value = data.billingCycle || 'per_event';
+                document.getElementById('onboardingForm').billingCycle.value = data.billingCycle || 'weekly';
                 document.getElementById('onboardingForm').ratePerStudent.value = data.ratePerStudent || '';
                 document.getElementById('onboardingForm').primaryTrainerId.value = data.primaryTrainerId || '';
                 document.getElementById('onboardingForm').notes.value = data.notes || '';
@@ -2490,6 +2509,8 @@ function closeOnboardingModal() {
     isEditingMode = false;
     editingSchoolId = null;
     document.getElementById('onboardingModalTitle').textContent = 'Onboard New School';
+    // Clear price display
+    document.getElementById('selectedProgramPrice').textContent = '';
 }
 
 function changeOnboardingStep(delta) {
@@ -2542,6 +2563,35 @@ function updateOnboardingUI() {
     }
 }
 
+// Update program price when selection changes
+function updateProgramPriceDisplay(programId = null) {
+    const programSelect = document.getElementById('programSelect');
+    if (!programSelect) return;
+    
+    const selectedOption = programSelect.options[programSelect.selectedIndex];
+    const priceDisplay = document.getElementById('selectedProgramPrice');
+    const rateField = document.getElementById('ratePerStudent');
+    
+    if (selectedOption && selectedOption.value) {
+        const price = selectedOption.dataset.price;
+        if (priceDisplay) priceDisplay.textContent = `Rate: KES ${Number(price).toFixed(2)} per student`;
+        if (rateField) rateField.value = price;
+    } else {
+        if (priceDisplay) priceDisplay.textContent = '';
+        if (rateField) rateField.value = '';
+    }
+}
+
+// Attach program change listener on document ready
+document.addEventListener('DOMContentLoaded', function() {
+    const programSelect = document.getElementById('programSelect');
+    if (programSelect) {
+        programSelect.addEventListener('change', function() {
+            updateProgramPriceDisplay();
+        });
+    }
+});
+
 function validateOnboardingStep(step) {
     const stepElement = document.querySelector(`#step-${step}`);
     if (!stepElement) {
@@ -2568,13 +2618,18 @@ function updateOnboardingSummary() {
     const contact = form.contactName.value || 'Contact';
     const trainerSelect = form.primaryTrainerId;
     const trainerName = trainerSelect.options[trainerSelect.selectedIndex]?.text || 'Not assigned';
+    const programSelect = form.programId;
+    const programName = programSelect.options[programSelect.selectedIndex]?.text.split(' - ')[0] || 'No program selected';
+    const rate = form.ratePerStudent.value ? `KES ${Number(form.ratePerStudent.value).toFixed(2)}/student` : 'Not set';
     
     summary.innerHTML = `
         <strong>${name}</strong><br>
         📍 ${city}<br>
         👤 ${contact}<br>
+        🎓 Program: ${programName}<br>
+        💰 Rate: ${rate}<br>
         📞 Trainer: ${trainerName}<br>
-        📦 Package: ${form.servicePackage.value}
+        📅 Billing: ${form.billingCycle.value.replace('_', ' ')}
     `;
 }
 

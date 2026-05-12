@@ -46,6 +46,83 @@ async function getKPIMetrics(dateRange = '30d') {
     startDate: { $gte: thisMonthStart }
   });
 
+  // Average lead time from booking to event start (days)
+  const leadTimePipeline = await Event.aggregate([
+    {
+      $match: {
+        createdAt: { $exists: true },
+        startDate: { $exists: true },
+        startDate: { $gte: startDate }
+      }
+    },
+    {
+      $project: {
+        diffDays: {
+          $divide: [{ $subtract: ['$startDate', '$createdAt'] }, 1000 * 60 * 60 * 24]
+        }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        avgLeadDays: { $avg: '$diffDays' }
+      }
+    }
+  ]);
+  const avgBookingLeadDays = Math.round(leadTimePipeline[0]?.avgLeadDays || 0);
+
+  // Average attendance rate across completed events
+  const attendancePipeline = await Event.aggregate([
+    {
+      $match: {
+        status: 'completed',
+        startDate: { $gte: startDate },
+        currentParticipants: { $gt: 0 }
+      }
+    },
+    {
+      $project: {
+        percentage: {
+          $cond: [
+            { $gt: ['$currentParticipants', 0] },
+            {
+              $multiply: [
+                { $divide: [{ $ifNull: ['$review.actualAttendeeCount', 0] }, '$currentParticipants'] },
+                100
+              ]
+            },
+            0
+          ]
+        }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        avgAttendanceRate: { $avg: '$percentage' }
+      }
+    }
+  ]);
+  const avgEventAttendanceRate = Math.round(attendancePipeline[0]?.avgAttendanceRate || 0);
+
+  const activeTrainerCount = await Staff.countDocuments({
+    role: { $in: ['trainer', 'senior trainer', 'supervisor'] },
+    status: 'Active'
+  });
+  const completedEventsPipeline = await Event.aggregate([
+    {
+      $match: {
+        status: 'completed',
+        startDate: { $gte: startDate }
+      }
+    },
+    { $count: 'count' }
+  ]);
+  const completedEvents = completedEventsPipeline[0]?.count || 0;
+  const avgEventsPerTrainer = activeTrainerCount > 0 ? Math.round(completedEvents / activeTrainerCount) : 0;
+
+  const schoolParticipationPercent = totalSchools > 0 ? Math.round((activeSchools / totalSchools) * 100) : 0;
+
   // Revenue collected (sum of amountPaid)
   const revenuePipeline = await Payment.aggregate([
     { $group: { _id: null, total: { $sum: '$amountPaid' } } }
@@ -76,7 +153,11 @@ async function getKPIMetrics(dateRange = '30d') {
     eventsThisMonth,
     revenueCollected,
     outstandingPayments,
-    avgEngagementScore
+    avgEngagementScore,
+    avgBookingLeadDays,
+    avgEventAttendanceRate,
+    avgEventsPerTrainer,
+    schoolParticipationPercent
   };
 }
 

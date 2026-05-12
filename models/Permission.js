@@ -79,9 +79,9 @@ const permissionSchema = new mongoose.Schema({
       // School Admin: View notifications
       canViewOwnNotifications: { type: Boolean, default: true },
 
-      // Scout Management - school admin can manage own scouts
-      canManageScouts: { type: Boolean, default: true },
-      canViewOwnScouts: { type: Boolean, default: true },
+      // Student Management - school admin can manage own students
+      canManageStudents: { type: Boolean, default: true },
+      canViewOwnStudents: { type: Boolean, default: true },
 
       // Document Management
       canManageDocuments: { type: Boolean, default: true },

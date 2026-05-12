@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scouts & Groups - Arrow-Park Ventures</title>
+    <title>Students & Groups - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
     <style>
-        .scout-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; background: var(--card); transition: var(--transition-base); }
-        .scout-card:hover { box-shadow: var(--shadow-soft); }
-        .scout-name { font-weight: 600; font-size: 1.1rem; color: var(--foreground); }
-        .scout-meta { font-size: 0.9rem; color: var(--muted-foreground); margin-top: 0.25rem; }
+        .student-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; background: var(--card); transition: var(--transition-base); }
+        .student-card:hover { box-shadow: var(--shadow-soft); }
+        .student-name { font-weight: 600; font-size: 1.1rem; color: var(--foreground); }
+        .student-meta { font-size: 0.9rem; color: var(--muted-foreground); margin-top: 0.25rem; }
         .badge-section { margin-top: 0.5rem; }
         .badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-right: 0.25rem; }
         .badge-primary { background: var(--primary); color: var(--primary-foreground); }
@@ -38,17 +38,17 @@
                         <path d="M3 12h18"></path><path d="M3 6h18"></path><path d="M3 18h18"></path>
                     </svg>
                 </button>
-                <h1 class="page-title">Scouts & Groups</h1>
+                <h1 class="page-title">Students & Groups</h1>
                 <div class="header-actions">
-                    <button type="button" class="btn btn-primary" id="addScoutBtn">+ Add Scout</button>
+                     <button type="button" class="btn btn-primary" id="addStudentBtn">+ Add Student</button>
                 </div>
             </header>
 
             <div class="dashboard-content">
                 <div class="stats-section" style="margin-bottom: 1.5rem;">
                     <div class="stat-card" style="flex:1;max-width:200px;">
-                        <span class="stat-value" id="totalScouts"><%= scouts ? scouts.length : 0 %></span>
-                        <span class="stat-label">Total Scouts</span>
+                         <span class="stat-value" id="totalStudents"><%= students ? students.length : 0 %></span>
+                        <span class="stat-label">Total Students</span>
                     </div>
                     <div class="stat-card" style="flex:1;max-width:200px;">
                         <span class="stat-value"><%= groups ? groups.length : 0 %></span>
@@ -58,7 +58,7 @@
 
                 <div class="tab-container">
                     <button class="tab-btn active" data-tab="groups">Groups</button>
-                    <button class="tab-btn" data-tab="scouts">All Scouts</button>
+                    <button class="tab-btn" data-tab="students">All Students</button>
                 </div>
 
                 <div id="groupsTab" class="tab-panel active">
@@ -70,25 +70,25 @@
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                             </svg>
-                            <p>No scout groups configured yet. Add scouts and groups will be auto-created from sections.</p>
+                            <p>No Student Groups configured yet. Add Students and groups will be auto-created from sections.</p>
                         </div>
                     <% } else { %>
                         <div class="groups-list">
                             <% if (groups && groups.length > 0) { %>
                                 <% groups.forEach(group => { %>
-                                <div class="scout-card">
+                                <div class="student-card">
                                     <div class="group-header">
                                         <div>
-                                            <h3 class="scout-name"><%= group.name %></h3>
-                                             <div class="scout-meta">
+                                            <h3 class="student-name"><%= group.name %></h3>
+                                             <div class="student-meta">
                                                  Leader: <%= group.leaderName || 'Not assigned' %> • <%= group.memberCount || 0 %> members • <%= group.advancementLevel || 'N/A' %>
                                              </div>
                                              <% if (group.meetingSchedule) { %>
-                                                 <div class="scout-meta">Meets: <%= group.meetingSchedule.day || 'TBD' %> at <%= group.meetingSchedule.time || 'TBD' %> (<%= group.meetingSchedule.location || 'TBD' %>)</div>
+                                                 <div class="student-meta">Meets: <%= group.meetingSchedule.day || 'TBD' %> at <%= group.meetingSchedule.time || 'TBD' %> (<%= group.meetingSchedule.location || 'TBD' %>)</div>
                                              <% } %>
                                         </div>
                                         <div class="group-stats">
-                                            <span class="badge badge-primary"><%= group.memberCount || 0 %> scouts</span>
+                                             <span class="badge badge-primary"><%= group.memberCount || 0 %> students</span>
                                             <span class="badge badge-secondary"><%= group.advancementLevel || 'N/A' %></span>
                                         </div>
                                     </div>
@@ -96,7 +96,7 @@
                         <% }) %>
                         <% } else { %>
                             <div class="empty-state">
-                                <p>No scouts found.</p>
+                                 <p>No students found.</p>
                             </div>
                         <% } %>
                     </div>
@@ -105,23 +105,32 @@
                     <% } %>
                 </div>
 
-                <div id="scoutsTab" class="tab-panel">
-                    <div class="scouts-list" id="scoutsList">
-                        <% if (scouts && scouts.length > 0) { %>
-                            <% scouts.forEach(scout => { %>
-                            <div class="scout-card" data-id="<%= scout._id %>">
-                                <div class="scout-header">
-                                    <h3 class="scout-name"><%= scout.fullName || 'Unnamed Scout' %></h3>
-                                    <span class="badge badge-primary"><%= scout.scoutSection || 'Unassigned' %></span>
+                <div id="studentsTab" class="tab-panel">
+                    <div class="students-list" id="studentsList">
+                        <% if (students && students.length > 0) { %>
+                            <% students.forEach(student => { %>
+                            <div class="student-card" data-id="<%= student._id %>">
+                                <div class="student-header">
+                                    <h3 class="student-name"><%= student.fullName || 'Unnamed Student' %></h3>
+                                    <span class="badge badge-primary"><%= student.scoutSection || 'Unassigned' %></span>
                                 </div>
-                                <div class="scout-meta">
-                                    Gender: <%= scout.gender || 'N/A' %> • DOB: <%= scout.dateOfBirth ? new Date(scout.dateOfBirth).toLocaleDateString() : 'N/A' %> • Age: <%= scout.dateOfBirth ? Math.floor((new Date() - new Date(scout.dateOfBirth)) / (365.25*24*60*60*1000)) : 'N/A' %>
+                                <div class="student-meta">
+                                    Gender: <%= student.gender || 'N/A' %> • DOB: <%= student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : 'N/A' %> • Age: <%= student.dateOfBirth ? Math.floor((new Date() - new Date(student.dateOfBirth)) / (365.25*24*60*60*1000)) : 'N/A' %>
                                 </div>
-                                <div class="scout-meta">
-                                    Parent: <%= scout.parentContact?.name || 'Unknown' %> (<a href="tel:<%= scout.parentContact?.phone || '' %>"><%= scout.parentContact?.phone || 'N/A' %></a>)
+                                <div class="student-meta">
+                                    Parent: <%= student.parentContact?.name || 'Unknown' %> (<a href="tel:<%= student.parentContact?.phone || '' %>"><%= student.parentContact?.phone || 'N/A' %></a>)
+                                </div>
+                                <div class="student-meta">
+                                    Trainer: <%= student.assignedTrainerName || 'Unassigned' %>
                                 </div>
                                 <div class="action-btns">
-                                    <button class="btn btn-sm btn-outline edit-scout-btn" data-id="<%= scout._id %>" data-name="<%= scout.fullName %>" data-section="<%= scout.scoutSection %>">Edit</button>
+                                    <button class="btn btn-sm btn-outline edit-student-btn"
+                                            data-id="<%= student._id %>"
+                                            data-name="<%= student.fullName %>"
+                                            data-yeargroup="<%= student.scoutSection %>"
+                                            data-trainer="<%= student.assignedTrainer?._id || student.assignedTrainer || '' %>">
+                                        Edit
+                                    </button>
                                 </div>
                             </div>
                         <% }) %>
@@ -131,12 +140,12 @@
         </main>
     </div>
 
-    <!-- Add/Edit Scout Modal -->
-    <div id="scoutModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+     <!-- Add/Edit Student Modal -->
+    <div id="studentModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
         <div class="modal-content" style="background:var(--card);padding:2rem;border-radius:var(--radius);max-width:500px;width:90%;max-height:90vh;overflow-y:auto;">
-            <h3 id="modalTitle">Add Scout</h3>
-            <form id="scoutForm" class="form-grid" style="gap:0.75rem;margin-top:1rem;">
-                <input type="hidden" id="scoutId">
+            <h3 id="modalTitle">Add Student</h3>
+            <form id="studentForm" class="form-grid" style="gap:0.75rem;margin-top:1rem;">
+                <input type="hidden" id="studentId">
                 <div class="form-group">
                     <label for="fullName">Full Name *</label>
                     <input type="text" id="fullName" name="fullName" class="form-input" required>
@@ -165,17 +174,24 @@
                     <label for="parentEmail">Parent Email *</label>
                     <input type="email" id="parentEmail" name="parentEmail" class="form-input" required>
                 </div>
-                <div class="form-group">
-                    <label for="scoutSection">Scout Section *</label>
-                    <select id="scoutSection" name="scoutSection" class="form-input" required>
-                        <option value="Sungura">Sungura</option>
-                        <option value="Chipukizi">Chipukizi</option>
-                        <option value="Mwamba">Mwamba</option>
-                        <option value="Rover">Rover</option>
-                    </select>
-                </div>
+                  <div class="form-group">
+                      <label for="yearGroup">Year Group *</label>
+                      <select id="yearGroup" name="scoutSection" class="form-input" required>
+                          <option value="Sungura">Sungura</option>
+                          <option value="Chipukizi">Chipukizi</option>
+                          <option value="Mwamba">Mwamba</option>
+                          <option value="Rover">Rover</option>
+                      </select>
+                  </div>
+                 <div class="form-group">
+                     <label for="assignedTrainer">Assigned Trainer</label>
+                     <select id="assignedTrainer" name="assignedTrainer" class="form-input">
+                         <option value="">— Unassigned —</option>
+                         <!-- Trainers will be populated by JavaScript -->
+                     </select>
+                 </div>
                 <div class="form-actions" style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:flex-end;">
-                    <button type="button" class="btn btn-secondary" id="cancelScoutBtn">Cancel</button>
+                     <button type="button" class="btn btn-secondary" id="cancelStudentBtn">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
@@ -197,40 +213,60 @@
             });
 
             // Modal handling
-            const modal = document.getElementById('scoutModal');
-            const form = document.getElementById('scoutForm');
-            const addBtn = document.getElementById('addScoutBtn');
-            const cancelBtn = document.getElementById('cancelScoutBtn');
-            const editButtons = document.querySelectorAll('.edit-scout-btn');
+            const modal = document.getElementById('studentModal');
+            const form = document.getElementById('studentForm');
+            const addBtn = document.getElementById('addStudentBtn');
+            const cancelBtn = document.getElementById('cancelStudentBtn');
+            const editButtons = document.querySelectorAll('.edit-student-btn');
+            const trainerSelect = document.getElementById('assignedTrainer');
+
+            // Populate trainers dropdown
+            const trainers = <%- JSON.stringify(trainers || []) %>;
+            trainers.forEach(trainer => {
+              const option = document.createElement('option');
+              option.value = trainer._id;
+              option.textContent = trainer.name;
+              trainerSelect.appendChild(option);
+            });
 
             function openModal() { modal.style.display = 'flex'; }
-            function closeModal() { modal.style.display = 'none'; form.reset(); document.getElementById('scoutId').value=''; }
+            function closeModal() { modal.style.display = 'none'; form.reset(); document.getElementById('studentId').value=''; }
 
-            addBtn?.addEventListener('click', openModal);
+            addBtn?.addEventListener('click', () => {
+              trainerSelect.value = ''; // Reset to unassigned for new students
+              openModal();
+            });
             cancelBtn?.addEventListener('click', closeModal);
             window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
             editButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const id = btn.dataset.id;
-                    const name = btn.dataset.name;
-                    const section = btn.dataset.section;
-                    document.getElementById('scoutId').value = id;
-                    document.getElementById('fullName').value = name;
-                    document.getElementById('scoutSection').value = section;
-                    // In full implementation, prefill all fields via API
-                    openModal();
-                });
+              btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const name = btn.dataset.name;
+                const yeargroup = btn.dataset.yeargroup;
+                document.getElementById('studentId').value = id;
+                document.getElementById('fullName').value = name;
+                document.getElementById('yearGroup').value = yeargroup;
+                // Prefill trainer if available
+                const trainerId = btn.dataset.trainer || '';
+                trainerSelect.value = trainerId;
+                openModal();
+              });
             });
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData.entries());
-                const scoutId = data.scoutId;
+                const studentId = data.studentId;
 
-                const url = scoutId ? `/api/school/scouts/${scoutId}` : '/api/school/scouts';
-                const method = scoutId ? 'PUT' : 'POST';
+                // Convert empty assignedTrainer to null
+                if (data.assignedTrainer === '') {
+                  data.assignedTrainer = null;
+                }
+
+                const url = studentId ? `/api/school/students/${studentId}` : '/api/school/students';
+                const method = studentId ? 'PUT' : 'POST';
 
                 const res = await fetch(url, {
                     method,
@@ -240,7 +276,7 @@
 
                 const result = await res.json();
                 if (result.success) {
-                    alert('Scout saved successfully');
+                    alert('Student saved successfully');
                     closeModal();
                     location.reload();
                 } else {
@@ -251,3 +287,4 @@
     </script>
 </body>
 </html>
+

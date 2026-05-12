@@ -61,8 +61,8 @@ const servicePackageSchema = new mongoose.Schema({
   // Billing cycle default
   defaultBillingCycle: {
     type: String,
-    enum: ['monthly', 'quarterly', 'per_event', 'annual'],
-    default: 'per_event'
+    enum: ['weekly', 'monthly', 'quarterly', 'per_event', 'annual'],
+    default: 'weekly'
   },
 
   // Invoice settings

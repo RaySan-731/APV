@@ -56,14 +56,14 @@ const schoolSchema = new mongoose.Schema({
     enum: ['basic', 'standard', 'premium', 'custom'],
     default: 'standard'
   },
-  // Payment terms configuration
-  paymentTerms: {
-    method: { type: String, enum: ['bank_transfer', 'mpesa', 'cheque', 'cash'], default: 'bank_transfer' },
-    billingCycle: { type: String, enum: ['monthly', 'quarterly', 'per_event', 'annual'], default: 'per_event' },
-    currency: { type: String, default: 'KES' },
-    ratePerStudent: Number,
-    notes: String
-  },
+   // Payment terms configuration
+   paymentTerms: {
+     method: { type: String, enum: ['bank_transfer', 'mpesa', 'cheque', 'cash'], default: 'bank_transfer' },
+     billingCycle: { type: String, enum: ['weekly', 'per_event', 'monthly', 'quarterly', 'annual'], default: 'weekly' },
+     currency: { type: String, default: 'KES' },
+     ratePerStudent: Number,
+     notes: String
+   },
   // Invoice settings
   invoiceSettings: {
     prefix: { type: String, default: 'INV' },

@@ -157,20 +157,223 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const staffSelect = document.getElementById('staffSortOrder');
     const staffTable = document.getElementById('staffTable')?.querySelector('tbody');
+    const staffSearch = document.getElementById('staffSearch');
+    const roleFilter = document.getElementById('roleFilter');
+    const statusFilter = document.getElementById('statusFilter');
 
     if (staffSelect && staffTable) {
         staffSelect.addEventListener('change', function() {
-            const rows = Array.from(staffTable.querySelectorAll('tr'));
-            const order = this.value;
-
-            rows.sort((a, b) => {
-                const textA = a.cells[1]?.textContent.trim().toLowerCase() || '';
-                const textB = b.cells[1]?.textContent.trim().toLowerCase() || '';
-                return order === 'asc' ? textA.localeCompare(textB) : textB.localeCompare(textA);
-            });
-
-            rows.forEach(row => staffTable.appendChild(row));
+            const [sortBy, order] = this.value.split('-');
+            sortStaffTable(sortBy, order);
         });
+    }
+
+    function sortStaffTable(sortBy = 'name', order = 'asc') {
+        if (!staffTable) return;
+        const rows = Array.from(staffTable.querySelectorAll('tr'));
+        const hasPagination = document.getElementById('staffPagination') !== null;
+
+        rows.forEach(row => {
+            const cellIndex = sortBy === 'name' ? 1 : 0;
+            const cellText = row.cells[cellIndex]?.textContent.trim().toLowerCase() || '';
+            row.dataset.sortValue = cellText;
+        });
+
+        rows.sort((a, b) => {
+            const valA = a.dataset.sortValue || '';
+            const valB = b.dataset.sortValue || '';
+            return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        });
+
+        // Clear and re-append sorted rows
+        while (staffTable.firstChild) {
+            staffTable.removeChild(staffTable.firstChild);
+        }
+        rows.forEach(row => staffTable.appendChild(row));
+
+        // Update pagination if exists
+        if (hasPagination) {
+            updatePagination();
+            filterStaffTable(); // Re-apply current filters
+        }
+    }
+
+    function filterStaffTable() {
+        if (!staffTable) return;
+        const allRows = Array.from(staffTable.querySelectorAll('tr'));
+        const placeholderRow = allRows.find(r => r.classList.contains('placeholder-row'));
+        const staffRows = allRows.filter(r => !r.classList.contains('placeholder-row'));
+        const hasStaffRows = staffRows.length > 0;
+
+        // Case: No staff entries at all (empty DB)
+        if (!hasStaffRows) {
+            if (placeholderRow) placeholderRow.style.display = '';
+            if (resultsContainer) resultsContainer.textContent = 'No staff members in the system. Add your first staff member below.';
+            if (paginationContainer) paginationContainer.innerHTML = '';
+            return;
+        }
+
+        // Normal filtering
+        const searchTerm = staffSearch?.value.trim().toLowerCase() || '';
+        const roleValue = roleFilter?.value || '';
+        const statusValue = statusFilter?.value || '';
+
+        let visibleCount = 0;
+        staffRows.forEach(row => {
+            const name = row.dataset.name || '';
+            const email = row.dataset.email || '';
+            const id = row.dataset.id || '';
+            const role = row.dataset.role || '';
+            const status = row.dataset.status || '';
+
+            const matchesSearch = !searchTerm || 
+                name.includes(searchTerm) || 
+                email.includes(searchTerm) || 
+                id.includes(searchTerm);
+            const matchesRole = !roleValue || role.toLowerCase() === roleValue.toLowerCase();
+            const matchesStatus = !statusValue || status.toLowerCase() === statusValue.toLowerCase();
+
+            if (matchesSearch && matchesRole && matchesStatus) {
+                row.classList.remove('hidden');
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.classList.add('hidden');
+                row.style.display = 'none';
+            }
+        });
+
+        // Always hide placeholder when staff exist
+        if (placeholderRow) placeholderRow.style.display = 'none';
+
+        // Update results and pagination
+        updatePagination();
+    }
+
+    // Setup event listeners for staff filters
+    if (staffSearch) {
+        staffSearch.addEventListener('input', debounce(filterStaffTable, 300));
+        staffSearch.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') this.value = '';
+            filterStaffTable();
+        });
+    }
+    if (roleFilter) roleFilter.addEventListener('change', filterStaffTable);
+    if (statusFilter) statusFilter.addEventListener('change', filterStaffTable);
+
+    // Action Dropdown Toggle
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('action-toggle')) {
+            e.stopPropagation();
+            const menu = e.target.nextElementSibling;
+            const allMenus = document.querySelectorAll('.action-menu');
+            allMenus.forEach(m => {
+                if (m !== menu) m.style.display = 'none';
+            });
+            menu.style.display = menu.style.display === 'none' || menu.style.display === '' ? 'block' : 'none';
+        } else if (!e.target.closest('.action-dropdown')) {
+            document.querySelectorAll('.action-menu').forEach(m => m.style.display = 'none');
+        }
+    });
+
+    // Debounce utility
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+
+
+    // ============ STAFF PAGINATION ============
+    const staffTableBody = document.getElementById('staffTable')?.querySelector('tbody');
+    const paginationContainer = document.getElementById('staffPagination');
+    const resultsContainer = document.getElementById('staffResults');
+    const rowsPerPage = 10;
+
+    function updatePagination() {
+        if (!staffTable || !paginationContainer) return;
+
+        const allRows = Array.from(staffTable.querySelectorAll('tr'));
+        const visibleRows = [];
+        
+        // Filter visible rows and assign page numbers
+        allRows.forEach(row => {
+            if (!row.classList.contains('hidden') && !row.classList.contains('placeholder-row')) {
+                visibleRows.push(row);
+            }
+        });
+
+        const totalRows = visibleRows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage);
+        const currentPage = parseInt(paginationContainer.dataset.currentPage) || 1;
+
+        // Assign page number to each visible row
+        visibleRows.forEach((row, idx) => {
+            row.dataset.page = Math.floor(idx / rowsPerPage) + 1;
+        });
+
+        // Show/hide rows based on current page
+        allRows.forEach(row => {
+            const pageNum = parseInt(row.dataset.page);
+            const isVisible = !row.classList.contains('hidden') && !row.classList.contains('placeholder-row');
+            row.style.display = (isVisible && pageNum === currentPage) ? '' : 'none';
+        });
+
+        // Update results text
+        if (resultsContainer) {
+            if (totalRows === 0) {
+                resultsContainer.textContent = 'No staff members match your criteria.';
+            } else {
+                const startIdx = (currentPage - 1) * rowsPerPage + 1;
+                const endIdx = Math.min(currentPage * rowsPerPage, totalRows);
+                resultsContainer.textContent = `Showing ${startIdx}–${endIdx} of ${totalRows} staff member${totalRows !== 1 ? 's' : ''}`;
+            }
+        }
+
+        // Build pagination controls
+        let html = '';
+        if (totalPages > 1) {
+            html += `<button ${currentPage === 1 ? 'disabled' : ''} data-page="${currentPage - 1}" aria-label="Previous page">‹</button>`;
+            
+            for (let i = 1; i <= totalPages; i++) {
+                if (totalPages <= 7 || i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    html += `<button class="${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span style="padding: 0.5rem; color: var(--muted-foreground);">…</span>`;
+                }
+            }
+            
+            html += `<button ${currentPage === totalPages ? 'disabled' : ''} data-page="${currentPage + 1}" aria-label="Next page">›</button>`;
+        }
+        
+        paginationContainer.innerHTML = html || `<span style="color: var(--muted-foreground); font-size: 0.875rem;">${totalRows} result${totalRows !== 1 ? 's' : ''}</span>`;
+
+        // Add click handlers
+        paginationContainer.querySelectorAll('button[data-page]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const page = parseInt(btn.dataset.page);
+                paginationContainer.dataset.currentPage = page;
+                updatePagination();
+            });
+        });
+    }
+
+
+
+    // Initial pagination setup
+    if (paginationContainer) {
+        paginationContainer.dataset.currentPage = '1';
+        // Force full re-render to ensure pagination is calculated correctly
+        setTimeout(() => {
+            if (staffSearch) filterStaffTable();
+        }, 0);
     }
 });
 
@@ -2567,6 +2770,11 @@ function updateOnboardingUI() {
 function updateProgramPriceDisplay(programId = null) {
     const programSelect = document.getElementById('programSelect');
     if (!programSelect) return;
+    
+    // If a specific programId is passed (e.g., on edit load), set the select value
+    if (programId) {
+        programSelect.value = programId;
+    }
     
     const selectedOption = programSelect.options[programSelect.selectedIndex];
     const priceDisplay = document.getElementById('selectedProgramPrice');

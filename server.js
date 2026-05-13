@@ -4439,7 +4439,10 @@ app.get('/dashboard/schools', requireAuth, requirePermission('canViewSchools'), 
     else if (sortBy === 'lastVisit') sortObj.lastVisitDate = order === 'desc' ? -1 : 1;
     else sortObj.createdAt = order === 'desc' ? -1 : 1;
 
-    let schoolList = await School.find(query).sort(sortObj).lean();
+    let schoolList = await School.find(query)
+      .populate('programsEnrolled', 'name category price duration')
+      .sort(sortObj)
+      .lean();
 
     // For trainers, filter to assigned schools
     if (req.session.user.role === 'trainer') {
@@ -4523,17 +4526,31 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
       return res.status(400).json({ success: false, error: 'Please select a program' });
     }
 
-    // Validate program exists and get its price
-    const program = await Program.findById(programId);
-    if (!program) {
-      return res.status(404).json({ success: false, error: 'Selected program not found' });
+    let ratePerStudent = null;
+    const validLegacyPackages = ['basic', 'standard', 'premium', 'custom'];
+    const packagePrices = { basic: 500, standard: 750, premium: 1000, custom: 0 };
+
+    // Check if programId is a valid ObjectId (new program-based flow)
+    const isObjectId = mongoose.Types.ObjectId.isValid(programId);
+    
+    if (isObjectId) {
+      // New flow: programId references a Program document
+      const program = await Program.findById(programId);
+      if (!program) {
+        return res.status(404).json({ success: false, error: 'Selected program not found' });
+      }
+      ratePerStudent = program.price.amount || 0;
+    } else if (validLegacyPackages.includes(programId)) {
+      // Legacy fallback: programId is actually a servicePackage name
+      ratePerStudent = packagePrices[programId] || 0;
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid program selection' });
     }
-    const ratePerStudent = program.price.amount || 0;
 
     const trainerObjectId = primaryTrainerId ? new mongoose.Types.ObjectId(primaryTrainerId) : null;
 
-    // Create school with comprehensive onboarding data
-    const school = new School({
+    // Build school object
+    const schoolData = {
       name: name.trim(),
       address: {
         street: street?.trim(),
@@ -4551,8 +4568,6 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
         position: contactPosition?.trim()
       },
       studentCount: parseInt(studentCount) || 0,
-      servicePackage: 'standard', // default since program determines pricing
-      programsEnrolled: programId ? [new mongoose.Types.ObjectId(programId)] : [],
       paymentTerms: {
         method: paymentMethod || 'bank_transfer',
         billingCycle: billingCycle || 'weekly',
@@ -4569,8 +4584,19 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
       partnershipDate: new Date(),
       status: 'active',
       serviceStatus: 'active'
-    });
+    };
 
+    // Handle program vs legacy servicePackage
+    if (isObjectId) {
+      schoolData.programsEnrolled = [new mongoose.Types.ObjectId(programId)];
+      schoolData.servicePackage = 'standard'; // default
+    } else {
+      // Legacy: store in servicePackage field
+      schoolData.servicePackage = programId;
+      schoolData.programsEnrolled = [];
+    }
+
+    const school = new School(schoolData);
     await school.save();
 
     // Create initial visit log for onboarding
@@ -4775,6 +4801,7 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
       zone, region,
       contactName, contactEmail, contactPhone, contactPosition,
       programId,
+      servicePackage, // legacy field, still supported for backwards compatibility
       notes,
       studentCount,
       paymentMethod,
@@ -4800,31 +4827,39 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
     if (zone !== undefined) school.zone = zone.trim();
     if (region !== undefined) school.region = region.trim();
 
-     // Contact person - ensure object exists
-     if (!school.contactPerson) school.contactPerson = {};
-     if (contactName !== undefined) school.contactPerson.name = contactName.trim();
-     if (contactEmail !== undefined) school.contactPerson.email = contactEmail.trim().toLowerCase();
-     if (contactPhone !== undefined) school.contactPerson.phone = contactPhone.trim();
-     if (contactPosition !== undefined) school.contactPerson.position = contactPosition.trim();
+      // Program enrollment - if programId provided, fetch program price and update enrollment
+      if (programId) {
+        const validLegacyPackages = ['basic', 'standard', 'premium', 'custom'];
+        const packagePrices = { basic: 500, standard: 750, premium: 1000, custom: 0 };
+        const isObjectId = mongoose.Types.ObjectId.isValid(programId);
+        
+        if (isObjectId) {
+          // New flow: programId references a Program document
+          const program = await Program.findById(programId);
+          if (!program) {
+            return res.status(404).json({ success: false, error: 'Program not found' });
+          }
+          // Set rate from program price if not explicitly provided
+          if (ratePerStudent === undefined || ratePerStudent === '' || ratePerStudent === null) {
+            ratePerStudent = program.price.amount;
+          }
+          // Replace programsEnrolled with this single program
+          school.programsEnrolled = [new mongoose.Types.ObjectId(programId)];
+          // Set servicePackage to default or keep existing
+          school.servicePackage = school.servicePackage || 'standard';
+        } else if (validLegacyPackages.includes(programId)) {
+          // Legacy fallback: use servicePackage field
+          if (ratePerStudent === undefined || ratePerStudent === '' || ratePerStudent === null) {
+            ratePerStudent = packagePrices[programId] || 0;
+          }
+          school.servicePackage = programId;
+          school.programsEnrolled = [];
+        } else {
+          return res.status(400).json({ success: false, error: 'Invalid program selection' });
+        }
+      }
 
-     // Program enrollment - if programId provided, fetch program price and update enrollment
-     if (programId) {
-       if (!mongoose.Types.ObjectId.isValid(programId)) {
-         return res.status(400).json({ success: false, error: 'Invalid program ID' });
-       }
-       const program = await Program.findById(programId);
-       if (!program) {
-         return res.status(404).json({ success: false, error: 'Program not found' });
-       }
-       // Set rate from program price if not explicitly provided
-       if (ratePerStudent === undefined || ratePerStudent === '' || ratePerStudent === null) {
-         ratePerStudent = program.price.amount;
-       }
-       // Replace programsEnrolled with this single program (or could add to array, but requirement says "register for a program")
-       school.programsEnrolled = [new mongoose.Types.ObjectId(programId)];
-     }
-
-      // Service package - only update if explicitly provided
+      // Service package - only update if explicitly provided (legacy support)
       if (servicePackage !== undefined) {
         const validPackages = ['basic', 'standard', 'premium', 'custom'];
         if (validPackages.includes(servicePackage)) {
@@ -4837,6 +4872,7 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
      if (notes !== undefined) {
        school.notes = notes.trim();
      }
+
 
      // Student count
      if (studentCount !== undefined) {
@@ -4884,9 +4920,72 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
 
     // Return updated school as plain object
     res.json({ success: true, school: school.toObject(), message: 'School updated successfully' });
-  } catch (err) {
+   } catch (err) {
     console.error('Update school error:', err);
-    res.status(500).json({ success: false, error: 'Failed to update school' });
+    res.status(500).json({ success: false, error: 'Failed to update school: ' + err.message });
+  }
+});
+
+// POST: Bulk update school program enrollments
+app.post('/api/schools/:schoolId/update-programs', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { programIds } = req.body; // array of program ObjectId strings
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    // Validate programIds array: filter valid ObjectIds and verify programs exist
+    let validProgramIds = [];
+    if (Array.isArray(programIds)) {
+      const objectIdPrograms = programIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+      const validPrograms = await Program.find({ _id: { $in: objectIdPrograms } }).select('_id').lean();
+      validProgramIds = validPrograms.map(p => p._id);
+    }
+
+    // Get old program IDs before update (as strings)
+    const oldProgramIds = (school.programsEnrolled || []).map(id => id.toString());
+
+    // Update school programsEnrolled
+    school.programsEnrolled = validProgramIds;
+    await school.save();
+
+    // Sync Program.schools arrays: for each affected program (old or new), update its schools list
+    const allAffectedProgramIds = [...new Set([...oldProgramIds, ...validProgramIds.map(id => id.toString())])];
+    const programsToUpdate = await Program.find({ _id: { $in: allAffectedProgramIds } });
+
+    for (const program of programsToUpdate) {
+      const progIdStr = program._id.toString();
+      const isInNewList = validProgramIds.some(id => id.toString() === progIdStr);
+      if (isInNewList) {
+        if (!program.schools) program.schools = [];
+        if (!program.schools.includes(schoolId)) {
+          program.schools.push(schoolId);
+        }
+      } else {
+        // Remove school from program
+        if (program.schools) {
+          program.schools = program.schools.filter(id => id.toString() !== schoolId);
+        }
+      }
+      await program.save();
+    }
+
+    // Return updated school with populated programs
+    const updatedSchool = await School.findById(schoolId)
+      .populate('programsEnrolled', 'name category price duration')
+      .lean();
+
+    res.json({ success: true, school: updatedSchool, message: 'Program allocations updated successfully' });
+  } catch (err) {
+    console.error('Error updating school programs:', err);
+    res.status(500).json({ success: false, error: 'Failed to update school programs' });
   }
 });
 
@@ -4906,10 +5005,14 @@ app.get('/api/schools/:schoolId/onboard-data', requireAuth, requirePermission('c
 
     // Transform school data to match onboarding form field names
     const primaryTrainer = school.assignedStaff && school.assignedStaff.find(a => a.assignmentType === 'primary');
-    // Get first enrolled program (if any)
-    const programId = school.programsEnrolled && school.programsEnrolled.length > 0
-      ? school.programsEnrolled[0].toString()
-      : '';
+    // Get first enrolled program (if any); fallback to servicePackage for legacy schools
+    let programId = '';
+    if (school.programsEnrolled && school.programsEnrolled.length > 0) {
+        programId = school.programsEnrolled[0].toString();
+    } else if (school.servicePackage) {
+        // Legacy: use servicePackage as the program identifier for backwards compatibility
+        programId = school.servicePackage;
+    }
     const onboardData = {
       name: school.name,
       street: school.address?.street || '',
@@ -5682,9 +5785,17 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
       modelData.eventList = await Event.find().sort({ startDate: 1 }).lean();
     }
 
-     if (page === 'programs') {
-       modelData.programList = await Program.find().sort({ updatedAt: -1 }).lean();
-     }
+      if (page === 'programs') {
+        modelData.programList = await Program.find()
+          .populate('schools', 'name address.city')
+          .sort({ updatedAt: -1 })
+          .lean();
+        // Fetch all active schools for allocation modal
+        modelData.allSchools = await School.find({ status: 'active' })
+          .select('_id name address.city studentCount')
+          .sort({ name: 1 })
+          .lean();
+      }
 
     // Fetch available active programs for onboarding modal (all pages)
     modelData.allPrograms = await Program.find({ status: 'active' })
@@ -5760,6 +5871,262 @@ app.post('/api/analytics/programs/:programId/assign-trainer', requireAuth, requi
   } catch (err) {
     console.error('Error assigning trainer to program:', err);
     res.status(500).json({ success: false, error: 'Failed to assign trainer to program' });
+  }
+});
+
+// ============ SCHOOL-PROGRAM ALLOCATION ROUTES ============
+
+// Allocate a school to a program (adds program to school and school to program)
+app.post('/api/programs/:programId/allocate-school', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { programId } = req.params;
+    const { schoolId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(programId) || !mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid program or school ID' });
+    }
+
+    const program = await Program.findById(programId);
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    // Add school to program (if not already there)
+    if (!program.schools) program.schools = [];
+    if (!program.schools.includes(schoolId)) {
+      program.schools.push(schoolId);
+      await program.save();
+    }
+
+    // Add program to school (if not already there)
+    if (!school.programsEnrolled) school.programsEnrolled = [];
+    if (!school.programsEnrolled.includes(programId)) {
+      school.programsEnrolled.push(programId);
+      // Also set rate from program price if not already set
+      if (program.price && program.price.amount) {
+        if (!school.paymentTerms) school.paymentTerms = {};
+        if (!school.paymentTerms.ratePerStudent) {
+          school.paymentTerms.ratePerStudent = program.price.amount;
+        }
+      }
+      await school.save();
+    }
+
+    // Return updated program with populated school reference
+    const updatedProgram = await Program.findById(programId)
+      .populate('schools', 'name address.city contactPerson')
+      .lean();
+
+    res.json({ success: true, program: updatedProgram, message: 'School allocated to program successfully' });
+  } catch (err) {
+    console.error('Error allocating school to program:', err);
+    res.status(500).json({ success: false, error: 'Failed to allocate school to program' });
+  }
+});
+
+// Deallocate a school from a program
+app.post('/api/programs/:programId/deallocate-school', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { programId } = req.params;
+    const { schoolId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(programId) || !mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid program or school ID' });
+    }
+
+    const program = await Program.findById(programId);
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    // Remove school from program
+    if (program.schools) {
+      program.schools = program.schools.filter(id => id.toString() !== schoolId);
+      await program.save();
+    }
+
+    // Remove program from school
+    if (school.programsEnrolled) {
+      school.programsEnrolled = school.programsEnrolled.filter(id => id.toString() !== programId);
+      await school.save();
+    }
+
+    const updatedProgram = await Program.findById(programId)
+      .populate('schools', 'name address.city contactPerson')
+      .lean();
+
+    res.json({ success: true, program: updatedProgram, message: 'School deallocated from program successfully' });
+  } catch (err) {
+    console.error('Error deallocating school from program:', err);
+    res.status(500).json({ success: false, error: 'Failed to deallocate school from program' });
+  }
+});
+
+// Allocate a program to a school (alternative endpoint from school side)
+app.post('/api/schools/:schoolId/allocate-program', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { programId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId) || !mongoose.Types.ObjectId.isValid(programId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school or program ID' });
+    }
+
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    const program = await Program.findById(programId);
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    // Add program to school (if not already there)
+    if (!school.programsEnrolled) school.programsEnrolled = [];
+    if (!school.programsEnrolled.includes(programId)) {
+      school.programsEnrolled.push(programId);
+      // Set rate from program price if not already set
+      if (program.price && program.price.amount) {
+        if (!school.paymentTerms) school.paymentTerms = {};
+        if (!school.paymentTerms.ratePerStudent) {
+          school.paymentTerms.ratePerStudent = program.price.amount;
+        }
+      }
+      await school.save();
+    }
+
+    // Add school to program (if not already there)
+    if (!program.schools) program.schools = [];
+    if (!program.schools.includes(schoolId)) {
+      program.schools.push(schoolId);
+      await program.save();
+    }
+
+    const updatedSchool = await School.findById(schoolId)
+      .populate('programsEnrolled', 'name category price duration')
+      .lean();
+
+    res.json({ success: true, school: updatedSchool, message: 'Program allocated to school successfully' });
+  } catch (err) {
+    console.error('Error allocating program to school:', err);
+    res.status(500).json({ success: false, error: 'Failed to allocate program to school' });
+  }
+});
+
+// Deallocate a program from a school
+app.post('/api/schools/:schoolId/deallocate-program', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { programId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId) || !mongoose.Types.ObjectId.isValid(programId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school or program ID' });
+    }
+
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    const program = await Program.findById(programId);
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    // Remove program from school
+    if (school.programsEnrolled) {
+      school.programsEnrolled = school.programsEnrolled.filter(id => id.toString() !== programId);
+      await school.save();
+    }
+
+    // Remove school from program
+    if (program.schools) {
+      program.schools = program.schools.filter(id => id.toString() !== schoolId);
+      await program.save();
+    }
+
+    const updatedSchool = await School.findById(schoolId)
+      .populate('programsEnrolled', 'name category price duration')
+      .lean();
+
+    res.json({ success: true, school: updatedSchool, message: 'Program deallocated from school successfully' });
+  } catch (err) {
+    console.error('Error deallocating program from school:', err);
+    res.status(500).json({ success: false, error: 'Failed to deallocate program from school' });
+  }
+});
+
+// POST: Bulk update program school allocations
+app.post('/api/programs/:programId/update-schools', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { programId } = req.params;
+    const { schoolIds } = req.body; // array of school ObjectId strings
+
+    if (!mongoose.Types.ObjectId.isValid(programId)) {
+      return res.status(400).json({ success: false, error: 'Invalid program ID' });
+    }
+
+    const program = await Program.findById(programId);
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    // Validate schoolIds array
+    let validSchoolIds = [];
+    if (Array.isArray(schoolIds)) {
+      const objectIdSchools = schoolIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+      const validSchools = await School.find({ _id: { $in: objectIdSchools } }).select('_id').lean();
+      validSchoolIds = validSchools.map(s => s._id);
+    }
+
+    // Get old school IDs before update
+    const oldSchoolIds = (program.schools || []).map(id => id.toString());
+
+    // Update program schools array
+    program.schools = validSchoolIds;
+    await program.save();
+
+    // Sync School.programsEnrolled arrays
+    const allAffectedSchoolIds = [...new Set([...oldSchoolIds, ...validSchoolIds.map(id => id.toString())])];
+    const schoolsToUpdate = await School.find({ _id: { $in: allAffectedSchoolIds } });
+
+    for (const school of schoolsToUpdate) {
+      const schoolIdStr = school._id.toString();
+      const isInNewList = validSchoolIds.some(id => id.toString() === schoolIdStr);
+      if (isInNewList) {
+        if (!school.programsEnrolled) school.programsEnrolled = [];
+        if (!school.programsEnrolled.includes(programId)) {
+          school.programsEnrolled.push(programId);
+        }
+      } else {
+        // Remove program from school
+        if (school.programsEnrolled) {
+          school.programsEnrolled = school.programsEnrolled.filter(id => id.toString() !== programId);
+        }
+      }
+      await school.save();
+    }
+
+    // Return updated program with populated schools
+    const updatedProgram = await Program.findById(programId)
+      .populate('schools', 'name address.city contactPerson')
+      .lean();
+
+    res.json({ success: true, program: updatedProgram, message: 'School allocations updated successfully' });
+  } catch (err) {
+    console.error('Error updating program schools:', err);
+    res.status(500).json({ success: false, error: 'Failed to update program schools' });
   }
 });
 

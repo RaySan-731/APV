@@ -64,6 +64,12 @@ const programSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Staff'
   },
+  // Schools enrolled in this program
+  schools: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    default: []
+  }],
   status: {
     type: String,
     enum: ['active', 'inactive', 'draft'],
@@ -94,5 +100,7 @@ programSchema.virtual('formattedPrice').get(function() {
 programSchema.index({ category: 1 });
 programSchema.index({ status: 1 });
 programSchema.index({ 'ageGroup.min': 1, 'ageGroup.max': 1 });
+programSchema.index({ schools: 1 });
+programSchema.index({ schools: 1 });
 
 module.exports = mongoose.model('Program', programSchema);

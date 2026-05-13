@@ -976,86 +976,127 @@ app.post('/contact', (req, res) => {
 });
 
 app.get('/dashboard', requireAuth, async (req, res) => {
+  // Redirect trainers to their dedicated dashboard
   if (req.session.user && req.session.user.role === 'trainer') {
     return res.redirect('/trainer/dashboard');
   }
 
-   try {
-     // Fetch real statistics
-     const totalStaff = await Staff.countDocuments();
-     const activeStaff = await Staff.countDocuments({ status: 'Active' });
-     const onLeaveStaff = await Staff.countDocuments({ status: 'On Leave' });
-     
-     // Fetch staff list for compose dropdown (active non-inactive staff)
-     const staffList = await Staff.find({ status: { $ne: 'Inactive' } })
-       .select('_id name email role')
-       .sort({ name: 1 })
-       .lean();
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-     // Fetch active programs for onboarding dropdown
-     const programs = await Program.find({ status: 'active' })
-       .select('_id name price duration')
-       .sort({ name: 1 })
-       .lean();
-     
-     // Calculate average performance metrics
-     const performanceStats = await Staff.aggregate([
-       {
-         $group: {
-           _id: null,
-           avgAttendance: { $avg: '$performanceMetrics.averageAttendanceRate' },
-           avgFeedback: { $avg: '$performanceMetrics.averageFeedbackRating' },
-           totalEvents: { $sum: '$performanceMetrics.eventsCompleted' },
-           totalReports: { $sum: '$performanceMetrics.reportsSubmitted' }
-         }
-       }
-     ]);
+    // Fetch all dashboard metrics in parallel
+    const [
+      totalSchools,
+      activeSchools,
+      newSchoolsThisMonth,
+      activeServiceSchools,
+      totalStudents,
+      eventsThisMonth,
+      revenueCollected,
+      outstandingPayments,
+      staffList,
+      allPrograms
+    ] = await Promise.all([
+      // Total schools
+      School.countDocuments(),
+      // Active schools (status = active)
+      School.countDocuments({ status: 'active' }),
+      // New schools this month
+      School.countDocuments({
+        createdAt: { $gte: startOfMonth }
+      }),
+      // Schools with active service status
+      School.countDocuments({ serviceStatus: 'active' }),
+      // Total active students
+      Student.countDocuments({ status: 'active' }),
+      // Events this month
+      Event.countDocuments({
+        startDate: { $gte: startOfMonth, $lte: new Date(now.getFullYear(), now.getMonth() + 1, 0) }
+      }),
+      // Revenue collected this year (sum of paid invoices)
+      Invoice.aggregate([
+        {
+          $match: {
+            status: 'paid',
+            paidDate: { $gte: startOfYear }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$totalAmount' }
+          }
+        }
+      ]),
+      // Outstanding payments (issued, sent, partial, overdue)
+      Invoice.aggregate([
+        {
+          $match: {
+            status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$balance' }
+          }
+        }
+      ]),
+      // Staff list for compose dropdown (active staff only)
+      Staff.find({ status: 'Active' })
+        .select('_id name email role')
+        .sort({ name: 1 })
+        .lean(),
+      // All active programs for onboarding
+      Program.find({ status: 'active' })
+        .select('_id name price duration')
+        .sort({ name: 1 })
+        .lean()
+    ]);
 
-    const stats = performanceStats[0] || {
-      avgAttendance: 0,
-      avgFeedback: 0,
-      totalEvents: 0,
-      totalReports: 0
-    };
+    // Extract values from aggregations
+    const totalRevenue = revenueCollected[0]?.total || 0;
+    const totalOutstanding = outstandingPayments[0]?.total || 0;
 
-     res.render('dashboard', {
-       user: req.session.user,
-       page: 'dashboard',
-       staffList,
-       allPrograms: programs,
-       stats: {
-         totalStaff,
-         activeStaff,
-         onLeaveStaff,
-         avgAttendance: Math.round(stats.avgAttendance || 0),
-         avgFeedback: Math.round(stats.avgFeedback || 0),
-         totalEvents: stats.totalEvents || 0,
-         totalReports: stats.totalReports || 0
-       }
-     });
-   } catch (err) {
-     console.error('Dashboard stats error:', err);
-     // Fetch programs even on error to prevent undefined in view
-     const programsFallback = await Program.find({ status: 'active' })
-       .select('_id name price duration')
-       .sort({ name: 1 })
-       .lean();
-     res.render('dashboard', {
-       user: req.session.user,
-       page: 'dashboard',
-       staffList: [],
-       allPrograms: programsFallback,
-       stats: {
-         totalStaff: 0,
-         activeStaff: 0,
-         onLeaveStaff: 0,
-         avgAttendance: 0,
-         avgFeedback: 0,
-         totalEvents: 0,
-         totalReports: 0
-       }
-     });
-   }
+    res.render('dashboard', {
+      user: req.session.user,
+      page: 'dashboard',
+      stats: {
+        totalSchools,
+        activeSchools,
+        newSchoolsThisMonth,
+        totalStudents,
+        eventsThisMonth,
+        revenueCollected: totalRevenue,
+        outstandingPayments: totalOutstanding,
+        activeServiceSchools
+      },
+      staffList,
+      allPrograms
+    });
+
+  } catch (err) {
+    console.error('Dashboard error:', err);
+    // Render with empty data on error
+    res.render('dashboard', {
+      user: req.session.user,
+      page: 'dashboard',
+      stats: {
+        totalSchools: 0,
+        activeSchools: 0,
+        newSchoolsThisMonth: 0,
+        totalStudents: 0,
+        eventsThisMonth: 0,
+        revenueCollected: 0,
+        outstandingPayments: 0,
+        activeServiceSchools: 0
+      },
+      staffList: [],
+      allPrograms: []
+    });
+  }
 });
 
 app.get('/trainer/dashboard', requireAuth, (req, res) => {
@@ -2514,110 +2555,136 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     schoolController.getNotifications(req, res);
   });
 
-  // API: Mark notification as read
-  app.post('/api/school/notifications/:notificationId/read', requireAuth, requireSchoolAdmin, async (req, res) => {
-    const schoolController = require('./backend/controllers/schoolController');
-    schoolController.markNotificationRead(req, res);
-  });
+   // API: Mark notification as read
+   app.post('/api/school/notifications/:notificationId/read', requireAuth, requireSchoolAdmin, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.markNotificationRead(req, res);
+   });
 
-  // School Admin Dashboard Page
-   app.get('/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
-     try {
-       const schoolId = req.schoolId;
-       const school = req.school;
+   // API: Get available programs
+   app.get('/api/school/programs', requireAuth, requireSchoolAdmin, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.getAvailablePrograms(req, res);
+   });
 
-       const [
-         totalScouts,
-         activeGroupsCount,
-         upcomingEvents,
-         pendingInvoices,
-         unreadNotificationsCount,
-         unreadMessagesCount,
-         recentStudents,
-         totalPaidThisYear
-       ] = await Promise.all([
-         Student.countDocuments({ school: schoolId, status: 'active' }),
-         ScoutGroup.countDocuments({ schoolId, status: 'active' }),
-         Event.find({
-           'targetSchools.schoolId': schoolId,
-           startDate: { $gte: new Date(), $lte: new Date(Date.now() + 30*24*60*60*1000) },
-           status: { $in: ['confirmed', 'in_progress', 'scheduled'] }
-         }).sort({ startDate: 1 }).limit(1).lean(),
-         Invoice.countDocuments({
-           schoolId,
-           status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
-         }),
-         Notification.countDocuments({
-           recipientId: req.staff._id,
-           isRead: false,
-           dismissed: false
-         }),
-         Message.countDocuments({
-           'recipients.staffId': req.staff._id,
-           'recipients.status': 'sent',
-           'recipients.deleted': { $ne: true }
-         }),
-         // Recent students with trainer info
-         Student.find({ school: schoolId, status: 'active' })
-           .sort({ createdAt: -1 })
-           .limit(5)
-           .populate('assignedTrainer', 'name')
-           .lean(),
-         // Total paid this year
-         Invoice.aggregate([
-           {
-             $match: {
-               schoolId: new mongoose.Types.ObjectId(schoolId),
-               status: 'paid',
-               paidDate: { $gte: new Date(new Date().getFullYear(), 0, 1) }
-             }
-           },
-           {
-             $group: {
-               _id: null,
-               totalPaid: { $sum: '$totalAmount' }
-             }
-           }
-         ])
-       ]);
+   // API: Enroll in a program
+   app.post('/api/school/programs/enroll', requireAuth, requireSchoolAdmin, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.enrollProgram(req, res);
+   });
 
-       const totalPaid = totalPaidThisYear[0]?.totalPaid || 0;
+   // API: Remove program enrollment
+   app.post('/api/school/programs/remove', requireAuth, requireSchoolAdmin, async (req, res) => {
+     const schoolController = require('./backend/controllers/schoolController');
+     schoolController.removeProgram(req, res);
+   });
 
-       // Transform recent students to include readable names
-       const transformedRecentStudents = recentStudents.map(s => ({
-         _id: s._id,
-         fullName: s.fullName,
-         scoutSection: s.scoutSection,
-         assignedTrainerName: s.assignedTrainer?.name || 'Unassigned',
-         createdAt: s.createdAt
-       }));
+   // School Admin Dashboard Page
+    app.get('/school/dashboard', requireAuth, requireSchoolAdmin, async (req, res) => {
+      try {
+        const schoolId = req.schoolId;
+        const school = req.school;
 
-       const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+        const [
+          totalScouts,
+          activeGroupsCount,
+          upcomingEvents,
+          pendingInvoices,
+          unreadNotificationsCount,
+          unreadMessagesCount,
+          recentStudents,
+          totalPaidThisYear,
+          enrolledPrograms
+        ] = await Promise.all([
+          Student.countDocuments({ school: schoolId, status: 'active' }),
+          ScoutGroup.countDocuments({ schoolId, status: 'active' }),
+          Event.find({
+            'targetSchools.schoolId': schoolId,
+            startDate: { $gte: new Date(), $lte: new Date(Date.now() + 30*24*60*60*1000) },
+            status: { $in: ['confirmed', 'in_progress', 'scheduled'] }
+          }).sort({ startDate: 1 }).limit(1).lean(),
+          Invoice.countDocuments({
+            schoolId,
+            status: { $in: ['issued', 'sent', 'partial', 'overdue'] }
+          }),
+          Notification.countDocuments({
+            recipientId: req.staff._id,
+            isRead: false,
+            dismissed: false
+          }),
+          Message.countDocuments({
+            'recipients.staffId': req.staff._id,
+            'recipients.status': 'sent',
+            'recipients.deleted': { $ne: true }
+          }),
+          // Recent students with trainer info
+          Student.find({ school: schoolId, status: 'active' })
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .populate('assignedTrainer', 'name')
+            .lean(),
+          // Total paid this year
+          Invoice.aggregate([
+            {
+              $match: {
+                schoolId: new mongoose.Types.ObjectId(schoolId),
+                status: 'paid',
+                paidDate: { $gte: new Date(new Date().getFullYear(), 0, 1) }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                totalPaid: { $sum: '$totalAmount' }
+              }
+            }
+          ]),
+          // Enrolled programs
+          School.findById(schoolId)
+            .populate('programsEnrolled', 'name description category duration price')
+            .select('programsEnrolled')
+            .lean()
+        ]);
 
-       res.render('school_dashboard', {
-         user: req.session.user,
-         school,
-         stats: {
-           totalScouts,
-           activeGroupsCount,
-           upcomingEventsCount: upcomingEvents.length,
-           pastEventsCount: null, // not needed on dashboard
-           pendingInvoices,
-           totalPaidThisYear: totalPaid,
-           daysSinceLastVisit: await calculateDaysSinceLastVisit(schoolId),
-           unreadNotifications: unreadNotificationsCount,
-           unreadMessages: unreadMessagesCount
-         },
-         nextEvent,
-         pendingActions: await buildPendingActions(schoolId, req.staff._id),
-         notifications: {
-           unreadCount: unreadNotificationsCount,
-           recent: await Notification.find({ recipientId: req.staff._id, isRead: false, dismissed: false })
-             .sort({ createdAt: -1 }).limit(5).lean()
-         },
-         recentStudents: transformedRecentStudents,
-         page: 'school_dashboard'
-       });
+        const totalPaid = totalPaidThisYear[0]?.totalPaid || 0;
+        const programs = enrolledPrograms?.programsEnrolled || [];
+
+        // Transform recent students to include readable names
+        const transformedRecentStudents = recentStudents.map(s => ({
+          _id: s._id,
+          fullName: s.fullName,
+          scoutSection: s.scoutSection,
+          assignedTrainerName: s.assignedTrainer?.name || 'Unassigned',
+          createdAt: s.createdAt
+        }));
+
+        const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+
+        res.render('school_dashboard', {
+          user: req.session.user,
+          school,
+          stats: {
+            totalScouts,
+            activeGroupsCount,
+            upcomingEventsCount: upcomingEvents.length,
+            pastEventsCount: null, // not needed on dashboard
+            pendingInvoices,
+            totalPaidThisYear: totalPaid,
+            daysSinceLastVisit: await calculateDaysSinceLastVisit(schoolId),
+            unreadNotifications: unreadNotificationsCount,
+            unreadMessages: unreadMessagesCount
+          },
+          programs,
+          nextEvent,
+          pendingActions: await buildPendingActions(schoolId, req.staff._id),
+          notifications: {
+            unreadCount: unreadNotificationsCount,
+            recent: await Notification.find({ recipientId: req.staff._id, isRead: false, dismissed: false })
+              .sort({ createdAt: -1 }).limit(5).lean()
+          },
+          recentStudents: transformedRecentStudents,
+          page: 'school_dashboard'
+        });
   } catch (err) {
     console.error('School dashboard error:', err);
     // Log more details for debugging

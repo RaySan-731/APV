@@ -392,113 +392,113 @@
             <div class="dashboard-content">
                 <% if (page === 'dashboard') { %>
                     <!-- Dashboard Stats -->
-                    <div class="stats-grid">
-                        <!-- Total Schools -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
-                                    <path d="M2 12h20"></path>
-                                    <path d="M6 12v8"></path>
-                                    <path d="M18 12v8"></path>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="totalSchools">0</div>
-                            <div class="stat-label">Total Schools</div>
-                        </div>
+                     <div class="stats-grid">
+                         <!-- Total Schools -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
+                                     <path d="M2 12h20"></path>
+                                     <path d="M6 12v8"></path>
+                                     <path d="M18 12v8"></path>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="totalSchools"><%= stats ? stats.totalSchools.toLocaleString() : 0 %></div>
+                             <div class="stat-label">Total Schools</div>
+                         </div>
 
-                        <!-- Active Schools -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
-                                    <path d="M2 12h20"></path>
-                                    <path d="M6 12v8"></path>
-                                    <path d="M18 12v8"></path>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="activeSchools">0</div>
-                            <div class="stat-label">Active Schools</div>
-                        </div>
+                         <!-- Active Schools -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
+                                     <path d="M2 12h20"></path>
+                                     <path d="M6 12v8"></path>
+                                     <path d="M18 12v8"></path>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="activeSchools"><%= stats ? stats.activeSchools.toLocaleString() : 0 %></div>
+                             <div class="stat-label">Active Schools</div>
+                         </div>
 
-                        <!-- New Schools This Month -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="newSchoolsThisMonth">0</div>
-                            <div class="stat-label">New This Month</div>
-                        </div>
+                         <!-- New Schools This Month -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <line x1="12" y1="5" x2="12" y2="19"></line>
+                                     <line x1="5" y1="12" x2="19" y2="12"></line>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="newSchoolsThisMonth"><%= stats ? stats.newSchoolsThisMonth.toLocaleString() : 0 %></div>
+                             <div class="stat-label">New This Month</div>
+                         </div>
 
-                        <!-- Total Students -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="9" cy="7" r="4"></circle>
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="totalStudents">0</div>
-                            <div class="stat-label">Total Students</div>
-                        </div>
+                         <!-- Total Students -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                     <circle cx="9" cy="7" r="4"></circle>
+                                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="totalStudents"><%= stats ? stats.totalStudents.toLocaleString() : 0 %></div>
+                             <div class="stat-label">Total Students</div>
+                         </div>
 
-                        <!-- Events This Month -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="eventsThisMonth">0</div>
-                            <div class="stat-label">Events This Month</div>
-                        </div>
+                         <!-- Events This Month -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                     <line x1="16" y1="2" x2="16" y2="6"></line>
+                                     <line x1="8" y1="2" x2="8" y2="6"></line>
+                                     <line x1="3" y1="10" x2="21" y2="10"></line>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="eventsThisMonth"><%= stats ? stats.eventsThisMonth.toLocaleString() : 0 %></div>
+                             <div class="stat-label">Events This Month</div>
+                         </div>
 
-                        <!-- Revenue Collected -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="1" x2="12" y2="23"></line>
-                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="revenueCollected">KES 0</div>
-                            <div class="stat-label">Revenue Collected</div>
-                        </div>
+                         <!-- Revenue Collected -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <line x1="12" y1="1" x2="12" y2="23"></line>
+                                     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="revenueCollected">KES <%= stats ? stats.revenueCollected.toLocaleString() : 0 %></div>
+                             <div class="stat-label">Revenue Collected</div>
+                         </div>
 
-                        <!-- Outstanding Payments -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                                    <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                                    <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="outstandingPayments">KES 0</div>
-                            <div class="stat-label">Outstanding Payments</div>
-                        </div>
+                         <!-- Outstanding Payments -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <circle cx="12" cy="12" r="10"></circle>
+                                     <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                     <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                     <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="outstandingPayments">KES <%= stats ? stats.outstandingPayments.toLocaleString() : 0 %></div>
+                             <div class="stat-label">Outstanding Payments</div>
+                         </div>
 
-                        <!-- Active Service Schools -->
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                                    <polyline points="22,4 12,14.01 9,11.01"></polyline>
-                                </svg>
-                            </div>
-                            <div class="stat-number" id="activeServiceSchools">0</div>
-                            <div class="stat-label">Active Service</div>
-                        </div>
-                    </div>
+                         <!-- Active Service Schools -->
+                         <div class="stat-card">
+                             <div class="stat-icon">
+                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                     <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                                 </svg>
+                             </div>
+                             <div class="stat-number" id="activeServiceSchools"><%= stats ? stats.activeServiceSchools.toLocaleString() : 0 %></div>
+                             <div class="stat-label">Active Service</div>
+                         </div>
+                     </div>
 
                     <!-- Recent Activities -->
                     <div class="content-card">

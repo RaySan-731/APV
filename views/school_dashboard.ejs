@@ -165,17 +165,15 @@
                 <section class="stats-section">
                     <div class="stat-card">
                          <div class="stat-icon students">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="9" cy="7" r="4"></circle>
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                            </svg>
-                        </div>
-                        <div class="stat-info">
-                             <span class="stat-value"><%= stats?.totalStudents || 0 %></span>
-                             <span class="stat-label">Active Students</span>
-                        </div>
+                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                 <circle cx="9" cy="7" r="4"></circle>
+                             </svg>
+                         </div>
+                         <div class="stat-info">
+                              <span class="stat-value"><%= stats?.totalStudents || 0 %></span>
+                              <span class="stat-label">Active Students</span>
+                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon groups">
@@ -217,6 +215,37 @@
                             <span class="stat-label">Paid This Year</span>
                         </div>
                     </div>
+                </section>
+
+                <!-- Programs Section -->
+                <section class="card programs-section">
+                    <div class="section-header">
+                        <h3>Enrolled Programs</h3>
+                        <button class="btn btn-primary btn-sm" id="addProgramBtn">Add Program</button>
+                    </div>
+                    
+                    <% if (programs && programs.length > 0) { %>
+                        <div class="programs-list">
+                            <% programs.forEach(program => { %>
+                                <div class="program-item" data-program-id="<%= program._id %>">
+                                    <div class="program-info">
+                                        <h4><%= program.name %></h4>
+                                        <p class="program-description"><%= program.description %></p>
+                                        <div class="program-meta">
+                                            <span class="badge badge-secondary"><%= program.category.replace('-', ' ') %></span>
+                                            <span class="program-duration"><%= program.duration.replace('-', ' ') %></span>
+                                            <span class="program-price">$<%= program.price?.amount || 0 %> <%= program.price?.currency || 'USD' %></span>
+                                        </div>
+                                    </div>
+                                    <div class="program-actions">
+                                        <button class="btn btn-outline btn-sm remove-program-btn" data-program-id="<%= program._id %>">Remove</button>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <p class="placeholder-text">No programs enrolled yet. Click "Add Program" to get started.</p>
+                    <% } %>
                 </section>
 
                 <!-- Next Event & Service Status -->
@@ -382,7 +411,147 @@
                     sidebar.classList.toggle('mobile-open');
                 });
             }
+        // Programs management
+        const programSelect = document.getElementById('programSelect');
+        const programDetails = document.getElementById('programDetails');
+        const addProgramModal = document.getElementById('addProgramModal');
+        const addProgramBtn = document.getElementById('addProgramBtn');
+        const closeModalBtn = document.getElementById('closeAddProgramModal');
+        const cancelAddProgramBtn = document.getElementById('cancelAddProgram');
+        const addProgramForm = document.getElementById('addProgramForm');
+
+        // Fetch and populate available programs
+        async function loadAvailablePrograms() {
+            try {
+                const response = await fetch('/api/school/programs');
+                const data = await response.json();
+                
+                if (data.success) {
+                    programSelect.innerHTML = '<option value="">Choose a program...</option>';
+                    data.data.programs.forEach(program => {
+                        const option = document.createElement('option');
+                        option.value = program._id;
+                        option.textContent = `${program.name} - $${program.price?.amount || 0} ${program.price?.currency || 'USD'}`;
+                        option.dataset.description = program.description;
+                        option.dataset.category = program.category;
+                        option.dataset.duration = program.duration;
+                        programSelect.appendChild(option);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load programs:', err);
+            }
+        }
+
+        // Show program details on selection
+        if (programSelect) {
+            programSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (selectedOption.value) {
+                    const desc = selectedOption.dataset.description || '';
+                    const category = selectedOption.dataset.category.replace('-', ' ') || '';
+                    const duration = selectedOption.dataset.duration.replace('-', ' ') || '';
+                    programDetails.innerHTML = `
+                        <p><strong>Description:</strong> ${desc}</p>
+                        <p><strong>Category:</strong> ${category}</p>
+                        <p><strong>Duration:</strong> ${duration}</p>
+                    `;
+                } else {
+                    programDetails.innerHTML = '';
+                }
+            });
+        }
+
+        // Open modal
+        if (addProgramBtn) {
+            addProgramBtn.addEventListener('click', async () => {
+                await loadAvailablePrograms();
+                addProgramModal.style.display = 'flex';
+            });
+        }
+
+        // Close modal handlers
+        function closeModal() {
+            addProgramModal.style.display = 'none';
+            programSelect.value = '';
+            programDetails.innerHTML = '';
+        }
+
+        if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+        if (cancelAddProgramBtn) cancelAddProgramBtn.addEventListener('click', closeModal);
+        
+        document.querySelector('.modal-overlay')?.addEventListener('click', closeModal);
+
+        // Handle program enrollment form submission
+        if (addProgramForm) {
+            addProgramForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const programId = programSelect.value;
+                if (!programId) {
+                    alert('Please select a program');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/school/programs/enroll', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ programId })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        alert('Program enrolled successfully!');
+                        closeModal();
+                        // Reload the page to show the new program
+                        window.location.reload();
+                    } else {
+                        alert(`Failed to enroll: ${result.error}`);
+                    }
+                } catch (err) {
+                    console.error('Enrollment error:', err);
+                    alert('Failed to enroll in program. Please try again.');
+                }
+            });
+        }
+
+        // Handle remove program buttons
+        document.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('remove-program-btn')) {
+                const programId = e.target.dataset.programId;
+                if (!confirm('Are you sure you want to remove this program?')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/school/programs/remove', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ programId })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        alert('Program removed successfully!');
+                        window.location.reload();
+                    } else {
+                        alert(`Failed to remove: ${result.error}`);
+                    }
+                } catch (err) {
+                    console.error('Remove program error:', err);
+                    alert('Failed to remove program. Please try again.');
+                }
+            }
         });
-    </script>
+
+    });
+</script>
 </body>
 </html>

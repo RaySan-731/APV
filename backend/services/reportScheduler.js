@@ -21,34 +21,43 @@ class ReportScheduler {
     this.queue = [];
     this.CONCURRENCY_LIMIT = 2;
     this.processingCount = 0;
-    this.lastCPUCheck = 0;
-    this.CPU_THRESHOLD = 80; // Skip if CPU > 80%
-    this.MEMORY_THRESHOLD_MB = 500; // Skip if process uses > 500MB
+    this.lastCPUTime = 0;
+    this.CPU_CHECK_INTERVAL = 5000; // Check every 5 seconds
+    this.CPU_THRESHOLD_MS = 250; // 250ms of CPU time in 5s window = 5% CPU (reasonable)
+    this.MEMORY_THRESHOLD_MB = 500;
+    this.avgProcessTime = 0;
+    this.lastProcessTimeCheck = 0;
   }
 
   /**
-   * Check if system is under heavy load
+   * Check if system is under heavy load using delta CPU measurement
    */
   isSystemOverloaded() {
-    const usage = process.memoryUsage();
-    const memoryMB = usage.heapUsed / 1024 / 1024;
-
-    // Only check CPU occasionally to avoid overhead
     const now = Date.now();
-    const shouldCheckCPU = now - this.lastCPUCheck > 30000; // Every 30 seconds
-    if (shouldCheckCPU) {
-      this.lastCPUCheck = now;
-      // Simple CPU load check using process.cpuUsage
+    
+    // Check CPU usage (per-interval delta)
+    if (now - this.lastCPUTime > this.CPU_CHECK_INTERVAL) {
       const cpu = process.cpuUsage();
-      const totalCPUTime = (cpu.user + cpu.system) / 1000000; // Convert to seconds
-      // Estimate CPU usage over the last interval (rough approximation)
-      // This is simplified - for production use a proper monitoring library
-      if (totalCPUTime > 0.5) { // High CPU usage detected
-        console.warn(`[ReportScheduler] High CPU usage detected (${(totalCPUTime*1000).toFixed(1)}ms total), skipping job to prevent blocking`);
-        return true;
+      const totalCPUTime = (cpu.user + cpu.system) / 1000; // Convert µs to ms
+
+      if (this.lastCPUTime > 0) {
+        const cpuDelta = totalCPUTime - this.lastCPUTime;
+        const timeDelta = now - this.lastCPUTime;
+        const cpuPercent = (cpuDelta / timeDelta) * 100;
+
+        if (cpuDelta > this.CPU_THRESHOLD_MS) {
+          console.warn(`[ReportScheduler] High CPU load (${cpuDelta.toFixed(0)}ms in ${timeDelta}ms = ${cpuPercent.toFixed(1)}% CPU), throttling`);
+          this.lastCPUTime = totalCPUTime;
+          return true;
+        }
       }
+
+      this.lastCPUTime = totalCPUTime;
     }
 
+    // Check memory
+    const usage = process.memoryUsage();
+    const memoryMB = usage.heapUsed / 1024 / 1024;
     if (memoryMB > this.MEMORY_THRESHOLD_MB) {
       console.warn(`[ReportScheduler] High memory usage (${memoryMB.toFixed(0)}MB), throttling`);
       return true;

@@ -4900,6 +4900,27 @@ app.get('/dashboard/schools/:schoolId/edit', requireAuth, requirePermission('can
   } catch (err) {
     console.error('Error loading school edit form:', err);
     res.status(500).render('404', { user: req.session.user, error: 'Failed to load edit form' });
+   }
+ });
+
+// GET: Fetch single school details
+app.get('/api/schools/:schoolId', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
+    const school = await School.findById(schoolId).lean();
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    res.json({ success: true, school });
+  } catch (err) {
+    console.error('Error fetching school:', err);
+    res.status(500).json({ success: false, error: 'Failed to load school' });
   }
 });
 
@@ -6250,6 +6271,86 @@ app.post('/api/programs/:programId/update-schools', requireAuth, requirePermissi
   } catch (err) {
     console.error('Error updating program schools:', err);
     res.status(500).json({ success: false, error: 'Failed to update program schools' });
+  }
+});
+
+// GET single program by ID
+app.get('/api/programs/:programId', requireAuth, async (req, res) => {
+  try {
+    const { programId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(programId)) {
+      return res.status(400).json({ success: false, error: 'Invalid program ID' });
+    }
+
+    const program = await Program.findById(programId).lean();
+
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    res.json({ success: true, program });
+  } catch (err) {
+    console.error('Error fetching program:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch program' });
+  }
+});
+
+// PUT update program details
+app.put('/api/programs/:programId', requireAuth, requirePermission('canEditPrograms'), async (req, res) => {
+  try {
+    const { programId } = req.params;
+    const {
+      name,
+      description,
+      category,
+      ageMin,
+      ageMax,
+      duration,
+      maxParticipants,
+      priceAmount,
+      priceCurrency,
+      status
+    } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(programId)) {
+      return res.status(400).json({ success: false, error: 'Invalid program ID' });
+    }
+
+    const program = await Program.findById(programId);
+
+    if (!program) {
+      return res.status(404).json({ success: false, error: 'Program not found' });
+    }
+
+    // Update fields if provided
+    if (name !== undefined) program.name = name;
+    if (description !== undefined) program.description = description;
+    if (category !== undefined) program.category = category;
+    if (ageMin !== undefined || ageMax !== undefined) {
+      program.ageGroup = {
+        min: ageMin !== undefined ? parseInt(ageMin) : program.ageGroup.min,
+        max: ageMax !== undefined ? parseInt(ageMax) : program.ageGroup.max
+      };
+    }
+    if (duration !== undefined) program.duration = duration;
+    if (maxParticipants !== undefined) program.maxParticipants = parseInt(maxParticipants);
+    if (priceAmount !== undefined || priceCurrency !== undefined) {
+      program.price = {
+        amount: priceAmount !== undefined ? parseFloat(priceAmount) : program.price.amount,
+        currency: priceCurrency !== undefined ? priceCurrency : program.price.currency
+      };
+    }
+    if (status !== undefined) program.status = status;
+
+    await program.save();
+
+    const updatedProgram = await Program.findById(programId).lean();
+
+    res.json({ success: true, program: updatedProgram, message: 'Program updated successfully' });
+  } catch (err) {
+    console.error('Error updating program:', err);
+    res.status(500).json({ success: false, error: 'Failed to update program' });
   }
 });
 

@@ -1008,7 +1008,7 @@
                                                                 </svg>
                                                                 Edit
                                                             </button>
-                                                            <button class="btn btn-sm btn-primary" onclick="openProgramAllocationModal('<%= school._id %>', '<%= school.name %>', <%- JSON.stringify(school.programsEnrolled ? school.programsEnrolled.map(p => p._id) : []) %>)">
+                                                             <button class="btn btn-sm btn-primary" onclick="openProgramAllocationModal('<%= school._id %>', '<%= school.name %>', [<%= school.programsEnrolled ? school.programsEnrolled.map(p => `'${p._id}'`).join(',') : '' %>])">
                                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                                     <line x1="12" y1="5" x2="12" y2="19"></line>
                                                                     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -1974,7 +1974,8 @@ async function saveProgramAllocation() {
                                                 <td><%= program.status %></td>
                                                 <td>
                                                     <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
-                                                        <button class="btn btn-sm btn-primary" onclick="openSchoolAllocationModal('<%= program._id %>', '<%= program.name %>', <%- JSON.stringify(program.schools ? program.schools.map(s => s._id) : []) %>)">Allocate Schools</button>
+                                                         <button class="btn btn-sm btn-primary" onclick="openSchoolAllocationModal('<%= program._id %>', '<%= program.name %>', [<%= program.schools ? program.schools.map(s => `'${s._id}'`).join(',') : '' %>])">Allocate Schools</button>
+                                                         <button class="btn btn-sm btn-secondary" onclick="openEditProgramModal('<%= program._id %>')">Edit</button>
                                                     <% } %>
                                                 </td>
                                             </tr>
@@ -2016,14 +2017,17 @@ async function saveProgramAllocation() {
                                 <form id="schoolAllocationForm">
                                     <input type="hidden" id="schoolAllocationProgramId">
                                     <div class="form-group">
-                                        <label>Select Schools (Ctrl+Click or Cmd+Click for multiple selection)</label>
-                                        <select id="schoolAllocationSelect" name="schoolIds" multiple style="width:100%; min-height:200px; padding:0.5rem;">
+                                        <label>Select Schools</label>
+                                        <div id="schoolCheckboxContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem; background: white;">
                                             <% allSchools.forEach(function(school) { %>
-                                                <option value="<%= school._id %>">
-                                                    <%= school.name %> - <%= school.address?.city || 'No city' %> (<%= school.studentCount || 0 %> students)
-                                                </option>
+                                                <div style="margin-bottom: 0.25rem;">
+                                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                                        <input type="checkbox" name="schoolIds" value="<%= school._id %>" style="margin-right: 0.5rem;">
+                                                        <%= school.name %> - <%= school.address?.city || 'No city' %> (<%= school.studentCount || 0 %> students)
+                                                    </label>
+                                                </div>
                                             <% }) %>
-                                        </select>
+                                        </div>
                                     </div>
                                     <div id="schoolAllocationMessage" class="message" style="display:none; margin-top:1rem;"></div>
                                 </form>
@@ -2040,19 +2044,18 @@ function openSchoolAllocationModal(programId, programName, allocatedSchoolIds) {
   document.getElementById('modalProgramName').textContent = programName;
   document.getElementById('schoolAllocationProgramId').value = programId;
   
-  const select = document.getElementById('schoolAllocationSelect');
-  // Clear all selections
-  for (let i = 0; i < select.options.length; i++) {
-    select.options[i].selected = false;
-  }
-  
-  // Select already allocated schools
+  const container = document.getElementById('schoolCheckboxContainer');
+  // Clear all checkboxes
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb => { cb.checked = false; });
+
+  // Check already allocated schools
   if (allocatedSchoolIds && allocatedSchoolIds.length) {
-    for (let i = 0; i < select.options.length; i++) {
-      if (allocatedSchoolIds.includes(select.options[i].value)) {
-        select.options[i].selected = true;
+    checkboxes.forEach(cb => {
+      if (allocatedSchoolIds.includes(cb.value)) {
+        cb.checked = true;
       }
-    }
+    });
   }
   
   document.getElementById('schoolAllocationModal').style.display = 'flex';
@@ -2073,9 +2076,9 @@ document.addEventListener('click', function(event) {
 
 async function saveSchoolAllocation() {
   const programId = document.getElementById('schoolAllocationProgramId').value;
-  const select = document.getElementById('schoolAllocationSelect');
-  const selectedOptions = Array.from(select.selectedOptions);
-  const schoolIds = selectedOptions.map(option => option.value);
+  const container = document.getElementById('schoolCheckboxContainer');
+  const checkedBoxes = container.querySelectorAll('input[type="checkbox"]:checked');
+  const schoolIds = Array.from(checkedBoxes).map(cb => cb.value);
   
   const messageEl = document.getElementById('schoolAllocationMessage');
   messageEl.style.display = 'none';
@@ -2556,9 +2559,252 @@ async function saveSchoolAllocation() {
                                              <button class="btn btn-warning" onclick="requestRevision()">Request Revision</button>
                                          </div>
                                      </div>
-                                  </div>
+                     </div>
+                     
+                     <!-- Edit Program Modal -->
+                     <div id="editProgramModal" class="modal" style="display: none;">
+                         <div class="modal-content">
+                             <div class="modal-header">
+                                 <h3>Edit Program</h3>
+                                 <button type="button" class="close-btn" onclick="closeEditProgramModal()">×</button>
+                             </div>
+                             <div class="modal-body">
+                                 <form id="editProgramForm">
+                                     <input type="hidden" id="editProgramId">
+                                     <div class="form-group">
+                                         <label>Name</label>
+                                         <input type="text" id="editProgramName" name="name" required>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Description</label>
+                                         <textarea id="editProgramDescription" name="description" rows="3" required></textarea>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Category</label>
+                                         <select id="editProgramCategory" name="category" required>
+                                             <option value="leadership">Scouting Principle</option>
+                                             <option value="outdoor">Outdoor</option>
+                                             <option value="team-building">Team Building</option>
+                                             <option value="first-aid">First Aid</option>
+                                             <option value="environmental">Environmental</option>
+                                             <option value="community-service">Community Service</option>
+                                         </select>
+                                     </div>
+                                     <div class="form-row">
+                                         <div class="form-group">
+                                             <label>Age Min</label>
+                                             <input type="number" id="editAgeMin" name="ageMin" min="5" max="18" required>
+                                         </div>
+                                         <div class="form-group">
+                                             <label>Age Max</label>
+                                             <input type="number" id="editAgeMax" name="ageMax" min="5" max="18" required>
+                                         </div>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Duration</label>
+                                         <select id="editProgramDuration" name="duration" required>
+                                             <option value="half-day">Half Day</option>
+                                             <option value="full-day">Full Day</option>
+                                             <option value="weekend">Weekend</option>
+                                             <option value="week">Week</option>
+                                             <option value="month">Month</option>
+                                         </select>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Max Participants</label>
+                                         <input type="number" id="editMaxParticipants" name="maxParticipants" min="1" required>
+                                     </div>
+                                     <div class="form-row">
+                                         <div class="form-group">
+                                             <label>Price Amount</label>
+                                             <input type="number" id="editPriceAmount" name="priceAmount" step="0.01" min="0" required>
+                                         </div>
+                                         <div class="form-group">
+                                             <label>Currency</label>
+                                             <input type="text" id="editPriceCurrency" name="priceCurrency" required>
+                                         </div>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Status</label>
+                                         <select id="editProgramStatus" name="status" required>
+                                             <option value="active">Active</option>
+                                             <option value="inactive">Inactive</option>
+                                             <option value="draft">Draft</option>
+                                         </select>
+                                     </div>
+                                     <div id="editProgramMessage" class="message" style="display:none; margin-top:1rem;"></div>
+                                 </form>
+                             </div>
+                             <div class="modal-footer">
+                                 <button type="button" class="btn btn-secondary" onclick="closeEditProgramModal()">Cancel</button>
+                                 <button type="button" class="btn btn-primary" onclick="saveProgramEdit()">Save Changes</button>
+                             </div>
+                         </div>
+                     </div>
+                                     
+                     <!-- Edit Program Modal -->
+                     <div id="editProgramModal" class="modal" style="display: none;">
+                         <div class="modal-content">
+                             <div class="modal-header">
+                                 <h3>Edit Program</h3>
+                                 <button type="button" class="close-btn" onclick="closeEditProgramModal()">×</button>
+                             </div>
+                             <div class="modal-body">
+                                 <form id="editProgramForm">
+                                     <input type="hidden" id="editProgramId">
+                                     <div class="form-group">
+                                         <label>Name</label>
+                                         <input type="text" id="editProgramName" name="name" required>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Description</label>
+                                         <textarea id="editProgramDescription" name="description" rows="3" required></textarea>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Category</label>
+                                         <select id="editProgramCategory" name="category" required>
+                                             <option value="leadership">Scouting Principle</option>
+                                             <option value="outdoor">Outdoor</option>
+                                             <option value="team-building">Team Building</option>
+                                             <option value="first-aid">First Aid</option>
+                                             <option value="environmental">Environmental</option>
+                                             <option value="community-service">Community Service</option>
+                                         </select>
+                                     </div>
+                                     <div class="form-row">
+                                         <div class="form-group">
+                                             <label>Age Min</label>
+                                             <input type="number" id="editAgeMin" name="ageMin" min="5" max="18" required>
+                                         </div>
+                                         <div class="form-group">
+                                             <label>Age Max</label>
+                                             <input type="number" id="editAgeMax" name="ageMax" min="5" max="18" required>
+                                         </div>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Duration</label>
+                                         <select id="editProgramDuration" name="duration" required>
+                                             <option value="half-day">Half Day</option>
+                                             <option value="full-day">Full Day</option>
+                                             <option value="weekend">Weekend</option>
+                                             <option value="week">Week</option>
+                                             <option value="month">Month</option>
+                                         </select>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Max Participants</label>
+                                         <input type="number" id="editMaxParticipants" name="maxParticipants" min="1" required>
+                                     </div>
+                                     <div class="form-row">
+                                         <div class="form-group">
+                                             <label>Price Amount</label>
+                                             <input type="number" id="editPriceAmount" name="priceAmount" step="0.01" min="0" required>
+                                         </div>
+                                         <div class="form-group">
+                                             <label>Currency</label>
+                                             <input type="text" id="editPriceCurrency" name="priceCurrency" required>
+                                         </div>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Status</label>
+                                         <select id="editProgramStatus" name="status" required>
+                                             <option value="active">Active</option>
+                                             <option value="inactive">Inactive</option>
+                                             <option value="draft">Draft</option>
+                                         </select>
+                                     </div>
+                                     <div id="editProgramMessage" class="message" style="display:none; margin-top:1rem;"></div>
+                                 </form>
+                             </div>
+                             <div class="modal-footer">
+                                 <button type="button" class="btn btn-secondary" onclick="closeEditProgramModal()">Cancel</button>
+                                 <button type="button" class="btn btn-primary" onclick="saveProgramEdit()">Save Changes</button>
+                             </div>
+                         </div>
+                     </div>
 
-       <script>
+                     <!-- Edit Program Modal -->
+                     <div id="editProgramModal" class="modal" style="display: none;">
+                         <div class="modal-content">
+                             <div class="modal-header">
+                                 <h3>Edit Program</h3>
+                                 <button type="button" class="close-btn" onclick="closeEditProgramModal()">×</button>
+                             </div>
+                             <div class="modal-body">
+                                 <form id="editProgramForm">
+                                     <input type="hidden" id="editProgramId">
+                                     <div class="form-group">
+                                         <label>Name</label>
+                                         <input type="text" id="editProgramName" name="name" required>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Description</label>
+                                         <textarea id="editProgramDescription" name="description" rows="3" required></textarea>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Category</label>
+                                         <select id="editProgramCategory" name="category" required>
+                                             <option value="leadership">Scouting Principle</option>
+                                             <option value="outdoor">Outdoor</option>
+                                             <option value="team-building">Team Building</option>
+                                             <option value="first-aid">First Aid</option>
+                                             <option value="environmental">Environmental</option>
+                                             <option value="community-service">Community Service</option>
+                                         </select>
+                                     </div>
+                                     <div class="form-row">
+                                         <div class="form-group">
+                                             <label>Age Min</label>
+                                             <input type="number" id="editAgeMin" name="ageMin" min="5" max="18" required>
+                                         </div>
+                                         <div class="form-group">
+                                             <label>Age Max</label>
+                                             <input type="number" id="editAgeMax" name="ageMax" min="5" max="18" required>
+                                         </div>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Duration</label>
+                                         <select id="editProgramDuration" name="duration" required>
+                                             <option value="half-day">Half Day</option>
+                                             <option value="full-day">Full Day</option>
+                                             <option value="weekend">Weekend</option>
+                                             <option value="week">Week</option>
+                                             <option value="month">Month</option>
+                                         </select>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Max Participants</label>
+                                         <input type="number" id="editMaxParticipants" name="maxParticipants" min="1" required>
+                                     </div>
+                                     <div class="form-row">
+                                         <div class="form-group">
+                                             <label>Price Amount</label>
+                                             <input type="number" id="editPriceAmount" name="priceAmount" step="0.01" min="0" required>
+                                         </div>
+                                         <div class="form-group">
+                                             <label>Currency</label>
+                                             <input type="text" id="editPriceCurrency" name="priceCurrency" required>
+                                         </div>
+                                     </div>
+                                     <div class="form-group">
+                                         <label>Status</label>
+                                         <select id="editProgramStatus" name="status" required>
+                                             <option value="active">Active</option>
+                                             <option value="inactive">Inactive</option>
+                                             <option value="draft">Draft</option>
+                                         </select>
+                                     </div>
+                                     <div id="editProgramMessage" class="message" style="display:none; margin-top:1rem;"></div>
+                                 </form>
+                             </div>
+                             <div class="modal-footer">
+                                 <button type="button" class="btn btn-secondary" onclick="closeEditProgramModal()">Cancel</button>
+                                 <button type="button" class="btn btn-primary" onclick="saveProgramEdit()">Save Changes</button>
+                             </div>
+                         </div>
+                     </div>
+
+                     <script>
          // Expose current user and programs to client-side scripts
          window.currentUser = <%- JSON.stringify({
            id: user.id,
@@ -3139,8 +3385,240 @@ async function saveSchoolAllocation() {
 
           // I need to update renderNotifications to call viewAnnouncementModal and viewMessageModal instead of redirecting.
 
-        })();
-      </script>
+         })();
+       </script>
+
+       <!-- School Onboarding Modal JavaScript -->
+       <script>
+         (function() {
+           'use strict';
+
+           const onboardingModal = document.getElementById('onboardingModal');
+           const onboardingForm = document.getElementById('onboardingForm');
+           const onboardingTitle = document.getElementById('onboardingModalTitle');
+           const prevStepBtn = document.getElementById('prevStepBtn');
+           const nextStepBtn = document.getElementById('nextStepBtn');
+           const steps = document.querySelectorAll('.onboarding-step');
+           const messageEl = document.getElementById('onboardingMessage');
+           let currentStep = 0;
+           let editingSchoolId = null;
+
+           // Expose globally for onclick handlers
+           window.DashboardUtils = window.DashboardUtils || {};
+
+           // Helper: Show step
+           function showStep(index) {
+             steps.forEach((step, i) => {
+               step.style.display = i === index ? 'grid' : 'none';
+             });
+             // Update step indicators
+             document.querySelectorAll('[id^="step-indicator-"]').forEach((el, i) => {
+               el.style.fontWeight = i === index ? 'bold' : 'normal';
+               el.style.color = i === index ? 'var(--primary)' : 'var(--muted-foreground)';
+             });
+             prevStepBtn.style.display = index === 0 ? 'none' : 'inline-block';
+             nextStepBtn.textContent = index === steps.length - 1 ? 'Save School' : 'Next Step';
+           }
+
+           // Open modal for creating new school or editing existing
+           window.DashboardUtils.openOnboardingModal = function(schoolId = null) {
+             editingSchoolId = schoolId;
+             if (schoolId) {
+               onboardingTitle.textContent = 'Edit School';
+               // Fetch school data and pre-fill form
+               fetch(`/api/schools/${schoolId}`)
+                 .then(res => res.json())
+                 .then(data => {
+                   const school = data.school || data;
+                   if (school && school._id) {
+                     // Populate form fields
+                     document.querySelector('[name="name"]').value = school.name || '';
+                     document.querySelector('[name="street"]').value = school.address?.street || '';
+                     document.querySelector('[name="city"]').value = school.address?.city || '';
+                     document.querySelector('[name="state"]').value = school.address?.state || '';
+                     document.querySelector('[name="zipCode"]').value = school.address?.zipCode || '';
+                     document.querySelector('[name="country"]').value = school.address?.country || 'Kenya';
+                     document.querySelector('[name="zone"]').value = school.zone || '';
+                     document.querySelector('[name="region"]').value = school.region || '';
+                     document.querySelector('[name="studentCount"]').value = school.studentCount || 0;
+
+                     // Contact info
+                     document.querySelector('[name="contactName"]').value = school.contactPerson?.name || '';
+                     document.querySelector('[name="contactEmail"]').value = school.contactPerson?.email || '';
+                     document.querySelector('[name="contactPhone"]').value = school.contactPerson?.phone || '';
+                     document.querySelector('[name="contactPosition"]').value = school.contactPerson?.position || '';
+                     document.querySelector('[name="notes"]').value = school.notes || '';
+
+                     // Program (select first matching if any)
+                     if (school.programsEnrolled && school.programsEnrolled.length > 0) {
+                       const programSelect = document.getElementById('programSelect');
+                       // Find first program that exists in the dropdown
+                       const firstProgramId = school.programsEnrolled[0]._id.toString();
+                       const optionExists = Array.from(programSelect.options).some(opt => opt.value === firstProgramId);
+                       if (optionExists) {
+                         programSelect.value = firstProgramId;
+                         programSelect.dispatchEvent(new Event('change'));
+                       }
+                     }
+
+                     // Trainer (use first assigned staff member's staffId)
+                     if (school.assignedStaff && school.assignedStaff.length > 0) {
+                       const trainer = school.assignedStaff[0];
+                       const trainerSelect = document.querySelector('[name="primaryTrainerId"]');
+                       if (trainerSelect && trainer.staffId) {
+                         const trainerId = trainer.staffId.toString();
+                         const optionExists = Array.from(trainerSelect.options).some(opt => opt.value === trainerId);
+                         if (optionExists) {
+                           trainerSelect.value = trainerId;
+                         }
+                       }
+                     }
+
+                     showStep(0);
+                   }
+                 })
+                 .catch(err => {
+                   console.error('Error loading school:', err);
+                   showMessage('Failed to load school data', true);
+                 });
+               } else {
+                 onboardingTitle.textContent = 'Onboard New School';
+                 onboardingForm.reset();
+                 showStep(0);
+               }
+             onboardingModal.style.display = 'flex';
+           };
+
+           function closeOnboardingModal() {
+             onboardingModal.style.display = 'none';
+             editingSchoolId = null;
+             messageEl.style.display = 'none';
+           }
+           window.closeOnboardingModal = closeOnboardingModal;
+
+           function showMessage(msg, isError = false) {
+             messageEl.textContent = msg;
+             messageEl.style.display = 'block';
+             messageEl.className = isError ? 'message error' : 'message success';
+             setTimeout(() => { messageEl.style.display = 'none'; }, 3000);
+           }
+
+           // Step navigation
+           function validateStep(index) {
+             if (index === 0) {
+               const name = document.querySelector('[name="name"]').value.trim();
+               if (!name) {
+                 showMessage('School name is required', true);
+                 return false;
+               }
+             }
+             if (index === 1) {
+               const email = document.querySelector('[name="contactEmail"]').value.trim();
+               const phone = document.querySelector('[name="contactPhone"]').value.trim();
+               if (!email || !phone) {
+                 showMessage('Contact email and phone are required', true);
+                 return false;
+               }
+             }
+             if (index === 2) {
+               const programId = document.getElementById('programSelect').value;
+               if (!programId) {
+                 showMessage('Please select a program', true);
+                 return false;
+               }
+             }
+             return true;
+           }
+
+           prevStepBtn.addEventListener('click', () => {
+             if (currentStep > 0) {
+               currentStep--;
+               showStep(currentStep);
+             }
+           });
+
+           nextStepBtn.addEventListener('click', () => {
+             if (!validateStep(currentStep)) return;
+             if (currentStep < steps.length - 1) {
+               currentStep++;
+               showStep(currentStep);
+             } else {
+               submitOnboardingForm();
+             }
+           });
+
+           // Program price auto-fill
+           document.getElementById('programSelect')?.addEventListener('change', function() {
+             const selected = this.options[this.selectedIndex];
+             const price = selected.dataset.price || '0';
+             document.getElementById('ratePerStudent').value = price;
+             document.getElementById('selectedProgramPrice').textContent = `Rate: KES ${price}`;
+           });
+
+           // Form submission
+           async function submitOnboardingForm() {
+             const formData = {
+               name: document.querySelector('[name="name"]').value.trim(),
+               street: document.querySelector('[name="street"]').value.trim(),
+               city: document.querySelector('[name="city"]').value.trim(),
+               state: document.querySelector('[name="state"]').value.trim(),
+               zipCode: document.querySelector('[name="zipCode"]').value.trim(),
+               country: document.querySelector('[name="country"]').value.trim(),
+               zone: document.querySelector('[name="zone"]').value.trim(),
+               region: document.querySelector('[name="region"]').value.trim(),
+               studentCount: parseInt(document.querySelector('[name="studentCount"]').value) || 0,
+               contactName: document.querySelector('[name="contactName"]').value.trim(),
+               contactEmail: document.querySelector('[name="contactEmail"]').value.trim(),
+               contactPhone: document.querySelector('[name="contactPhone"]').value.trim(),
+               contactPosition: document.querySelector('[name="contactPosition"]').value.trim(),
+               notes: document.querySelector('[name="notes"]').value.trim(),
+               programId: document.getElementById('programSelect').value,
+               primaryTrainerId: document.querySelector('[name="primaryTrainerId"]').value || null
+             };
+
+             try {
+               let url, method, data;
+               if (editingSchoolId) {
+                 url = `/api/schools/${editingSchoolId}/update`;
+                 method = 'POST';
+                 data = formData;
+               } else {
+                 url = '/dashboard/schools/onboard';
+                 method = 'POST';
+                 data = formData;
+               }
+               const res = await fetch(url, {
+                 method: method,
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify(data)
+               });
+               const result = await res.json();
+               const success = result.success || result.school;
+               if (success) {
+                 showMessage(editingSchoolId ? 'School updated successfully!' : 'School onboarded successfully!');
+                 setTimeout(() => {
+                   closeOnboardingModal();
+                   window.location.reload();
+                 }, 1000);
+               } else {
+                 showMessage(result.error || 'Operation failed', true);
+               }
+             } catch (err) {
+               console.error('Error saving school:', err);
+               showMessage('Network error', true);
+             }
+           }
+
+           // Initialize: show first step
+           showStep(0);
+
+         })();
+
+         // Also expose at window level for inline onclick handlers
+         window.openOnboardingModal = function(schoolId) {
+           window.DashboardUtils.openOnboardingModal(schoolId);
+         };
+       </script>
 
       <% if (page === 'analytics') { %>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -3362,7 +3840,108 @@ async function saveSchoolAllocation() {
             }
           }
         });
-      </script>
+
+// Edit Program Modal functions
+let currentEditProgramId = null;
+
+async function openEditProgramModal(programId) {
+  currentEditProgramId = programId;
+  
+  try {
+    const response = await fetch(`/api/programs/${programId}`);
+    const result = await response.json();
+    
+    if (response.ok && result.success) {
+      const program = result.program;
+      
+      // Populate form fields
+      document.getElementById('editProgramId').value = program._id;
+      document.getElementById('editProgramName').value = program.name || '';
+      document.getElementById('editProgramDescription').value = program.description || '';
+      document.getElementById('editProgramCategory').value = program.category || 'leadership';
+      document.getElementById('editAgeMin').value = program.ageGroup?.min || 8;
+      document.getElementById('editAgeMax').value = program.ageGroup?.max || 16;
+      document.getElementById('editProgramDuration').value = program.duration || 'half-day';
+      document.getElementById('editMaxParticipants').value = program.maxParticipants || 10;
+      document.getElementById('editPriceAmount').value = program.price?.amount || 0;
+      document.getElementById('editPriceCurrency').value = program.price?.currency || 'USD';
+      document.getElementById('editProgramStatus').value = program.status || 'active';
+      
+      document.getElementById('editProgramMessage').style.display = 'none';
+      document.getElementById('editProgramModal').style.display = 'flex';
+    } else {
+      alert('Error loading program: ' + (result.error || 'Unknown error'));
+    }
+  } catch (err) {
+    console.error('Error fetching program:', err);
+    alert('Network error loading program');
+  }
+}
+
+function closeEditProgramModal() {
+  document.getElementById('editProgramModal').style.display = 'none';
+  currentEditProgramId = null;
+}
+
+async function saveProgramEdit() {
+  const programId = document.getElementById('editProgramId').value;
+  
+  const formData = {
+    name: document.getElementById('editProgramName').value,
+    description: document.getElementById('editProgramDescription').value,
+    category: document.getElementById('editProgramCategory').value,
+    ageMin: parseInt(document.getElementById('editAgeMin').value),
+    ageMax: parseInt(document.getElementById('editAgeMax').value),
+    duration: document.getElementById('editProgramDuration').value,
+    maxParticipants: parseInt(document.getElementById('editMaxParticipants').value),
+    priceAmount: parseFloat(document.getElementById('editPriceAmount').value),
+    priceCurrency: document.getElementById('editPriceCurrency').value,
+    status: document.getElementById('editProgramStatus').value
+  };
+  
+  const messageEl = document.getElementById('editProgramMessage');
+  messageEl.style.display = 'none';
+  
+  try {
+    const response = await fetch(`/api/programs/${programId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok && result.success) {
+      messageEl.textContent = '✓ Program updated successfully!';
+      messageEl.className = 'message success';
+      messageEl.style.display = 'block';
+      setTimeout(() => {
+        closeEditProgramModal();
+        window.location.reload();
+      }, 1000);
+    } else {
+      messageEl.textContent = '✗ ' + (result.error || 'Error updating program');
+      messageEl.className = 'message error';
+      messageEl.style.display = 'block';
+    }
+  } catch (err) {
+    console.error('Error updating program:', err);
+    messageEl.textContent = '✗ Network error';
+    messageEl.className = 'message error';
+    messageEl.style.display = 'block';
+  }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+  const editModal = document.getElementById('editProgramModal');
+  if (event.target === editModal) {
+    closeEditProgramModal();
+  }
+});
+
+
+</script>
 
     </body>
 </html>

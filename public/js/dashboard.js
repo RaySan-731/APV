@@ -85,18 +85,18 @@ document.addEventListener('DOMContentLoaded', function() {
     auditActionFilter?.addEventListener('change', updateAuditFilters);
     auditEntityFilter?.addEventListener('change', updateAuditFilters);
 
-    // ============ SCHOOLS PAGE FILTERS ============
-    const schoolSearch = document.getElementById('schoolSearch');
-    const statusFilter = document.getElementById('statusFilter');
-    const serviceStatusFilter = document.getElementById('serviceStatusFilter');
-    const zoneFilter = document.getElementById('zoneFilter');
-    const schoolSortOrder = document.getElementById('schoolSortOrder');
+     // ============ SCHOOLS PAGE FILTERS ============
+     const schoolSearch = document.getElementById('schoolSearch');
+     const schoolStatusFilter = document.getElementById('statusFilter');
+     const serviceStatusFilter = document.getElementById('serviceStatusFilter');
+     const zoneFilter = document.getElementById('zoneFilter');
+     const schoolSortOrder = document.getElementById('schoolSortOrder');
 
     const updateSchoolFilters = () => {
         const params = new URLSearchParams();
         if (schoolSearch?.value.trim()) params.set('search', schoolSearch.value.trim());
-        if (statusFilter?.value) params.set('status', statusFilter.value);
-        if (serviceStatusFilter?.value) params.set('serviceStatus', serviceStatusFilter.value);
+         if (schoolStatusFilter?.value) params.set('status', schoolStatusFilter.value);
+         if (serviceStatusFilter?.value) params.set('serviceStatus', serviceStatusFilter.value);
         if (zoneFilter?.value) params.set('zone', zoneFilter.value);
         if (schoolSortOrder?.value) {
             const [sortBy, order] = schoolSortOrder.value.split('-');
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     schoolSearch?.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), updateSchoolFilters()));
-    [statusFilter, serviceStatusFilter, zoneFilter, schoolSortOrder].forEach(el => el?.addEventListener('change', updateSchoolFilters));
+     [schoolStatusFilter, serviceStatusFilter, zoneFilter, schoolSortOrder].forEach(el => el?.addEventListener('change', updateSchoolFilters));
 
     // Close sidebar when clicking outside on mobile
     document.addEventListener('click', function(e) {
@@ -155,13 +155,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const staffSelect = document.getElementById('staffSortOrder');
-    const staffTable = document.getElementById('staffTable')?.querySelector('tbody');
-    const staffSearch = document.getElementById('staffSearch');
-    const roleFilter = document.getElementById('roleFilter');
-    const statusFilter = document.getElementById('statusFilter');
+     const staffSelect = document.getElementById('staffSortOrder');
+     const staffTable = document.getElementById('staffTable')?.querySelector('tbody');
+     const staffSearch = document.getElementById('staffSearch');
+     const roleFilter = document.getElementById('roleFilter');
+     const staffStatusFilter = document.getElementById('statusFilter');
 
-    if (staffSelect && staffTable) {
+     if (staffSelect && staffTable) {
         staffSelect.addEventListener('change', function() {
             const [sortBy, order] = this.value.split('-');
             sortStaffTable(sortBy, order);
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Normal filtering
         const searchTerm = staffSearch?.value.trim().toLowerCase() || '';
         const roleValue = roleFilter?.value || '';
-        const statusValue = statusFilter?.value || '';
+         const statusValue = staffStatusFilter?.value || '';
 
         let visibleCount = 0;
         staffRows.forEach(row => {
@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     if (roleFilter) roleFilter.addEventListener('change', filterStaffTable);
-    if (statusFilter) statusFilter.addEventListener('change', filterStaffTable);
+     if (staffStatusFilter) staffStatusFilter.addEventListener('change', filterStaffTable);
 
     // Action Dropdown Toggle
     document.addEventListener('click', function(e) {

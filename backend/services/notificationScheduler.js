@@ -18,31 +18,41 @@ class NotificationScheduler {
   constructor() {
     this.jobs = [];
     this.maxConcurrency = 5;
-    this.lastLoadCheck = 0;
-    this.CPU_THRESHOLD_MS = 200; // Total CPU time threshold in ms
+    this.lastCPUTime = 0;
+    this.CPU_CHECK_INTERVAL = 5000; // Check every 5 seconds
+    this.CPU_THRESHOLD_MS = 200; // 200ms of CPU time in interval = 4% CPU
+    this.MEMORY_THRESHOLD_MB = 400;
   }
 
   /**
-   * Check if system is under heavy load
+   * Check if system is under heavy load using delta CPU measurement
    */
   isSystemOverloaded() {
     const now = Date.now();
-    if (now - this.lastLoadCheck < 30000) return false; // Check every 30s max
 
-    this.lastLoadCheck = now;
-    const cpu = process.cpuUsage();
-    const totalCPUTime = cpu.user + cpu.system; // microseconds
+    if (now - this.lastCPUTime > this.CPU_CHECK_INTERVAL) {
+      const cpu = process.cpuUsage();
+      const totalCPUTime = (cpu.user + cpu.system) / 1000; // µs to ms
 
-    // If total CPU time since last check exceeds threshold, consider overloaded
-    if (totalCPUTime > this.CPU_THRESHOLD_MS * 1000) {
-      console.warn(`[NotificationScheduler] High CPU load detected, throttling`);
-      return true;
+      if (this.lastCPUTime > 0) {
+        const cpuDelta = totalCPUTime - this.lastCPUTime;
+        const timeDelta = now - this.lastCPUTime;
+        const cpuPercent = (cpuDelta / timeDelta) * 100;
+
+        if (cpuDelta > this.CPU_THRESHOLD_MS) {
+          console.warn(`[NotificationScheduler] High CPU load (${cpuDelta.toFixed(0)}ms in ${timeDelta}ms = ${cpuPercent.toFixed(1)}% CPU), throttling`);
+          this.lastCPUTime = totalCPUTime;
+          return true;
+        }
+      }
+
+      this.lastCPUTime = totalCPUTime;
     }
 
     const usage = process.memoryUsage();
     const memoryMB = usage.heapUsed / 1024 / 1024;
-    if (memoryMB > 400) { // 400MB threshold
-      console.warn(`[NotificationScheduler] High memory usage (${memoryMB.toFixed(0)}MB)`);
+    if (memoryMB > this.MEMORY_THRESHOLD_MB) {
+      console.warn(`[NotificationScheduler] High memory (${memoryMB.toFixed(0)}MB), throttling`);
       return true;
     }
 

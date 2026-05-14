@@ -3,9 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profit & Loss Statement - Arrow-Park Ventures</title>
+    <title>Profit & Loss Report - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .report-header {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            padding: 2rem 0;
+        }
+        .metric-card {
+            border-left: 4px solid;
+        }
+        .metric-card.positive { border-left-color: #28a745; }
+        .metric-card.negative { border-left-color: #dc3545; }
+        .metric-card.neutral { border-left-color: #6c757d; }
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .total-row {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+        .net-income-row {
+            background-color: #d4edda;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -17,7 +44,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 12h18"></path>
                         <path d="M3 6h18"></path>
-                        <path d="M3 18h18"></path>
+                        <path d="M 18h18"></path>
                     </svg>
                 </button>
                 <h1 class="page-title">Profit & Loss Statement</h1>
@@ -27,54 +54,244 @@
                         <input type="hidden" name="reportType" value="profit_loss">
                         <input type="hidden" name="startDate" value="<%= startDate %>">
                         <input type="hidden" name="endDate" value="<%= endDate %>">
-                        <button type="submit" class="btn btn-outline-success btn-sm ms-2">Export CSV</button>
+                        <button type="submit" name="export" value="csv" class="btn btn-outline-success btn-sm ms-2">Export CSV</button>
+                        <button type="submit" name="export" value="pdf" class="btn btn-success btn-sm ms-1">Export PDF</button>
                     </form>
                 </div>
             </header>
 
             <div class="container-fluid mt-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h4 class="text-center mb-4">
-                            Profit & Loss Statement<br>
-                            <small class="text-muted">
-                                <%= new Date(startDate).toLocaleDateString() %> - <%= new Date(endDate).toLocaleDateString() %>
-                            </small>
-                        </h4>
-
-                        <table class="table table-bordered">
-                            <tbody>
-                                <tr class="table-success">
-                                    <td><strong>Total Revenue</strong></td>
-                                    <td class="text-end"><strong>KES <%= (reportData.revenue || 0).toLocaleString() %></strong></td>
-                                </tr>
-                                <tr class="table-danger">
-                                    <td><strong>Total Expenses</strong></td>
-                                    <td class="text-end"><strong>KES <%= (reportData.expenses || 0).toLocaleString() %></strong></td>
-                                </tr>
-                                <tr class="table-primary">
-                                    <td><strong>Gross Profit</strong></td>
-                                    <td class="text-end"><strong>KES <%= ((reportData.revenue || 0) - (reportData.expenses || 0)).toLocaleString() %></strong></td>
-                                </tr>
-                                <tr>
-                                    <td>Trainer Payroll Costs</td>
-                                    <td class="text-end">KES <%= (reportData.payroll || 0).toLocaleString() %></td>
-                                </tr>
-                                <tr class="table-info">
-                                    <td><strong>Net Income</strong></td>
-                                    <td class="text-end"><strong>KES <%= (reportData.netIncome || 0).toLocaleString() %></strong></td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <div class="mt-4">
-                            <a href="/finance/reports" class="btn btn-outline-primary">Generate Another Report</a>
+                <!-- Report Header -->
+                <div class="report-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2 class="mb-1">Profit & Loss Statement</h2>
+                            <p class="text-muted mb-0">Period: <%= new Date(startDate).toLocaleDateString() %> to <%= new Date(endDate).toLocaleDateString() %></p>
+                            <p class="text-muted mb-0">Generated on: <%= new Date().toLocaleDateString() %></p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">Print Report</button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Key Metrics -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card metric-card positive">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Revenue</h6>
+                                <p class="fs-4 mb-0">KES <%= (reportData.revenue || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card negative">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Expenses</h6>
+                                <p class="fs-4 mb-0">KES <%= (reportData.expenses || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card negative">
+                            <div class="card-body">
+                                <h6 class="card-title">Payroll Costs</h6>
+                                <p class="fs-4 mb-0">KES <%= (reportData.payroll || 0).toLocaleString() %></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card <%= (reportData.netIncome || 0) >= 0 ? 'positive' : 'negative' %>">
+                            <div class="card-body">
+                                <h6 class="card-title">Net Income</h6>
+                                <p class="fs-4 mb-0">KES <%= (reportData.netIncome || 0).toLocaleString() %></p>
+                                <small class="<%= (reportData.netIncome || 0) >= 0 ? 'text-success' : 'text-danger' %>">
+                                    <%= (reportData.netIncome || 0) >= 0 ? 'Profit' : 'Loss' %>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed P&L Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Detailed Breakdown</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th width="50%">Category</th>
+                                        <th width="25%" class="text-end">Amount (KES)</th>
+                                        <th width="25%" class="text-end">Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Revenue Section -->
+                                    <tr>
+                                        <td colspan="3"><strong>REVENUE</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>&nbsp;&nbsp;&nbsp;&nbsp;Invoice Revenue</td>
+                                        <td class="text-end"><%= (reportData.revenue || 0).toLocaleString() %></td>
+                                        <td class="text-end">100.0%</td>
+                                    </tr>
+                                    <tr class="total-row">
+                                        <td><strong>Total Revenue</strong></td>
+                                        <td class="text-end"><strong><%= (reportData.revenue || 0).toLocaleString() %></strong></td>
+                                        <td class="text-end"><strong>100.0%</strong></td>
+                                    </tr>
+
+                                    <!-- Expenses Section -->
+                                    <tr>
+                                        <td colspan="3"><strong>EXPENSES</strong></td>
+                                    </tr>
+                                    <% if (reportData.expenseBreakdown && reportData.expenseBreakdown.length > 0) { %>
+                                        <% reportData.expenseBreakdown.forEach(expense => { %>
+                                        <tr>
+                                            <td>&nbsp;&nbsp;&nbsp;&nbsp;<%= expense.category.replace('_', ' ').toUpperCase() %></td>
+                                            <td class="text-end"><%= expense.amount.toLocaleString() %></td>
+                                            <td class="text-end"><%= reportData.expenses > 0 ? ((expense.amount / reportData.expenses) * 100).toFixed(1) : 0 %>%</td>
+                                        </tr>
+                                        <% }); %>
+                                    <% } %>
+                                    <tr class="total-row">
+                                        <td><strong>Total Operating Expenses</strong></td>
+                                        <td class="text-end"><strong><%= (reportData.expenses || 0).toLocaleString() %></strong></td>
+                                        <td class="text-end"><strong><%= reportData.revenue > 0 ? ((reportData.expenses / reportData.revenue) * 100).toFixed(1) : 0 %>%</strong></td>
+                                    </tr>
+
+                                    <!-- Payroll Section -->
+                                    <tr>
+                                        <td colspan="3"><strong>PAYROLL</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>&nbsp;&nbsp;&nbsp;&nbsp;Staff Salaries & Benefits</td>
+                                        <td class="text-end"><%= (reportData.payroll || 0).toLocaleString() %></td>
+                                        <td class="text-end"><%= reportData.revenue > 0 ? ((reportData.payroll / reportData.revenue) * 100).toFixed(1) : 0 %>%</td>
+                                    </tr>
+                                    <tr class="total-row">
+                                        <td><strong>Total Payroll</strong></td>
+                                        <td class="text-end"><strong><%= (reportData.payroll || 0).toLocaleString() %></strong></td>
+                                        <td class="text-end"><strong><%= reportData.revenue > 0 ? ((reportData.payroll / reportData.revenue) * 100).toFixed(1) : 0 %>%</strong></td>
+                                    </tr>
+
+                                    <!-- Net Income -->
+                                    <tr class="net-income-row">
+                                        <td><strong>NET INCOME</strong></td>
+                                        <td class="text-end"><strong><%= (reportData.netIncome || 0).toLocaleString() %></strong></td>
+                                        <td class="text-end"><strong><%= reportData.revenue > 0 ? ((reportData.netIncome / reportData.revenue) * 100).toFixed(1) : 0 %>%</strong></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Insights -->
+                <div class="row g-3 mt-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">Expense Analysis</h6>
+                            </div>
+                            <div class="card-body">
+                                <% if (reportData.expenseBreakdown && reportData.expenseBreakdown.length > 0) { %>
+                                <canvas id="expenseChart" width="300" height="200"></canvas>
+                                <% } else { %>
+                                <p class="text-muted">No expense data available for the selected period.</p>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">Key Insights</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-unstyled">
+                                    <li class="mb-2">
+                                        <strong>Gross Margin:</strong>
+                                        <%= reportData.revenue > 0 ? (((reportData.revenue - reportData.expenses) / reportData.revenue) * 100).toFixed(1) : 0 %>%
+                                    </li>
+                                    <li class="mb-2">
+                                        <strong>Expense Ratio:</strong>
+                                        <%= reportData.revenue > 0 ? ((reportData.expenses / reportData.revenue) * 100).toFixed(1) : 0 %>%
+                                    </li>
+                                    <li class="mb-2">
+                                        <strong>Payroll Ratio:</strong>
+                                        <%= reportData.revenue > 0 ? ((reportData.payroll / reportData.revenue) * 100).toFixed(1) : 0 %>%
+                                    </li>
+                                    <li class="mb-2">
+                                        <strong>Net Profit Margin:</strong>
+                                        <%= reportData.revenue > 0 ? ((reportData.netIncome / reportData.revenue) * 100).toFixed(1) : 0 %>%
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="text-center text-muted mt-4 pb-4">
+                    <small>Report generated by ScoutMate Hub - Arrow-Park Ventures</small>
                 </div>
             </div>
         </main>
     </div>
+
+    <script>
+        // Expense Breakdown Chart
+        <% if (reportData.expenseBreakdown && reportData.expenseBreakdown.length > 0) { %>
+        const expenseCtx = document.getElementById('expenseChart').getContext('2d');
+        new Chart(expenseCtx, {
+            type: 'pie',
+            data: {
+                labels: <%- JSON.stringify(reportData.expenseBreakdown.map(e => e.category.replace('_', ' ').toUpperCase())) %>,
+                datasets: [{
+                    data: <%- JSON.stringify(reportData.expenseBreakdown.map(e => e.amount)) %>,
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': KES ' + context.parsed.toLocaleString() + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        <% } %>
+    </script>
+
+    <style media="print">
+        .btn, .btn-group, .card-header .btn {
+            display: none !important;
+        }
+        .report-header {
+            background-color: white !important;
+            border-bottom: 2px solid black !important;
+        }
+        body {
+            font-size: 12px;
+        }
+        .container-fluid {
+            max-width: none;
+        }
+    </style>
 
     <script src="/js/main.js"></script>
 </body>

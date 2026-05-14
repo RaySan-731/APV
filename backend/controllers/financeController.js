@@ -15,63 +15,105 @@ const json2csv = require('json2csv');
 // GET: Financial Dashboard (overview for founders)
 exports.getFinancialDashboard = async (req, res) => {
   try {
-    const { dateRange = 'month', startDate, endDate, schoolId } = req.query;
+     const { dateRange = 'month', startDate, endDate, schoolId } = req.query;
 
-    const now = new Date();
-    let dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter = {
-        issueDate: { $gte: new Date(startDate), $lte: new Date(endDate) }
-      };
-    } else {
-      // Default based on dateRange
-      switch (dateRange) {
-        case 'week':
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          dateFilter = { issueDate: { $gte: weekAgo } };
-          break;
-        case 'month':
-          const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          dateFilter = { issueDate: { $gte: monthAgo } };
-          break;
-        case 'quarter':
-          const quarterAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-          dateFilter = { issueDate: { $gte: quarterAgo } };
-          break;
-        case 'year':
-          const yearAgo = new Date(now.getFullYear() - 1, 0, 1);
-          dateFilter = { issueDate: { $gte: yearAgo } };
-          break;
-      }
-    }
+     const now = new Date();
+     let dateFilter = {}; // for invoices (issueDate)
+     let expenseDateFilter = {}; // for expenses (paidDate)
 
-    // Build school filter
-    const schoolFilter = schoolId ? { schoolId: mongoose.Types.ObjectId(schoolId) } : {};
+     const setDateFilters = (issueDateGte) => {
+       dateFilter = { issueDate: { $gte: issueDateGte } };
+       expenseDateFilter = { paidDate: { $gte: issueDateGte } };
+     };
 
-    // Key metrics
-    const [
-      revenueSummary,
-      expenseSummary,
-      topSchools,
-      monthlyTrend,
-      expenseByCategory,
-      budgetAlerts
-    ] = await Promise.all([
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          return res.status(400).render('404', {
+            user: req.session.user,
+            error: 'Invalid date format. Use YYYY-MM-DD.'
+          });
+        }
+        dateFilter = { issueDate: { $gte: start, $lte: end } };
+        expenseDateFilter = { paidDate: { $gte: start, $lte: end } };
+      } else {
+       // Default based on dateRange
+       switch (dateRange) {
+         case 'week':
+           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+           setDateFilters(weekAgo);
+           break;
+         case 'month':
+           const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+           setDateFilters(monthAgo);
+           break;
+         case 'quarter':
+           const quarterAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+           setDateFilters(quarterAgo);
+           break;
+         case 'year':
+           const yearAgo = new Date(now.getFullYear() - 1, 0, 1);
+           setDateFilters(yearAgo);
+           break;
+         default:
+           // No filter
+           break;
+       }
+     }
+
+ // Build school filter - validate ObjectId if provided
+     let schoolFilter = {};
+     if (schoolId) {
+       if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+         return res.status(400).render('404', { 
+           user: req.session.user, 
+           error: 'Invalid school identifier' 
+         });
+       }
+       schoolFilter = { schoolId: mongoose.Types.ObjectId(schoolId) };
+     }
+
+     // Key metrics
+     const [
+       revenueSummary,
+       expenseSummary,
+       topSchools,
+       monthlyRevenueAgg,
+       monthlyExpensesAgg,
+       expenseByCategory,
+       budgetAlerts,
+       paymentMethods
+     ] = await Promise.all([
       // Revenue metrics (invoices)
       Invoice.aggregate([
-        { $match: { ...dateFilter, status: { $in: ['issued', 'sent', 'partial', 'paid'] } } },
-        { $match: schoolId ? { schoolId: mongoose.Types.ObjectId(schoolId) } : {} },
+        { $match: { ...dateFilter, status: { $in: ['issued', 'sent', 'partial', 'paid'] }, ...schoolFilter } },
         {
           $group: {
             _id: null,
             totalRevenue: { $sum: '$totalAmount' },
             totalCollected: { $sum: '$amountPaid' },
-            outstandingBalance: { $sum: '$balance' },
+            outstandingBalance: { $sum: { $subtract: ['$totalAmount', '$amountPaid'] } },
             invoiceCount: { $sum: 1 },
+            overdueAmount: {
+              $sum: {
+                $cond: [
+                  { $and: [
+                    { $eq: ['$status', 'overdue'] },
+                    { $gt: [{ $subtract: ['$totalAmount', '$amountPaid'] }, 0] }
+                  ] },
+                  { $subtract: ['$totalAmount', '$amountPaid'] },
+                  0
+                ]
+              }
+            },
             overdueCount: {
               $sum: {
                 $cond: [
-                  { $and: [{ $eq: ['$status', 'overdue'] }, { $gt: ['$balance', 0] }] },
+                  { $and: [
+                    { $eq: ['$status', 'overdue'] },
+                    { $gt: [{ $subtract: ['$totalAmount', '$amountPaid'] }, 0] }
+                  ] },
                   1,
                   0
                 ]
@@ -80,10 +122,19 @@ exports.getFinancialDashboard = async (req, res) => {
           }
         }
       ]),
-      // Expense metrics
+      // Expense metrics summary
       Expense.aggregate([
-        { $match: { ...dateFilter, status: 'approved' } },
-        { $match: schoolId ? { schoolId: mongoose.Types.ObjectId(schoolId) } : {} },
+        {
+          $match: {
+            status: 'approved',
+            ...schoolFilter,
+            paidDate: {
+              ...(expenseDateFilter.paidDate || {}),
+              $exists: true,
+              $ne: null
+            }
+          }
+        },
         {
           $group: {
             _id: null,
@@ -95,16 +146,16 @@ exports.getFinancialDashboard = async (req, res) => {
       ]),
       // Top schools by revenue
       Invoice.aggregate([
-        { $match: { ...dateFilter, status: { $in: ['issued', 'sent', 'partial', 'paid'] } } },
+        { $match: { ...dateFilter, status: { $in: ['issued', 'sent', 'partial', 'paid'] }, ...schoolFilter } },
         {
           $group: {
             _id: '$schoolId',
             totalRevenue: { $sum: '$totalAmount' },
+            totalCollected: { $sum: '$amountPaid' },
+            outstanding: { $sum: { $subtract: ['$totalAmount', '$amountPaid'] } },
             invoiceCount: { $sum: 1 }
           }
         },
-        { $sort: { totalRevenue: -1 } },
-        { $limit: 10 },
         {
           $lookup: {
             from: 'schools',
@@ -118,16 +169,28 @@ exports.getFinancialDashboard = async (req, res) => {
           $project: {
             schoolName: '$school.name',
             totalRevenue: 1,
-            invoiceCount: 1
+            totalCollected: 1,
+            outstanding: 1,
+            invoiceCount: 1,
+            collectionRate: {
+              $cond: [
+                { $eq: ['$totalRevenue', 0] },
+                0,
+                { $multiply: [{ $divide: ['$totalCollected', '$totalRevenue'] }, 100] }
+              ]
+            }
           }
-        }
+        },
+        { $sort: { totalRevenue: -1 } },
+        { $limit: 10 }
       ]),
-      // Monthly revenue trend (last 12 months)
+      // Monthly revenue aggregation
       Invoice.aggregate([
         {
           $match: {
-            issueDate: { $gte: new Date(now.getFullYear() - 1, 0, 1) },
-            status: { $in: ['issued', 'sent', 'partial', 'paid'] }
+            ...dateFilter,
+            status: { $in: ['issued', 'sent', 'partial', 'paid'] },
+            ...schoolFilter
           }
         },
         {
@@ -139,65 +202,188 @@ exports.getFinancialDashboard = async (req, res) => {
         },
         { $sort: { _id: 1 } }
       ]),
-      // Expenses by category
+       // Monthly expenses aggregation
       Expense.aggregate([
-        { $match: { ...dateFilter, status: 'approved' } },
         {
-          $group: {
-            _id: '$category',
-            total: { $sum: '$netAmount' },
-            count: { $sum: 1 }
+          $match: {
+            status: 'approved',
+            ...schoolFilter,
+            paidDate: {
+              ...(expenseDateFilter.paidDate || {}),
+              $exists: true,
+              $ne: null
+            }
           }
         },
-        { $sort: { total: -1 } }
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$paidDate' } },
+            expenses: { $sum: '$netAmount' }
+          }
+        },
+        { $sort: { _id: 1 } }
       ]),
+       // Expenses by category
+       Expense.aggregate([
+         {
+           $match: {
+             status: 'approved',
+             ...schoolFilter,
+             paidDate: {
+               ...(expenseDateFilter.paidDate || {}),
+               $exists: true,
+               $ne: null
+             }
+           }
+         },
+         {
+           $group: {
+             _id: '$category',
+             totalAmount: { $sum: '$netAmount' },
+             count: { $sum: 1 }
+           }
+         },
+         { $sort: { totalAmount: -1 } }
+       ]),
       // Budget alerts
       Budget.find({
         status: 'active',
         alertTriggered: true
-      }).populate('eventId', 'name').limit(10).lean()
+      }).populate('eventId', 'name').limit(10).lean(),
+      // Payment methods summary
+      Payment.aggregate([
+        { $match: { status: 'completed', ...(schoolId && { schoolId: mongoose.Types.ObjectId(schoolId) }) } },
+        {
+          $group: {
+            _id: '$method',
+            totalAmount: { $sum: '$amount' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { totalAmount: -1 } }
+      ])
     ]);
 
+    // Merge monthly revenue and expenses into trend data
+    const monthMap = new Map();
+
+    monthlyRevenueAgg.forEach(item => {
+      monthMap.set(item._id, { month: item._id, revenue: item.revenue || 0, expenses: 0 });
+    });
+
+    monthlyExpensesAgg.forEach(item => {
+      const month = item._id;
+      if (monthMap.has(month)) {
+        monthMap.get(month).expenses = item.expenses || 0;
+      } else {
+        monthMap.set(month, { month, revenue: 0, expenses: item.expenses || 0 });
+      }
+    });
+
+    const monthlyTrend = Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month));
+    monthlyTrend.forEach(m => {
+      m.netIncome = (m.revenue || 0) - (m.expenses || 0);
+    });
+
+    // Normalize budget alerts
+    const alertData = budgetAlerts.map(alert => ({
+      ...alert,
+      eventName: alert.eventId?.name || '',
+      remaining: (alert.totalAllocated || 0) - (alert.totalSpent || 0),
+      usagePercent: alert.totalAllocated > 0 ? ((alert.totalSpent || 0) / alert.totalAllocated) * 100 : 0
+    }));
+
     // Calculate net income
-    const revenue = revenueSummary[0] || { totalRevenue: 0, totalCollected: 0, outstandingBalance: 0, invoiceCount: 0, overdueCount: 0 };
+    const revenue = revenueSummary[0] || { totalRevenue: 0, totalCollected: 0, outstandingBalance: 0, invoiceCount: 0, overdueAmount: 0, overdueCount: 0 };
     const expenses = expenseSummary[0] || { totalExpenses: 0, expenseCount: 0, avgExpense: 0 };
-    const netIncome = revenue.totalRevenue - expenses.totalExpenses;
+    const netIncome = revenue.totalCollected - expenses.totalExpenses;
 
-    // Profit margin
-    const profitMargin = revenue.totalRevenue > 0 ? (netIncome / revenue.totalRevenue) * 100 : 0;
-
-    const stats = {
+    const summary = {
       totalRevenue: revenue.totalRevenue,
       totalCollected: revenue.totalCollected,
-      outstandingInvoices: revenue.outstandingBalance,
-      overdueInvoices: revenue.overdueCount,
+      outstandingBalance: revenue.outstandingBalance,
       invoiceCount: revenue.invoiceCount,
       totalExpenses: expenses.totalExpenses,
       expenseCount: expenses.expenseCount,
       netIncome,
-      profitMargin,
-      topSchools
+      overdueAmount: revenue.overdueAmount,
+      overdueCount: revenue.overdueCount
     };
 
-    res.render('finance/dashboard', {
-      user: req.session.user,
-      page: 'finance/dashboard',
-      stats,
-      monthlyTrend,
-      expenseByCategory,
-      budgetAlerts,
-      dateRange,
-      startDate,
-      endDate,
-      schoolId,
-      schools: await School.find({}).select('_id name').lean()
-    });
+     res.render('finance/dashboard', {
+       user: req.session.user,
+       page: 'finance/dashboard',
+       summary,
+       monthlyTrend,
+       topSchools, // <<< ADDED
+       expenseByCategory,
+       budgetAlerts: alertData,
+       paymentMethods,
+       dateRange,
+       startDate,
+       endDate,
+       schoolId,
+       schools: await School.find({}).select('_id name').lean()
+     });
   } catch (err) {
     console.error('Error loading finance dashboard:', err);
     res.status(500).render('404', { user: req.session.user, error: 'Failed to load dashboard' });
   }
 };
+// Helper: Get monthly trends data
+exports.getMonthlyTrends = async (dateFilter, schoolId) => {
+  const now = new Date();
+  const trends = [];
 
+  // Get last 12 months of data
+  for (let i = 11; i >= 0; i--) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+
+    const [revenue, expenses] = await Promise.all([
+      Invoice.aggregate([
+        {
+          $match: {
+            issueDate: { $gte: monthStart, $lte: monthEnd },
+            status: { $in: ['issued', 'sent', 'partial', 'paid'] },
+            ...(schoolId && { schoolId: mongoose.Types.ObjectId(schoolId) })
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            invoiced: { $sum: '$totalAmount' },
+            collected: { $sum: '$amountPaid' }
+          }
+        }
+      ]),
+      Expense.aggregate([
+        {
+          $match: {
+            paidDate: { $gte: monthStart, $lte: monthEnd },
+            status: 'approved',
+            ...(schoolId && { schoolId: mongoose.Types.ObjectId(schoolId) })
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$netAmount' }
+          }
+        }
+      ])
+    ]);
+
+    trends.push({
+      month: monthStart.toISOString().slice(0, 7), // YYYY-MM format
+      revenue: revenue[0]?.collected || 0,
+      expenses: expenses[0]?.total || 0,
+      netIncome: (revenue[0]?.collected || 0) - (expenses[0]?.total || 0)
+    });
+  }
+
+  return trends;
+};
 // GET: Financial reports (P&L, school revenue, trainer costs)
 exports.getFinancialReports = async (req, res) => {
   try {

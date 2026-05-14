@@ -21,6 +21,8 @@ const expenseController = require('../controllers/expenseController');
 const budgetController = require('../controllers/budgetController');
 const servicePackageController = require('../controllers/servicePackageController');
 const financeController = require('../controllers/financeController');
+const paymentController = require('../controllers/paymentController');
+const financialReportsController = require('../controllers/financialReportsController');
 
 // Middleware: Ensure user is authenticated and has finance permissions
 const requireFinanceAccess = (req, res, next) => {
@@ -99,9 +101,32 @@ router.post('/invoices/:id/cancel', requireFinanceAccess, invoiceController.canc
 router.post('/invoices/:id/send-reminder', requireFinanceAccess, invoiceController.sendReminder);
 router.get('/invoices/:id/download', requireFinanceAccess, invoiceController.downloadInvoicePDF);
 
+// Auto-generate invoice routes
+router.post('/invoices/generate/event', requireFinanceAccess, invoiceController.generateEventInvoices);
+router.post('/invoices/generate/program', requireFinanceAccess, invoiceController.generateProgramInvoices);
+router.get('/invoices/overdue', requireFinanceAccess, invoiceController.getOverdueAccounts);
+
+// ========== PAYMENTS ==========
+router.get('/payments', requireFinanceAccess, paymentController.getPayments);
+router.get('/payments/create', requireFinanceAccess, paymentController.getCreatePayment);
+router.post('/payments/create', requireFinanceAccess, receiptUpload.single('receipt'), paymentController.createPayment);
+router.get('/payments/:id', requireFinanceAccess, paymentController.getPayment);
+router.post('/payments/:id/cancel', requireFinanceAccess, paymentController.cancelPayment);
+router.get('/payments/overdue', requireFinanceAccess, paymentController.getOverduePayments);
+router.post('/payments/:id/send-reminder', requireFinanceAccess, paymentController.sendPaymentReminder);
+router.get('/api/payments/methods-summary', requireFinanceAccess, paymentController.getPaymentMethodsSummary);
+
+// ========== FINANCIAL REPORTS ==========
+router.get('/reports', requireFinanceAccess, financialReportsController.getFinancialReports);
+router.get('/reports/pl-summary', requireFinanceAccess, financialReportsController.getPLReport);
+router.get('/reports/school-revenue', requireFinanceAccess, financialReportsController.getSchoolRevenueReport);
+router.get('/reports/trainer-costs', requireFinanceAccess, financialReportsController.getTrainerCostReport);
+router.get('/reports/trends', requireFinanceAccess, financialReportsController.getFinancialTrends);
+router.get('/api/reports/revenue-expenses', requireFinanceAccess, financialReportsController.getRevenueVsExpenses);
+
 // Record payment against invoice
-router.post('/invoices/:id/payments', requireFinanceAccess, (req, res) => {
-  const { amount, paymentDate, method, reference, notes } = req.body;
+router.post('/invoices/:id/payments', requireFinanceAccess, receiptUpload.single('receipt'), (req, res) => {
+  req.body.invoiceId = req.params.id;
   invoiceController.recordPayment(req, res);
 });
 

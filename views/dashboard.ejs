@@ -3943,5 +3943,56 @@ document.addEventListener('click', function(event) {
 
 </script>
 
+<!-- Allocate Schools Modal -->
+<div id='allocateSchoolsModal' class='modal' style='display: none;'>
+  <div class='modal-content'>
+    <div class='modal-header'>
+      <h3>Allocate Schools to <span id='allocateTrainerName'></span></h3>
+      <button type='button' class='close-btn' onclick='closeAllocateSchoolsModal()'>×</button>
+    </div>
+    <div class='modal-body'>
+      <div id='allocateMessage' class='message' style='display:none; margin-top:1rem;'></div>
+      <input type='hidden' id='allocateTrainerId'>
+      <div id='allocateSchoolsList' style='max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem; background: white;'>
+        <!-- Schools will be populated dynamically -->
+      </div>
+    </div>
+    <div class='modal-footer'>
+      <button type='button' class='btn btn-secondary' onclick='closeAllocateSchoolsModal()'>Cancel</button>
+      <button type='button' class='btn btn-primary' onclick='saveSchoolAllocation()'>Save Allocation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Trainer Modal -->
+<div id='editTrainerModal' class='modal' style='display: none;'>
+  <div class='modal-content'>
+    <div class='modal-header'>
+      <h3>Edit Trainer</h3>
+      <button type='button' class='close-btn' onclick='closeEditTrainerModal()'>×</button>
+    </div>
+    <div class='modal-body'>
+      <form id='editTrainerForm' class='form-grid' onsubmit='return false;'>
+        <input type='hidden' id='editTrainerId'>
+        <label>ID Number<input type='text' id='editTrainerIdNumber' name='idNumber'></label>
+        <label>Name<input type='text' id='editTrainerName' name='name' required></label>
+        <label>Email<input type='email' id='editTrainerEmail' name='email' required></label>
+        <label>Phone<input type='tel' id='editTrainerPhone' name='phone'></label>
+        <label>Status<select id='editTrainerStatus' name='status' required>
+          <option value='Active'>Active</option>
+          <option value='On Leave'>On Leave</option>
+          <option value='Inactive'>Inactive</option>
+          <option value='Suspended'>Suspended</option>
+        </select></label>
+        <div id='editTrainerMessage' class='message' style='display:none; grid-column: 1 / -1; margin-top:1rem;'></div>
+      </form>
+    </div>
+    <div class='modal-footer'>
+      <button type='button' class='btn btn-secondary' onclick='closeEditTrainerModal()'>Cancel</button>
+      <button type='button' class='btn btn-primary' onclick='saveEditTrainer()'>Save Changes</button>
+    </div>
+  </div>
+</div>
+
     </body>
 </html>

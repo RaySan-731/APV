@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Record Payment - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        .invoice-preview {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .payment-method-card {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .payment-method-card:hover {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        .payment-method-card.selected {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <%- include('../partials/sidebar', { user, page: 'finance/payments' }) %>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Record Payment</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/payments" class="btn btn-outline-secondary btn-sm">Back to Payments</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">Payment Details</h6>
+                            </div>
+                            <div class="card-body">
+                                <form id="paymentForm" action="/finance/payments" method="POST" enctype="multipart/form-data">
+                                    <!-- Invoice Selection -->
+                                    <div class="mb-3">
+                                        <label for="invoiceId" class="form-label">Invoice <span class="text-danger">*</span></label>
+                                        <select name="invoiceId" id="invoiceId" class="form-select" required onchange="loadInvoiceDetails()">
+                                            <option value="">Select Invoice</option>
+                                            <% invoices.forEach(invoice => { %>
+                                                <option value="<%= invoice._id %>" data-school="<%= invoice.school.name %>" data-amount="<%= invoice.totalAmount %>" data-paid="<%= invoice.amountPaid %>" data-balance="<%= invoice.balance %>">
+                                                    #<%= invoice.invoiceNumber %> - <%= invoice.school.name %> (KES <%= invoice.balance.toLocaleString() %> outstanding)
+                                                </option>
+                                            <% }); %>
+                                        </select>
+                                    </div>
+
+                                    <!-- Invoice Preview -->
+                                    <div id="invoicePreview" class="invoice-preview" style="display: none;">
+                                        <h6>Invoice Details</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p><strong>School:</strong> <span id="previewSchool"></span></p>
+                                                <p><strong>Total Amount:</strong> KES <span id="previewTotal"></span></p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p><strong>Amount Paid:</strong> KES <span id="previewPaid"></span></p>
+                                                <p><strong>Outstanding:</strong> KES <span id="previewBalance"></span></p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Payment Amount -->
+                                    <div class="mb-3">
+                                        <label for="amount" class="form-label">Payment Amount (KES) <span class="text-danger">*</span></label>
+                                        <input type="number" name="amount" id="amount" class="form-control" min="1" step="0.01" required>
+                                        <div class="form-text">Enter the amount being paid. Cannot exceed outstanding balance.</div>
+                                    </div>
+
+                                    <!-- Payment Method -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Payment Method <span class="text-danger">*</span></label>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <div class="payment-method-card card p-3 text-center" data-method="mpesa">
+                                                    <input type="radio" name="method" value="mpesa" class="d-none" required>
+                                                    <img src="/images/mpesa-icon.png" alt="M-Pesa" class="mb-2" style="height: 40px;" onerror="this.innerHTML='📱'">
+                                                    <h6 class="mb-1">M-Pesa</h6>
+                                                    <small class="text-muted">Mobile money payment</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="payment-method-card card p-3 text-center" data-method="bank_transfer">
+                                                    <input type="radio" name="method" value="bank_transfer" class="d-none">
+                                                    <svg class="mb-2" width="40" height="40" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"/>
+                                                    </svg>
+                                                    <h6 class="mb-1">Bank Transfer</h6>
+                                                    <small class="text-muted">Direct bank transfer</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="payment-method-card card p-3 text-center" data-method="cash">
+                                                    <input type="radio" name="method" value="cash" class="d-none">
+                                                    <svg class="mb-2" width="40" height="40" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4z"/>
+                                                    </svg>
+                                                    <h6 class="mb-1">Cash</h6>
+                                                    <small class="text-muted">Cash payment</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="payment-method-card card p-3 text-center" data-method="cheque">
+                                                    <input type="radio" name="method" value="cheque" class="d-none">
+                                                    <svg class="mb-2" width="40" height="40" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                    <h6 class="mb-1">Cheque</h6>
+                                                    <small class="text-muted">Cheque payment</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Payment Reference -->
+                                    <div class="mb-3">
+                                        <label for="reference" class="form-label">Payment Reference</label>
+                                        <input type="text" name="reference" id="reference" class="form-control" placeholder="Transaction ID, receipt number, etc.">
+                                        <div class="form-text">Optional reference number for tracking this payment</div>
+                                    </div>
+
+                                    <!-- Payment Date -->
+                                    <div class="mb-3">
+                                        <label for="paymentDate" class="form-label">Payment Date <span class="text-danger">*</span></label>
+                                        <input type="date" name="paymentDate" id="paymentDate" class="form-control" required value="<%= new Date().toISOString().split('T')[0] %>">
+                                    </div>
+
+                                    <!-- Receipt Upload -->
+                                    <div class="mb-3">
+                                        <label for="receipt" class="form-label">Receipt/Proof of Payment</label>
+                                        <input type="file" name="receipt" id="receipt" class="form-control" accept="image/*,.pdf">
+                                        <div class="form-text">Upload receipt image or PDF (optional)</div>
+                                    </div>
+
+                                    <!-- Notes -->
+                                    <div class="mb-3">
+                                        <label for="notes" class="form-label">Notes</label>
+                                        <textarea name="notes" id="notes" class="form-control" rows="3" placeholder="Additional payment notes..."></textarea>
+                                    </div>
+
+                                    <!-- Submit Buttons -->
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <a href="/finance/payments" class="btn btn-outline-secondary">Cancel</a>
+                                        <button type="submit" class="btn btn-primary">Record Payment</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Payment method selection
+        document.querySelectorAll('.payment-method-card').forEach(card => {
+            card.addEventListener('click', function() {
+                // Remove selected class from all cards
+                document.querySelectorAll('.payment-method-card').forEach(c => c.classList.remove('selected'));
+                // Add selected class to clicked card
+                this.classList.add('selected');
+                // Check the radio button
+                const radio = this.querySelector('input[type="radio"]');
+                radio.checked = true;
+            });
+        });
+
+        // Load invoice details
+        function loadInvoiceDetails() {
+            const select = document.getElementById('invoiceId');
+            const selectedOption = select.options[select.selectedIndex];
+            const preview = document.getElementById('invoicePreview');
+
+            if (selectedOption.value) {
+                document.getElementById('previewSchool').textContent = selectedOption.getAttribute('data-school');
+                document.getElementById('previewTotal').textContent = parseFloat(selectedOption.getAttribute('data-amount')).toLocaleString();
+                document.getElementById('previewPaid').textContent = parseFloat(selectedOption.getAttribute('data-paid')).toLocaleString();
+                document.getElementById('previewBalance').textContent = parseFloat(selectedOption.getAttribute('data-balance')).toLocaleString();
+
+                // Set max amount to outstanding balance
+                document.getElementById('amount').max = selectedOption.getAttribute('data-balance');
+
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        // Form validation
+        document.getElementById('paymentForm').addEventListener('submit', function(e) {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const maxAmount = parseFloat(document.getElementById('amount').max);
+
+            if (amount > maxAmount) {
+                e.preventDefault();
+                alert('Payment amount cannot exceed the outstanding balance of KES ' + maxAmount.toLocaleString());
+                return false;
+            }
+
+            if (amount <= 0) {
+                e.preventDefault();
+                alert('Payment amount must be greater than zero');
+                return false;
+            }
+        });
+
+        // Auto-format amount input
+        document.getElementById('amount').addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value < 0) this.value = 0;
+        });
+    </script>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Management - Arrow-Park Ventures</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .payment-method-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <%- include('../partials/sidebar', { user, page: 'finance/payments' }) %>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="dashboard-header">
+                <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                </button>
+                <h1 class="page-title">Payment Management</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/payments/create" class="btn btn-primary btn-sm">Record Payment</a>
+                    <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm ms-2">Back to Dashboard</a>
+                </div>
+            </header>
+
+            <div class="container-fluid mt-4">
+                <!-- Filters -->
+                <form method="GET" action="/finance/payments" class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <select name="status" class="form-select" onchange="this.form.submit()">
+                            <option value="">All Statuses</option>
+                            <option value="pending" <%= status === 'pending' ? 'selected' : '' %>>Pending</option>
+                            <option value="completed" <%= status === 'completed' ? 'selected' : '' %>>Completed</option>
+                            <option value="failed" <%= status === 'failed' ? 'selected' : '' %>>Failed</option>
+                            <option value="cancelled" <%= status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select name="method" class="form-select" onchange="this.form.submit()">
+                            <option value="">All Methods</option>
+                            <option value="mpesa" <%= method === 'mpesa' ? 'selected' : '' %>>M-Pesa</option>
+                            <option value="bank_transfer" <%= method === 'bank_transfer' ? 'selected' : '' %>>Bank Transfer</option>
+                            <option value="cash" <%= method === 'cash' ? 'selected' : '' %>>Cash</option>
+                            <option value="cheque" <%= method === 'cheque' ? 'selected' : '' %>>Cheque</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" name="startDate" class="form-control" value="<%= startDate || '' %>" onchange="this.form.submit()">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" name="endDate" class="form-control" value="<%= endDate || '' %>" onchange="this.form.submit()">
+                    </div>
+                </form>
+
+                <!-- Summary Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Total Payments</h6>
+                                <p class="fs-4 mb-0 text-primary">KES <%= (summary.totalAmount || 0).toLocaleString() %></p>
+                                <small class="text-muted"><%= summary.totalCount || 0 %> transactions</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Completed</h6>
+                                <p class="fs-4 mb-0 text-success">KES <%= (summary.completedAmount || 0).toLocaleString() %></p>
+                                <small class="text-muted"><%= summary.completedCount || 0 %> transactions</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Pending</h6>
+                                <p class="fs-4 mb-0 text-warning">KES <%= (summary.pendingAmount || 0).toLocaleString() %></p>
+                                <small class="text-muted"><%= summary.pendingCount || 0 %> transactions</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Failed</h6>
+                                <p class="fs-4 mb-0 text-danger">KES <%= (summary.failedAmount || 0).toLocaleString() %></p>
+                                <small class="text-muted"><%= summary.failedCount || 0 %> transactions</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payments Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Payment Records</h6>
+                    </div>
+                    <div class="card-body">
+                        <% if (payments && payments.length > 0) { %>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>School</th>
+                                        <th>Invoice</th>
+                                        <th>Amount</th>
+                                        <th>Method</th>
+                                        <th>Reference</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% payments.forEach(payment => { %>
+                                    <tr>
+                                        <td><%= new Date(payment.createdAt).toLocaleDateString() %></td>
+                                        <td>
+                                            <% if (payment.invoice && payment.invoice.school) { %>
+                                                <%= payment.invoice.school.name %>
+                                            <% } else { %>
+                                                <span class="text-muted">N/A</span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (payment.invoice) { %>
+                                                <a href="/finance/invoices/<%= payment.invoice._id %>">#<%= payment.invoice.invoiceNumber %></a>
+                                            <% } else { %>
+                                                <span class="text-muted">N/A</span>
+                                            <% } %>
+                                        </td>
+                                        <td>KES <%= payment.amount.toLocaleString() %></td>
+                                        <td>
+                                            <span class="d-flex align-items-center">
+                                                <% if (payment.method === 'mpesa') { %>
+                                                    <img src="/images/mpesa-icon.png" alt="M-Pesa" class="payment-method-icon" onerror="this.style.display='none'">
+                                                <% } else if (payment.method === 'bank_transfer') { %>
+                                                    <svg class="payment-method-icon" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"/>
+                                                    </svg>
+                                                <% } else if (payment.method === 'cash') { %>
+                                                    <svg class="payment-method-icon" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4z"/>
+                                                    </svg>
+                                                <% } %>
+                                                <%= payment.method.replace('_', ' ').toUpperCase() %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <% if (payment.reference) { %>
+                                                <%= payment.reference %>
+                                            <% } else { %>
+                                                <span class="text-muted">-</span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <span class="badge status-badge bg-<%= payment.status === 'completed' ? 'success' : payment.status === 'pending' ? 'warning' : payment.status === 'failed' ? 'danger' : 'secondary' %>">
+                                                <%= payment.status.toUpperCase() %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="/finance/payments/<%= payment._id %>" class="btn btn-outline-primary btn-sm">View</a>
+                                                <% if (payment.status === 'pending') { %>
+                                                    <button class="btn btn-outline-success btn-sm" onclick="updatePaymentStatus('<%= payment._id %>', 'completed')">Complete</button>
+                                                <% } %>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <% if (totalPages > 1) { %>
+                        <nav aria-label="Payment pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                <% if (currentPage > 1) { %>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<%= currentPage - 1 %>&status=<%= status %>&method=<%= method %>&startDate=<%= startDate %>&endDate=<%= endDate %>">Previous</a>
+                                    </li>
+                                <% } %>
+
+                                <% for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) { %>
+                                    <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                                        <a class="page-link" href="?page=<%= i %>&status=<%= status %>&method=<%= method %>&startDate=<%= startDate %>&endDate=<%= endDate %>"><%= i %></a>
+                                    </li>
+                                <% } %>
+
+                                <% if (currentPage < totalPages) { %>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<%= currentPage + 1 %>&status=<%= status %>&method=<%= method %>&startDate=<%= startDate %>&endDate=<%= endDate %>">Next</a>
+                                    </li>
+                                <% } %>
+                            </ul>
+                        </nav>
+                        <% } %>
+                        <% } else { %>
+                        <div class="text-center py-5">
+                            <svg class="mb-3" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            <h5 class="text-muted">No payments found</h5>
+                            <p class="text-muted">No payment records match your current filters.</p>
+                            <a href="/finance/payments/create" class="btn btn-primary">Record First Payment</a>
+                        </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function updatePaymentStatus(paymentId, status) {
+            if (confirm('Are you sure you want to mark this payment as ' + status + '?')) {
+                fetch('/finance/payments/' + paymentId + '/status', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: status })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error updating payment status: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error updating payment status');
+                });
+            }
+        }
+    </script>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

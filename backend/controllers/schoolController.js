@@ -612,17 +612,99 @@ exports.removeProgram = async (req, res) => {
       }
     );
 
-    res.json({
-      success: true,
-      message: 'Program removed successfully'
-    });
-  } catch (err) {
-    console.error('Remove program error:', err);
-    res.status(500).json({ success: false, error: 'Failed to remove program' });
-  }
-};
+     res.json({
+       success: true,
+       message: 'Program removed successfully'
+     });
+   } catch (err) {
+     console.error('Remove program error:', err);
+     res.status(500).json({ success: false, error: 'Failed to remove program' });
+   }
+ };
 
-// Helper: Calculate pending actions
+ // --- Additional School Admin API endpoints ---
+
+ // Get school's events (placeholder)
+ exports.getEvents = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Get event details (placeholder)
+ exports.getEventDetails = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Update event attendance (placeholder)
+ exports.updateEventAttendance = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Get invoices for school (JSON API)
+ exports.getInvoices = async (req, res) => {
+   try {
+     const invoices = await Invoice.find({ schoolId: req.schoolId })
+       .sort({ issueDate: -1 })
+       .lean();
+     res.json({ success: true, invoices });
+   } catch (err) {
+     res.status(500).json({ success: false, error: err.message });
+   }
+ };
+
+ // Download invoice (placeholder - could forward to finance controller)
+ exports.downloadInvoice = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Raise payment query (placeholder)
+ exports.raisePaymentQuery = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Get school documents (placeholder)
+ exports.getDocuments = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Upload document (placeholder)
+ exports.uploadDocument = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Get school messages (placeholder)
+ exports.getMessages = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Send message (placeholder)
+ exports.sendMessage = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Get notifications (placeholder)
+ exports.getNotifications = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Mark notification as read (placeholder)
+ exports.markNotificationRead = async (req, res) => {
+   res.status(501).json({ success: false, error: 'Not implemented' });
+ };
+
+ // Get available programs for school to enroll (programs not already enrolled)
+ exports.getAvailablePrograms = async (req, res) => {
+   try {
+     const school = await School.findById(req.schoolId).select('programsEnrolled');
+     const programs = await Program.find({
+       _id: { $nin: school.programsEnrolled || [] }
+     }).select('name description category duration price');
+     res.json({ success: true, programs });
+   } catch (err) {
+     res.status(500).json({ success: false, error: err.message });
+   }
+ };
+
+ // Helper: Calculate pending actions
 async function calculatePendingActions(schoolId, staffId) {
   const actions = [];
 

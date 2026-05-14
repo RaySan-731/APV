@@ -6,13 +6,17 @@
     <title>Financial Dashboard - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-      /* Additional finance-specific styles can go here */
       .finance-card { border-left: 4px solid #007bff; }
       .finance-card.bg-primary { background-color: #007bff; color: white; }
       .finance-card.bg-success { background-color: #28a745; color: white; }
       .finance-card.bg-warning { background-color: #ffc107; color: black; }
       .finance-card.bg-info { background-color: #17a2b8; color: white; }
+      .finance-card.bg-danger { background-color: #dc3545; color: white; }
+      .chart-container { position: relative; height: 300px; width: 100%; }
+      .alert-budget { border-left: 4px solid #ffc107; }
+      .overdue-highlight { background-color: #fff3cd; border: 1px solid #ffeaa7; }
     </style>
 </head>
 <body>
@@ -31,6 +35,10 @@
                     </svg>
                 </button>
                 <h1 class="page-title">Financial Dashboard</h1>
+                <div class="btn-toolbar">
+                    <a href="/finance/reports" class="btn btn-outline-primary btn-sm">Reports</a>
+                    <a href="/finance/invoices/create" class="btn btn-primary btn-sm ms-2">New Invoice</a>
+                </div>
             </header>
 
             <div class="container-fluid mt-4">
@@ -55,152 +63,182 @@
                         <select name="schoolId" class="form-select" onchange="this.form.submit()">
                             <option value="">All Schools</option>
                             <% schools.forEach(school => { %>
-                                <option value="<%= school._id %>" <%= schoolId == school._id ? 'selected' : '' %>><%= school.name %></option>
+                                <option value="<%= school._id %>" <%= schoolId === school._id.toString() ? 'selected' : '' %>><%= school.name %></option>
                             <% }); %>
                         </select>
                     </div>
                 </form>
 
-                <!-- Key Stats Cards -->
+                <!-- Key Metrics Cards -->
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
-                        <div class="card bg-primary text-white">
+                        <div class="card finance-card bg-primary">
                             <div class="card-body">
-                                <h5 class="card-title">Total Revenue</h5>
-                                <p class="card-text fs-4">KES <%= (stats.totalRevenue || 0).toLocaleString() %></p>
+                                <h6 class="card-title">Total Revenue</h6>
+                                <p class="fs-4 mb-0">KES <%= (summary.totalRevenue || 0).toLocaleString() %></p>
+                                <small>Collected: KES <%= (summary.totalCollected || 0).toLocaleString() %></small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-success text-white">
+                        <div class="card finance-card bg-success">
                             <div class="card-body">
-                                <h5 class="card-title">Total Collected</h5>
-                                <p class="card-text fs-4">KES <%= (stats.totalCollected || 0).toLocaleString() %></p>
+                                <h6 class="card-title">Outstanding</h6>
+                                <p class="fs-4 mb-0">KES <%= (summary.outstandingBalance || 0).toLocaleString() %></p>
+                                <small><%= summary.invoiceCount || 0 %> invoices</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-warning text-dark">
+                        <div class="card finance-card bg-warning">
                             <div class="card-body">
-                                <h5 class="card-title">Outstanding Invoices</h5>
-                                <p class="card-text fs-4">KES <%= (stats.outstandingInvoices || 0).toLocaleString() %></p>
-                                <% if (stats.overdueInvoices > 0) { %>
-                                    <small class="text-dark"><%= stats.overdueInvoices %> overdue</small>
-                                <% } %>
+                                <h6 class="card-title">Total Expenses</h6>
+                                <p class="fs-4 mb-0">KES <%= (summary.totalExpenses || 0).toLocaleString() %></p>
+                                <small><%= summary.expenseCount || 0 %> expenses</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-info text-white">
+                        <div class="card finance-card <%= (summary.netIncome || 0) >= 0 ? 'bg-info' : 'bg-danger' %>">
                             <div class="card-body">
-                                <h5 class="card-title">Total Expenses</h5>
-                                <p class="card-text fs-4">KES <%= (stats.totalExpenses || 0).toLocaleString() %></p>
+                                <h6 class="card-title">Net Income</h6>
+                                <p class="fs-4 mb-0">KES <%= (summary.netIncome || 0).toLocaleString() %></p>
+                                <small><%= (summary.netIncome || 0) >= 0 ? 'Profit' : 'Loss' %></small>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Net Income & Profit Margin -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="card <%= stats.netIncome >= 0 ? 'bg-success' : 'bg-danger' %> text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Net Income</h5>
-                                <p class="card-text fs-2">KES <%= (stats.netIncome || 0).toLocaleString() %></p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card bg-secondary text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Profit Margin</h5>
-                                <p class="card-text fs-2"><%= (stats.profitMargin || 0).toFixed(1) %>%</p>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Overdue Alert -->
+                <% if (summary.overdueAmount > 0) { %>
+                <div class="alert alert-danger overdue-highlight mb-4">
+                    <h6 class="alert-heading">⚠️ Overdue Payments Alert</h6>
+                    <p class="mb-2">KES <%= summary.overdueAmount.toLocaleString() %> outstanding from <%= summary.overdueCount %> overdue invoices</p>
+                    <a href="/finance/invoices/overdue" class="alert-link">View Overdue Accounts</a>
                 </div>
+                <% } %>
 
                 <!-- Charts Row -->
                 <div class="row g-3 mb-4">
+                    <!-- Revenue vs Expenses Trend -->
                     <div class="col-md-8">
                         <div class="card">
                             <div class="card-header">
-                                Monthly Revenue vs Collected
+                                <h6 class="card-title mb-0">Revenue vs Expenses Trend</h6>
                             </div>
                             <div class="card-body">
-                                <canvas id="trendChart" height="100"></canvas>
+                                <div class="chart-container">
+                                    <canvas id="revenueExpensesChart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Payment Methods -->
                     <div class="col-md-4">
                         <div class="card">
                             <div class="card-header">
-                                Expenses by Category
+                                <h6 class="card-title mb-0">Payment Methods</h6>
                             </div>
                             <div class="card-body">
-                                <canvas id="categoryChart" height="200"></canvas>
+                                <div class="chart-container">
+                                    <canvas id="paymentMethodsChart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Top Schools & Budget Alerts -->
+                <!-- Bottom Row -->
                 <div class="row g-3">
+                    <!-- Top Schools by Revenue -->
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header">
-                                Top Schools by Revenue
+                                <h6 class="card-title mb-0">Top Schools by Revenue</h6>
                             </div>
                             <div class="card-body">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>School</th>
-                                            <th class="text-end">Revenue</th>
-                                            <th class="text-end">Invoices</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <% stats.topSchools.slice(0, 10).forEach(s => { %>
+                                <% if (topSchools && topSchools.length > 0) { %>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
                                             <tr>
-                                                <td><%= s.schoolName || 'Unknown' %></td>
-                                                <td class="text-end">KES <%= (s.totalRevenue || 0).toLocaleString() %></td>
-                                                <td class="text-end"><%= s.invoiceCount || 0 %></td>
+                                                <th>School</th>
+                                                <th>Revenue</th>
+                                                <th>Collected</th>
+                                                <th>Rate</th>
                                             </tr>
-                                        <% }); %>
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            <% topSchools.forEach(school => { %>
+                                            <tr>
+                                                <td><%= school.schoolName %></td>
+                                                <td>KES <%= school.totalRevenue.toLocaleString() %></td>
+                                                <td>KES <%= school.totalCollected.toLocaleString() %></td>
+                                                <td>
+                                                    <span class="badge bg-<%= school.collectionRate >= 80 ? 'success' : school.collectionRate >= 50 ? 'warning' : 'danger' %>">
+                                                        <%= school.collectionRate.toFixed(1) %>%
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <% }); %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <% } else { %>
+                                <p class="text-muted">No revenue data available for the selected period.</p>
+                                <% } %>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Expense Categories & Budget Alerts -->
                     <div class="col-md-6">
-                        <div class="card border-warning">
-                            <div class="card-header text-warning d-flex justify-content-between align-items-center">
-                                <span>Budget Alerts (<%= budgetAlerts.length %>)</span>
-                                <a href="/finance/budgets?alert=true" class="btn btn-sm btn-warning">View All</a>
+                        <div class="row g-3">
+                            <!-- Expense Categories -->
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">Expenses by Category</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <% if (expenseByCategory && expenseByCategory.length > 0) { %>
+                                        <div class="chart-container">
+                                            <canvas id="expenseCategoriesChart"></canvas>
+                                        </div>
+                                        <% } else { %>
+                                        <p class="text-muted">No expense data available.</p>
+                                        <% } %>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <% if (budgetAlerts.length === 0) { %>
-                                    <p class="text-muted">No active budget alerts.</p>
-                                <% } else { %>
-                                    <ul class="list-group list-group-flush">
+
+                            <!-- Budget Alerts -->
+                            <% if (budgetAlerts && budgetAlerts.length > 0) { %>
+                            <div class="col-12">
+                                <div class="card alert-budget">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">⚠️ Budget Alerts</h6>
+                                    </div>
+                                    <div class="card-body">
                                         <% budgetAlerts.forEach(alert => { %>
-                                            <li class="list-group-item">
-                                                <strong><%= alert.name %></strong><br>
-                                                <small class="text-warning">
-                                                    Spent KES <%= alert.totalSpent?.toLocaleString() || 0 %> of KES <%= alert.totalAllocated?.toLocaleString() || 0 %> 
-                                                    (<%= ((alert.totalSpent / alert.totalAllocated) * 100).toFixed(1) %>%)
-                                                    <% if (alert.criticalAlertTriggered) { %>
-                                                        <span class="badge bg-danger">Critical</span>
-                                                    <% } else if (alert.alertTriggered) { %>
-                                                        <span class="badge bg-warning text-dark">Warning</span>
-                                                    <% } %>
-                                                </small>
-                                            </li>
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div>
+                                                <strong><%= alert.name %></strong>
+                                                <% if (alert.eventName) { %>
+                                                <br><small class="text-muted"><%= alert.eventName %></small>
+                                                <% } %>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="text-danger"><%= alert.usagePercent.toFixed(1) %>% used</div>
+                                                <small class="text-muted">KES <%= alert.remaining.toLocaleString() %> remaining</small>
+                                            </div>
+                                        </div>
                                         <% }); %>
-                                    </ul>
-                                <% } %>
+                                    </div>
+                                </div>
                             </div>
+                            <% } %>
                         </div>
                     </div>
                 </div>
@@ -208,58 +246,151 @@
         </main>
     </div>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Revenue vs Expenses trend
-        const trendCtx = document.getElementById('trendChart').getContext('2d');
-        new Chart(trendCtx, {
-            type: 'line',
-            data: {
-                labels: [<% monthlyTrend.forEach(m => { %>'<%= m._id %>', <% }); %>],
-                datasets: [{
-                    label: 'Revenue',
-                    data: [<% monthlyTrend.forEach(m => { %><%= m.revenue || 0 %>, <% }); %>],
-                    borderColor: 'rgb(75, 192, 192)',
-                    fill: false,
-                    tension: 0.1
-                }, {
-                    label: 'Collected',
-                    data: [<% monthlyTrend.forEach(m => { %><%= m.collected || 0 %>, <% }); %>],
-                    borderColor: 'rgb(54, 162, 235)',
-                    fill: false,
-                    tension: 0.1
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+        // Revenue vs Expenses Trend Chart
+        const revenueExpensesCanvas = document.getElementById('revenueExpensesChart');
+        const monthlyTrend = <%- JSON.stringify(monthlyTrend || []) %>;
 
-        // Expense by category
-        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
-        new Chart(categoryCtx, {
-            type: 'doughnut',
-            data: {
-                labels: [<% expenseByCategory.forEach(c => { %>'<%= c._id %>', <% }); %>],
-                datasets: [{
-                    data: [<% expenseByCategory.forEach(c => { %><%= c.total || 0 %>, <% }); %>],
-                    backgroundColor: [
-                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                        '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384', '#9C9C9C'
-                    ]
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+        if (revenueExpensesCanvas) {
+            const revenueExpensesCtx = revenueExpensesCanvas.getContext('2d');
+            new Chart(revenueExpensesCtx, {
+                type: 'line',
+                data: {
+                    labels: monthlyTrend.map(item => {
+                        const date = new Date(item.month + '-01');
+                        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    }),
+                    datasets: [{
+                        label: 'Revenue',
+                        data: monthlyTrend.map(item => item.revenue),
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Expenses',
+                        data: monthlyTrend.map(item => item.expenses),
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Net Income',
+                        data: monthlyTrend.map(item => item.netIncome),
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'KES ' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': KES ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
-        // Show/hide custom date fields
+        // Payment Methods Chart
+        const paymentMethodsCanvas = document.getElementById('paymentMethodsChart');
+        const paymentMethods = <%- JSON.stringify(paymentMethods || []) %>;
+
+        if (paymentMethodsCanvas) {
+            const paymentMethodsCtx = paymentMethodsCanvas.getContext('2d');
+            new Chart(paymentMethodsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: paymentMethods.map(method => method._id.replace('_', ' ').toUpperCase()),
+                    datasets: [{
+                        data: paymentMethods.map(method => method.totalAmount),
+                        backgroundColor: [
+                            '#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#17a2b8'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return context.label + ': KES ' + context.parsed.toLocaleString() + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Expense Categories Chart
+        const expenseCategoriesCanvas = document.getElementById('expenseCategoriesChart');
+        const expenseByCategory = <%- JSON.stringify(expenseByCategory || []) %>;
+
+        if (expenseCategoriesCanvas) {
+            const expenseCategoriesCtx = expenseCategoriesCanvas.getContext('2d');
+            new Chart(expenseCategoriesCtx, {
+                type: 'bar',
+                data: {
+                    labels: expenseByCategory.map(cat => cat._id.replace('_', ' ').toUpperCase()),
+                    datasets: [{
+                        label: 'Amount',
+                        data: expenseByCategory.map(cat => cat.totalAmount),
+                        backgroundColor: '#ffc107',
+                        borderColor: '#e0a800',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'KES ' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'KES ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         document.querySelector('select[name="dateRange"]').addEventListener('change', function() {
             const custom = this.value === 'custom';
-            document.querySelectorAll('[id$="DateDiv"]').forEach(div => {
-                div.style.display = custom ? 'block' : 'none';
-            });
+            document.getElementById('startDateDiv').style.display = custom ? 'block' : 'none';
+            document.getElementById('endDateDiv').style.display = custom ? 'block' : 'none';
         });
 
-        // Mobile sidebar toggle
         document.getElementById('mobileSidebarToggle').addEventListener('click', function() {
             document.getElementById('sidebar').classList.toggle('active');
         });

@@ -4939,7 +4939,7 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
       return res.status(404).json({ success: false, error: 'School not found' });
     }
 
-    const {
+    let {
       name,
       street, city, state, zipCode, country,
       zone, region,
@@ -5319,22 +5319,37 @@ app.get('/api/schools/:schoolId/payments', requireAuth, async (req, res) => {
     if (endDate) query.paymentDate = { ...query.paymentDate, $lte: new Date(endDate) };
 
     const payments = await Payment.find(query).sort({ paymentDate: -1 }).lean();
-    const summary = await Payment.aggregate([
+
+    // Compute summary: total amount of payments, overdue pending payments count
+    const rawSummary = await Payment.aggregate([
       { $match: { schoolId: schoolObjectId } },
       {
         $group: {
           _id: null,
           totalAmount: { $sum: '$amount' },
-          totalPaid: { $sum: '$amountPaid' },
-          totalOutstanding: { $sum: '$balance' },
-          overdueCount: { $sum: { $cond: [{ $and: [{ $eq: ['$status', 'pending'] }, { $lt: ['$dueDate', new Date()] }] }, 1, 0] } }
+          overdueCount: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$status', 'pending'] }, { $lt: ['$dueDate', new Date()] }] },
+                1,
+                0
+              ]
+            }
+          }
         }
       }
     ]);
 
+    const summary = {
+      totalAmount: rawSummary[0]?.totalAmount || 0,
+      totalPaid: rawSummary[0]?.totalAmount || 0, // all recorded payments are considered paid (status completed)
+      totalOutstanding: 0, // payments don't have outstanding balance; derived from invoices
+      overdueCount: rawSummary[0]?.overdueCount || 0
+    };
+
     res.json({
       payments,
-      summary: summary[0] || { totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueCount: 0 }
+      summary
     });
   } catch (err) {
     console.error('Error fetching payments:', err);
@@ -5895,8 +5910,8 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
     }
 
     if (page === 'trainers') {
-      // Fetch all staff members with role 'trainer'
-      modelData.trainersList = await Staff.find({ role: 'trainer' }).sort({ createdAt: -1 }).lean();
+      // Fetch all staff members with trainer roles
+      modelData.trainersList = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } }).sort({ createdAt: -1 }).lean();
       console.log('=== TRAINERS PAGE FETCH ===');
       console.log('Found trainers:', modelData.trainersList.length);
     }

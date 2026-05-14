@@ -155,6 +155,7 @@
                 <% if (student.sectionHistory && student.sectionHistory.length > 0) { %>
                     <div class="content-card">
                         <h2>Section History</h2>
+                        <div class="table-responsive">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -173,16 +174,18 @@
                                         <td><%= entry.notes || '-' %></td>
                                     </tr>
                                 <% }) %>
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                                </div>
                     </div>
                 <% } %>
 
                 <!-- Participation Records -->
-                <div class="content-card">
-                    <h2>Participation Records</h2>
-                    <% if (participationRecords && participationRecords.length > 0) { %>
-                        <table class="data-table">
+                    <div class="content-card">
+                        <h2>Participation Records</h2>
+                        <% if (participationRecords && participationRecords.length > 0) { %>
+                            <div class="table-responsive">
+                            <table class="data-table">
                             <thead>
                                 <tr>
                                     <th>Event</th>
@@ -200,9 +203,10 @@
                                         <td><span class="badge badge-<%= event.status === 'completed' ? 'success' : event.status === 'in_progress' ? 'warning' : 'info' %>"><%= event.status %></span></td>
                                     </tr>
                                 <% }) %>
-                            </tbody>
-                        </table>
-                    <% } else { %>
+                                </tbody>
+                            </table>
+                                </div>
+                        <% } else { %>
                         <p>No participation records yet.</p>
                     <% } %>
                 </div>

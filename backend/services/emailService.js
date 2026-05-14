@@ -12,6 +12,8 @@ const EmailLog = require('../../models/EmailLog');
 let transporter;
 
 function initializeTransporter() {
+  const defaultTimeout = parseInt(process.env.EMAIL_TIMEOUT) || 10000; // 10 second default
+
   if (process.env.EMAIL_HOST && process.env.EMAIL_PORT) {
     transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
@@ -20,10 +22,11 @@ function initializeTransporter() {
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-      }
+      },
+      timeout: defaultTimeout, // Connection timeout
+      connectionTimeout: defaultTimeout // Connection establishment timeout
     });
   } else if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    // Legacy variables support
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT, 10) || 587,
@@ -31,12 +34,14 @@ function initializeTransporter() {
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-      }
+      },
+      timeout: defaultTimeout,
+      connectionTimeout: defaultTimeout
     });
   } else {
-    // Development fallback - logs to console
     transporter = nodemailer.createTransport({
-      jsonTransport: true
+      jsonTransport: true,
+      timeout: defaultTimeout
     });
     console.warn('Email credentials not found. Using test transport (emails will be logged, not sent).');
   }
@@ -486,7 +491,7 @@ async function sendEmail(options) {
   try {
     await emailLog.save();
 
-    // Send email
+    // Send email with timeout to prevent blocking
     const mailOptions = {
       from: emailLog.from,
       to: emailLog.to.map(r => r.email).join(', '),
@@ -498,7 +503,13 @@ async function sendEmail(options) {
       attachments
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    const sendTimeout = parseInt(process.env.EMAIL_SEND_TIMEOUT) || 15000; // 15 second send timeout
+
+    const info = await Promise.race([
+      transporter.sendMail(mailOptions),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Email send timeout')), sendTimeout))
+    ]);
+
     const messageId = info.messageId || info.response?.split(' ')?.[1] || undefined;
 
     // Update log with success

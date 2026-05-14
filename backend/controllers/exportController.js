@@ -4,6 +4,8 @@
  */
 
 const { Parser } = require('json2csv');
+const path = require('path');
+const fs = require('fs');
 let PDFDocument;
 try {
   PDFDocument = require('pdfkit');
@@ -14,6 +16,7 @@ try {
 const emailService = require('../../backend/services/emailService');
 const ReportTemplate = require('../../models/ReportTemplate');
 const ScheduledReport = require('../../models/ScheduledReport');
+const SystemSettings = require('../../models/SystemSettings');
 const { getTrainerPerformance } = require('../utils/aggregations');
 const Event = require('../../models/Event');
 const School = require('../../models/School');
@@ -24,8 +27,8 @@ const User = require('../../models/User');
  */
 exports.exportReport = async (req, res) => {
   try {
-    const { reportType, format = 'csv' } = req.params;
-    const { dateRange, eventType, schoolId, trainerId, region } = req.query;
+    const { reportType } = req.params;
+    const { format = 'csv', dateRange, eventType, schoolId, trainerId, region, status } = req.query;
 
     let data = [];
     let headers = [];
@@ -71,7 +74,9 @@ exports.exportReport = async (req, res) => {
 
       case 'schools':
         headers = ['School Name', 'City', 'Region', 'Students', 'Service Status', 'Events Attended', 'Avg Attendance', 'Payment Reliability'];
-        const schools = await School.find({});
+        const { status } = req.query;
+        const schoolQuery = status ? { status } : {};
+        const schools = await School.find(schoolQuery);
         data = [];
         for (const school of schools) {
           const eventsCount = await Event.countDocuments({ 'targetSchools.schoolId': school._id });
@@ -114,16 +119,67 @@ exports.exportReport = async (req, res) => {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
       res.send(csv);
     } else if (format === 'pdf') {
+      // Fetch organization settings for branding
+      const systemSettings = await SystemSettings.findOne({ _id: 'global-settings' });
+      const org = systemSettings?.organization || {};
+      
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
       doc.pipe(res);
 
-      // PDF Header
-      doc.fontSize(20).text('Analytics Report', { align: 'center' });
-      doc.moveDown();
-      doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`);
-      doc.moveDown();
+       let currentY = 50;
+       const pageWidth = doc.page.width;
+
+       // Add logo if available
+       const logoWidth = org.logoWidth || 40;
+       let logoPlaced = false;
+
+       if (org.logoUrl) {
+         let imagePath = org.logoUrl;
+         let imageLoaded = false;
+
+         if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+           try {
+             const x = (pageWidth - logoWidth) / 2;
+             doc.image(imagePath, x, currentY, { width: logoWidth });
+             imageLoaded = true;
+           } catch (err) {
+             console.warn('Failed to load external logo:', err);
+           }
+         } else {
+           // Local file within public directory
+           const relativePath = imagePath.replace(/^\//, '');
+           const absolutePath = path.join(__dirname, '..', '..', 'public', relativePath);
+           if (fs.existsSync(absolutePath)) {
+             try {
+               const x = (pageWidth - logoWidth) / 2;
+               doc.image(absolutePath, x, currentY, { width: logoWidth });
+               imageLoaded = true;
+             } catch (err) {
+               console.warn('Failed to load local logo:', err);
+             }
+           } else {
+             console.warn('Logo file not found:', absolutePath);
+           }
+         }
+
+         if (imageLoaded) {
+           logoPlaced = true;
+           currentY += logoWidth + 15;
+           // Move PDF cursor down to avoid overlap
+           doc.y = currentY;
+         }
+       }
+
+       // Organization name as heading
+       doc.fontSize(20).text(org.organizationName || 'Analytics Report', { align: 'center' });
+       if (org.tagline) {
+         doc.fontSize(10).text(org.tagline, { align: 'center' });
+       }
+       doc.moveDown(0.5);
+       doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`);
+       doc.moveDown();
 
       // Table
       doc.fontSize(10);
@@ -138,7 +194,7 @@ exports.exportReport = async (req, res) => {
 
       // Data rows
       let y = tableTop + rowHeight;
-      csvData.forEach((row, rowIndex) => {
+      data.forEach((row, rowIndex) => {
         headers.forEach((header, i) => {
           doc.text(String(row[header] || ''), 50 + i * colWidth, y, { width: colWidth, align: 'left' });
         });

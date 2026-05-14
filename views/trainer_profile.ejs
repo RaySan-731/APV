@@ -739,6 +739,7 @@
                     <div class="profile-section-content">
                         <div id="certificationsList">
                             <% if (trainer.certifications && trainer.certifications.length > 0) { %>
+                                <div class="table-responsive">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -769,6 +770,7 @@
                                     <% }) %>
                                     </tbody>
                                 </table>
+                                    </div>
                             <% } else { %>
                                 <div class="empty-state">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

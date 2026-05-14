@@ -86,7 +86,6 @@
         border: 1px solid var(--border);
         padding: 0.75rem 0.5rem;
         text-align: left;
-        white-space: nowrap;
       }
       .data-table th {
         background: var(--secondary);
@@ -407,19 +406,19 @@
                              <div class="stat-label">Total Schools</div>
                          </div>
 
-                         <!-- Active Schools -->
-                         <div class="stat-card">
-                             <div class="stat-icon">
-                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                     <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
-                                     <path d="M2 12h20"></path>
-                                     <path d="M6 12v8"></path>
-                                     <path d="M18 12v8"></path>
-                                 </svg>
-                             </div>
-                             <div class="stat-number" id="activeSchools"><%= stats ? stats.activeSchools.toLocaleString() : 0 %></div>
-                             <div class="stat-label">Active Schools</div>
-                         </div>
+                          <!-- Active Schools - Clickable Button -->
+                          <div class="stat-card" id="activeSchoolsBtn" role="button" tabindex="0" onclick="openActiveSchoolsModal()" onkeydown="if(event.key==='Enter'||event.key===' ')openActiveSchoolsModal()" style="cursor: pointer;" aria-label="View active schools">
+                              <div class="stat-icon">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                      <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
+                                      <path d="M2 12h20"></path>
+                                      <path d="M6 12v8"></path>
+                                      <path d="M18 12v8"></path>
+                                  </svg>
+                              </div>
+                              <div class="stat-number" id="activeSchools"><%= stats ? stats.activeSchools.toLocaleString() : 0 %></div>
+                              <div class="stat-label">Active Schools</div>
+                          </div>
 
                          <!-- New Schools This Month -->
                          <div class="stat-card">
@@ -608,8 +607,9 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="card-content" style="overflow-x: auto;">
-                            <table class="data-table" id="staffTable">
+                        <div class="card-content">
+                            <div class="table-responsive">
+                                <table class="data-table" id="staffTable">
                                 <thead>
                                     <tr>
                                         <th>ID Number</th>
@@ -921,7 +921,8 @@
                             </div>
                         </div>
                         <div class="card-content">
-                            <table class="data-table" id="schoolsTable">
+                            <div class="table-responsive">
+                                <table class="data-table" id="schoolsTable">
                                 <thead>
                                     <tr>
                                         <th>School
@@ -991,11 +992,31 @@
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-outline" onclick="window.location.href='/dashboard/schools/<%= school._id %>'">View Profile</button>
-                                                    <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
-                                                        <button class="btn btn-sm btn-outline" onclick="openOnboardingModal('<%= school._id %>')">Edit</button>
-                                                        <button class="btn btn-sm btn-primary" onclick="openProgramAllocationModal('<%= school._id %>', '<%= school.name %>', <%- JSON.stringify(school.programsEnrolled ? school.programsEnrolled.map(p => p._id) : []) %>)">Allocate Programs</button>
-                                                    <% } %>
+                                                    <div class="action-buttons">
+                                                        <button class="btn btn-sm btn-outline" onclick="window.location.href='/dashboard/schools/<%= school._id %>'">
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                                <circle cx="12" cy="12" r="3"></circle>
+                                                            </svg>
+                                                            View Profile
+                                                        </button>
+                                                        <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+                                                            <button class="btn btn-sm btn-outline" onclick="openOnboardingModal('<%= school._id %>')">
+                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                                </svg>
+                                                                Edit
+                                                            </button>
+                                                            <button class="btn btn-sm btn-primary" onclick="openProgramAllocationModal('<%= school._id %>', '<%= school.name %>', <%- JSON.stringify(school.programsEnrolled ? school.programsEnrolled.map(p => p._id) : []) %>)">
+                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                                </svg>
+                                                                Allocate Programs
+                                                            </button>
+                                                        <% } %>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <% }) %>
@@ -1343,6 +1364,7 @@ async function saveProgramAllocation() {
                         <div class="content-card">
                             <div class="card-header"><h3>Event History</h3></div>
                             <div class="card-content">
+                                <div class="table-responsive">
                                 <table class="data-table">
                                     <thead><tr><th>Event</th><th>Date</th><th>Attendance</th><th>Status</th></tr></thead>
                                     <tbody>
@@ -1358,8 +1380,11 @@ async function saveProgramAllocation() {
                                         <% } else { %>
                                             <tr><td colspan="4" class="placeholder-text">No event participation recorded.</td></tr>
                                         <% } %>
-                                    </tbody>
-                            </table>
+                                 </tbody>
+                             </table>
+                                 </div>
+                        </div>
+                        </div>
                             <div id="staffResults" style="margin-top: 1rem; font-size: 0.875rem; color: var(--muted-foreground); text-align: center;">
                                 <!-- Results count will be shown here -->
                             </div>
@@ -1367,13 +1392,14 @@ async function saveProgramAllocation() {
                                 <!-- Pagination controls will be added here -->
                             </div>
                         </div>
-                        </div>
+                    </div>
 
                         <!-- Payment History -->
                         <div class="content-card">
                             <div class="card-header"><h3>Payment History</h3></div>
                             <div class="card-content">
                                 <% if (payments && payments.length > 0) { %>
+                                    <div class="table-responsive">
                                     <table class="data-table">
                                         <thead><tr><th>Date</th><th>Invoice</th><th>Amount</th><th>Status</th></tr></thead>
                                         <tbody>
@@ -1385,8 +1411,10 @@ async function saveProgramAllocation() {
                                                     <td><span class="badge badge-<%= payment.status === 'paid' ? 'success' : payment.status === 'pending' ? 'warning' : 'danger' %>"><%= payment.status %></span></td>
                                                 </tr>
                                             <% }) %>
-                                        </tbody>
-                                    </table>
+                                 </tbody>
+                             </table>
+                                 </div>
+                        </div>
                                 <% } else { %>
                                     <p class="placeholder-text">No payment records.</p>
                                 <% } %>
@@ -1497,7 +1525,8 @@ async function saveProgramAllocation() {
                     <!-- Table View -->
                     <div id="tableView" class="content-card">
                         <div class="card-content">
-                            <table class="data-table" id="eventsTable">
+                            <div class="table-responsive">
+                                <table class="data-table" id="eventsTable">
                                 <thead>
                                     <tr>
                                         <th>Event Name</th>
@@ -2092,12 +2121,13 @@ async function saveSchoolAllocation() {
                         <div class="stat-card"><div class="stat-icon">⭐</div><div><div class="stat-number"><%= totalTrainers > 0 ? ((activeTrainers / totalTrainers * 100).toFixed(0) + '%') : '0%' %></div><div class="stat-label">Active Rate</div></div></div>
                         <div class="stat-card"><div class="stat-icon">📊</div><div><div class="stat-number"><%= onLeaveTrainers %></div><div class="stat-label">On Leave</div></div></div>
                     </div>
-                    <div class="content-card">
-                        <div class="card-header">
-                            <h3>Trainers Directory</h3>
-                        </div>
-                        <div class="card-content">
-                            <table class="data-table">
+                     <div class="content-card">
+                         <div class="card-header">
+                             <h3>Trainers Directory</h3>
+                         </div>
+                         <div class="card-content">
+                             <div class="table-responsive">
+                                <table class="data-table">
                                 <thead><tr><th>ID Number</th><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
                                 <tbody>
                                 <% if (trainersList && trainersList.length > 0) { %>
@@ -2123,106 +2153,12 @@ async function saveSchoolAllocation() {
                         </div>
                     </div>
                     <div class="content-card">
-                        <div class="card-header">
-                            <h3>Add New Trainer</h3>
-                        </div>
-                        <div class="card-content">
-                            <form action="/dashboard/trainer/add" method="POST" class="form-grid">
-                                <label>ID Number<input type="text" name="idNumber" placeholder="e.g., TRN001"></label>
-                                <label>Name<input type="text" name="name" required placeholder="Full Name"></label>
-                                <label>Email<input type="email" name="email" required placeholder="trainer@example.com"></label>
-                                <label>Phone<input type="tel" name="phone" placeholder="+254712345678"></label>
-                                <label>Status<select name="status" required>
-                                    <option value="">Select Status</option>
-                                    <option value="Active">Active</option>
-                                    <option value="On Leave">On Leave</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select></label>
-                                <label>Password<input type="password" name="password" required placeholder="Set initial password"></label>
-                                <button type="submit" class="btn btn-primary">Add Trainer</button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <!-- Edit Trainer Modal -->
-                    <div id="editTrainerModal" class="modal" style="display: none;">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3>Edit Trainer</h3>
-                                <button type="button" class="close-btn" onclick="closeEditTrainerModal()">×</button>
-                            </div>
-                            <div class="modal-body">
-                                <form id="editTrainerForm" class="form-grid">
-                                    <input type="hidden" id="editTrainerId" name="trainerId">
-                                    <label>ID Number<input type="text" id="editTrainerIdNumber" name="idNumber"></label>
-                                    <label>Name<input type="text" id="editTrainerName" name="name" required></label>
-                                    <label>Email<input type="email" id="editTrainerEmail" name="email" required></label>
-                                    <label>Phone<input type="tel" id="editTrainerPhone" name="phone"></label>
-                                    <label>Status<select id="editTrainerStatus" name="status" required>
-                                        <option value="Active">Active</option>
-                                        <option value="On Leave">On Leave</option>
-                                        <option value="Inactive">Inactive</option>
-                                    </select></label>
-                                    <div id="editTrainerMessage" class="message" style="display: none; grid-column: 1 / -1; margin-top: 1rem;"></div>
-                                </form>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" onclick="closeEditTrainerModal()">Cancel</button>
-                                <button type="button" class="btn btn-primary" onclick="saveEditTrainer()">Save Changes</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Allocate Schools Modal -->
-                    <div id="allocateSchoolsModal" class="modal" style="display: none;">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3>Allocate Schools to <span id="allocateTrainerName"></span></h3>
-                                <button type="button" class="close-btn" onclick="closeAllocateSchoolsModal()">×</button>
-                            </div>
-                            <div class="modal-body">
-                                <input type="hidden" id="allocateTrainerId" value="">
-                                <div id="allocateSchoolsList" style="max-height: 400px; overflow-y: auto;">
-                                    <!-- Schools will be loaded dynamically -->
-                                </div>
-                                <div id="allocateMessage" class="message" style="display: none; margin-top: 1rem;"></div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" onclick="closeAllocateSchoolsModal()">Cancel</button>
-                                <button type="button" class="btn btn-primary" onclick="saveSchoolAllocation()">Save Allocation</button>
-                            </div>
-                        </div>
-                    </div>
-                <% } else if (page === 'audit-logs') { %>
-                    <div class="content-card">
-                        <div class="card-header">
-                            <h3>Audit Logs</h3>
-                            <div class="card-actions">
-                                <input type="text" id="auditSearch" placeholder="Search logs..." value="<%= auditSearch || '' %>" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
-                                <select id="auditActionFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
-                                    <option value="">All Actions</option>
-                                    <option value="created" <%= auditActionFilter === 'created' ? 'selected' : '' %>>Create</option>
-                                    <option value="updated" <%= auditActionFilter === 'updated' ? 'selected' : '' %>>Update</option>
-                                    <option value="deleted" <%= auditActionFilter === 'deleted' ? 'selected' : '' %>>Delete</option>
-                                    <option value="leave_approved" <%= auditActionFilter === 'leave_approved' ? 'selected' : '' %>>Leave Approved</option>
-                                    <option value="leave_rejected" <%= auditActionFilter === 'leave_rejected' ? 'selected' : '' %>>Leave Rejected</option>
-                                    <option value="permission_changed" <%= auditActionFilter === 'permission_changed' ? 'selected' : '' %>>Permission Changed</option>
-                                    <option value="account_activated" <%= auditActionFilter === 'account_activated' ? 'selected' : '' %>>Account Activated</option>
-                                    <option value="account_deactivated" <%= auditActionFilter === 'account_deactivated' ? 'selected' : '' %>>Account Deactivated</option>
-                                    <option value="password_reset" <%= auditActionFilter === 'password_reset' ? 'selected' : '' %>>Password Reset</option>
-                                </select>
-                                <select id="auditEntityFilter" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);">
-                                    <option value="">All Entities</option>
-                                    <option value="staff" <%= auditEntityFilter === 'staff' ? 'selected' : '' %>>Staff</option>
-                                    <option value="school" <%= auditEntityFilter === 'school' ? 'selected' : '' %>>School</option>
-                                    <option value="event" <%= auditEntityFilter === 'event' ? 'selected' : '' %>>Event</option>
-                                    <option value="program" <%= auditEntityFilter === 'program' ? 'selected' : '' %>>Program</option>
-                                    <option value="booking" <%= auditEntityFilter === 'booking' ? 'selected' : '' %>>Booking</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="card-content">
-                            <table class="data-table">
+                         <div class="card-header">
+                             <h3>Audit Logs</h3>
+                         </div>
+                         <div class="card-content">
+                             <div class="table-responsive">
+                                <table class="data-table">
                                 <thead>
                                     <tr>
                                         <th>Timestamp</th>
@@ -3205,6 +3141,7 @@ async function saveSchoolAllocation() {
 
         })();
       </script>
+
       <% if (page === 'analytics') { %>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="/js/analytics_dashboard.js"></script>
@@ -3256,5 +3193,176 @@ async function saveSchoolAllocation() {
         </div>
       </div>
 
-  </body>
+      <!-- Active Schools Modal -->
+      <div id="activeSchoolsModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+          <div class="modal-header">
+            <h3>Active Schools</h3>
+            <button type="button" class="close-btn" onclick="closeActiveSchoolsModal()">×</button>
+          </div>
+          <div class="modal-body">
+            <div id="activeSchoolsLoading" style="display: none; text-align: center; padding: 2rem;">
+              <div style="color: var(--muted-foreground);">Loading schools data...</div>
+            </div>
+            <div id="activeSchoolsContent" style="display: none;">
+              <div class="schools-export-actions" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center; justify-content: space-between;">
+                <div style="font-size: 0.9rem; color: var(--muted-foreground);">
+                  <span id="activeSchoolsCount">0</span> active schools
+                </div>
+                <% if (['admin', 'founder'].includes(user.role)) { %>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button class="btn btn-sm btn-primary" id="exportActiveSchoolsCSV">Export CSV</button>
+                  <button class="btn btn-sm btn-outline" id="exportActiveSchoolsPDF">Export PDF</button>
+                </div>
+                <% } %>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="activeSchoolsTable">
+                  <thead>
+                    <tr>
+                      <th>School Name</th>
+                      <th>City</th>
+                      <th>Region</th>
+                      <th>Contact Person</th>
+                      <th>Phone</th>
+                      <th>Students</th>
+                      <th>Service Status</th>
+                      <th>Events Attended</th>
+                      <th>Avg Attendance</th>
+                    </tr>
+                  </thead>
+                  <tbody id="activeSchoolsTableBody">
+                    <!-- Data populated by JS -->
+                                 </tbody>
+                             </table>
+                                 </div>
+                        </div>
+                    </div>
+                    </div>
+                    </div>
+                    </div>
+                    </div>
+                    </div>
+            <div id="activeSchoolsEmpty" style="display: none; text-align: center; padding: 2rem;">
+              <p class="placeholder-text">No active schools found.</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeActiveSchoolsModal()">Close</button>
+          </div>
+         </div>
+       </div>
+
+      <script>
+        // Active Schools Modal functionality
+        function openActiveSchoolsModal() {
+          const modal = document.getElementById('activeSchoolsModal');
+          const loadingEl = document.getElementById('activeSchoolsLoading');
+          const contentEl = document.getElementById('activeSchoolsContent');
+          const emptyEl = document.getElementById('activeSchoolsEmpty');
+          
+          // Show loading, hide others
+          loadingEl.style.display = 'block';
+          contentEl.style.display = 'none';
+          emptyEl.style.display = 'none';
+          modal.style.display = 'flex';
+
+          // Fetch active schools data
+          fetch('/api/schools/active', {
+            headers: { 'Accept': 'application/json' }
+          })
+          .then(res => {
+            if (!res.ok) {
+              if (res.status === 403) {
+                throw new Error('Access denied. You do not have permission to view schools.');
+              } else if (res.status === 401) {
+                throw new Error('Authentication required. Please log in.');
+              }
+              throw new Error('Failed to load schools');
+            }
+            return res.json();
+          })
+          .then(data => {
+            loadingEl.style.display = 'none';
+            if (data.success && data.schools && data.schools.length > 0) {
+              populateActiveSchoolsTable(data.schools);
+              contentEl.style.display = 'block';
+              document.getElementById('activeSchoolsCount').textContent = data.schools.length;
+            } else {
+              emptyEl.style.display = 'block';
+            }
+          })
+          .catch(err => {
+            console.error('Error fetching active schools:', err);
+            loadingEl.style.display = 'none';
+            emptyEl.style.display = 'block';
+            document.getElementById('activeSchoolsEmpty').innerHTML = '<p class="placeholder-text" style="color: var(--destructive);">' + err.message + '</p>';
+          });
+        }
+
+        function closeActiveSchoolsModal() {
+          const modal = document.getElementById('activeSchoolsModal');
+          modal.style.display = 'none';
+        }
+
+        function populateActiveSchoolsTable(schools) {
+          const tbody = document.getElementById('activeSchoolsTableBody');
+          tbody.innerHTML = '';
+          
+          schools.forEach(school => {
+            const tr = document.createElement('tr');
+            const contact = school.contactPerson || {};
+            const serviceStatus = school.serviceStatus || 'inactive';
+            const badgeClass = serviceStatus === 'active' ? 'badge-success' : serviceStatus === 'on_hold' ? 'badge-warning' : 'badge-secondary';
+            
+            tr.innerHTML = `
+              <td><strong>${school.name || '—'}</strong></td>
+              <td>${school.address?.city || school.city || '—'}</td>
+              <td>${school.region || '—'}</td>
+              <td>${contact.name || '—'}</td>
+              <td>${contact.phone || '—'}</td>
+              <td>${(school.studentCount || 0).toLocaleString()}</td>
+              <td><span class="badge ${badgeClass}">${serviceStatus.replace('_', ' ')}</span></td>
+              <td>${school.participationMetrics?.totalEventsAttended || 0}</td>
+              <td>${school.participationMetrics?.averageAttendanceRate || 0}%</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        (function attachExportHandlers() {
+          const csvBtn = document.getElementById('exportActiveSchoolsCSV');
+          const pdfBtn = document.getElementById('exportActiveSchoolsPDF');
+          
+          if (csvBtn) {
+            csvBtn.addEventListener('click', function() {
+              window.location.href = '/api/export/schools?format=csv&status=active';
+            });
+          }
+          
+          if (pdfBtn) {
+            pdfBtn.addEventListener('click', function() {
+              window.location.href = '/api/export/schools?format=pdf&status=active';
+            });
+          }
+        })();
+
+        document.addEventListener('click', function(event) {
+          const modal = document.getElementById('activeSchoolsModal');
+          if (event.target === modal) {
+            closeActiveSchoolsModal();
+          }
+        });
+
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') {
+            const modal = document.getElementById('activeSchoolsModal');
+            if (modal && modal.style.display === 'flex') {
+              closeActiveSchoolsModal();
+            }
+          }
+        });
+      </script>
+
+    </body>
 </html>

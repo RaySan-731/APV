@@ -272,6 +272,11 @@ const requirePermission = (permission) => {
     }
 
     try {
+      // Superuser bypass: admin and founder have all permissions
+      if (['admin', 'founder'].includes(req.session.user.role)) {
+        return next();
+      }
+
       const staffPermissions = await Permission.findOne({ role: req.session.user.role });
       if (!staffPermissions || !staffPermissions.permissions || !staffPermissions.permissions[permission]) {
         const isApiRequest = req.xhr ||
@@ -4246,6 +4251,8 @@ app.get('/api/trainer/students/export', requireAuth, async (req, res) => {
     } else if (format === 'pdf') {
       // PDF generation
       const PDFDocument = require('pdfkit');
+      const path = require('path');
+      const fs = require('fs');
       const doc = new PDFDocument({ margin: 50 });
 
       res.setHeader('Content-Type', 'application/pdf');
@@ -4253,12 +4260,61 @@ app.get('/api/trainer/students/export', requireAuth, async (req, res) => {
 
       doc.pipe(res);
 
-      // Title
-      doc.fontSize(20).text('Student List', { align: 'center' });
+      // Fetch organization settings for branding
+      const systemSettings = await SystemSettings.findOne({ _id: 'global-settings' });
+      const org = systemSettings?.organization || {};
+
+      let currentY = 50;
+      const pageWidth = doc.page.width;
+
+      // Add logo if available
+      const logoWidth = org.logoWidth || 40;
+      if (org.logoUrl) {
+        let imagePath = org.logoUrl;
+        let imageLoaded = false;
+
+        if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+          try {
+            const x = (pageWidth - logoWidth) / 2;
+            doc.image(imagePath, x, currentY, { width: logoWidth });
+            imageLoaded = true;
+          } catch (err) {
+            console.warn('Failed to load external logo:', err);
+          }
+        } else {
+          // Local file within public directory
+          const relativePath = imagePath.replace(/^\//, '');
+          const absolutePath = path.join(__dirname, '..', 'public', relativePath);
+          if (fs.existsSync(absolutePath)) {
+            try {
+              const x = (pageWidth - logoWidth) / 2;
+              doc.image(absolutePath, x, currentY, { width: logoWidth });
+              imageLoaded = true;
+            } catch (err) {
+              console.warn('Failed to load local logo:', err);
+            }
+          } else {
+            console.warn('Logo file not found:', absolutePath);
+          }
+        }
+
+        if (imageLoaded) {
+          currentY += logoWidth + 15;
+          doc.y = currentY;
+        }
+      }
+
+      // Organization name as heading
+      doc.fontSize(20).text(org.organizationName || 'Student List', { align: 'center' });
+      if (org.tagline) {
+        doc.fontSize(10).text(org.tagline, { align: 'center' });
+      }
+      doc.moveDown(0.5);
+      doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`);
       doc.moveDown();
 
       // Filter info
-      doc.fontSize(12);
+      doc.fontSize(10);
       if (schoolId) {
         const school = await School.findById(schoolId);
         if (school) doc.text(`School: ${school.name}`);
@@ -7742,6 +7798,8 @@ app.get('/api/calendar/export/pdf', requireAuth, requirePermission('canViewEvent
       .lean();
 
     const PDFDocument = require('pdfkit');
+    const path = require('path');
+    const fs = require('fs');
     const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -7749,10 +7807,56 @@ app.get('/api/calendar/export/pdf', requireAuth, requirePermission('canViewEvent
 
     doc.pipe(res);
 
+    // Fetch organization settings for branding
+    const systemSettings = await SystemSettings.findOne({ _id: 'global-settings' });
+    const org = systemSettings?.organization || {};
+
+    let currentY = 50;
+    const pageWidth = doc.page.width;
+
+    // Add logo if available (portrait orientation may need wider logo)
+    const logoWidth = org.logoWidth || 50;
+    if (org.logoUrl) {
+      let imagePath = org.logoUrl;
+      let imageLoaded = false;
+
+      if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        try {
+          const x = (pageWidth - logoWidth) / 2;
+          doc.image(imagePath, x, currentY, { width: logoWidth });
+          imageLoaded = true;
+        } catch (err) {
+          console.warn('Failed to load external logo:', err);
+        }
+      } else {
+        const relativePath = imagePath.replace(/^\//, '');
+        const absolutePath = path.join(__dirname, '..', 'public', relativePath);
+        if (fs.existsSync(absolutePath)) {
+          try {
+            const x = (pageWidth - logoWidth) / 2;
+            doc.image(absolutePath, x, currentY, { width: logoWidth });
+            imageLoaded = true;
+          } catch (err) {
+            console.warn('Failed to load local logo:', err);
+          }
+        } else {
+          console.warn('Logo file not found:', absolutePath);
+        }
+      }
+
+      if (imageLoaded) {
+        currentY += logoWidth + 15;
+        doc.y = currentY;
+      }
+    }
+
     // Title
-    doc.fontSize(20).text('Event Calendar Export', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`);
+    doc.fontSize(20).text(org.organizationName ? `Event Calendar - ${org.organizationName}` : 'Event Calendar Export', { align: 'center' });
+    if (org.tagline) {
+      doc.fontSize(10).text(org.tagline, { align: 'center' });
+    }
+    doc.moveDown(0.5);
+    doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`);
     doc.moveDown();
 
     // Table column definitions
@@ -7846,6 +7950,45 @@ app.get('/api/schools/list', requireAuth, requirePermission('canViewSchools'), a
   }
 });
 
+// Get all active schools with full details (for reports, modals)
+app.get('/api/schools/active', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
+  try {
+    const schools = await School.find({ status: 'active' })
+      .populate('programsEnrolled', 'name category price duration')
+      .select('name address city zone region contactPerson studentCount serviceStatus servicePackage programsEnrolled participationMetrics createdAt')
+      .sort({ name: 1 })
+      .lean();
+
+    // Enrich with participation metrics
+    const schoolIds = schools.map(s => s._id);
+    const eventAggregates = await Event.aggregate([
+      { $match: { 'targetSchools.schoolId': { $in: schoolIds } } },
+      {
+        $group: {
+          _id: '$targetSchools.schoolId',
+          eventCount: { $sum: 1 },
+          avgAttendance: { $avg: '$participationMetrics.averageAttendanceRate' }
+        }
+      }
+    ]);
+    const eventMap = new Map(eventAggregates.map(a => [a._id.toString(), a]));
+
+    const enrichedSchools = schools.map(school => ({
+      ...school,
+      participationMetrics: {
+        ...(school.participationMetrics || {}),
+        totalEventsAttended: eventMap.get(school._id.toString())?.eventCount || 0,
+        averageAttendanceRate: Math.round(eventMap.get(school._id.toString())?.avgAttendance || 0),
+        engagementScore: Math.min(100, Math.round(((eventMap.get(school._id.toString())?.eventCount || 0) * 10) + (eventMap.get(school._id.toString())?.avgAttendance || 0)))
+      }
+    }));
+
+    res.json({ success: true, schools: enrichedSchools });
+  } catch (err) {
+    console.error('Error fetching active schools:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch active schools' });
+  }
+});
 
 // Dashboard KPI data (enhanced)
 app.get('/api/dashboard/kpi', requireAuth, async (req, res) => {

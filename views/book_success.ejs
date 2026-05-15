@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Booking Confirmed - Arrow-Park Ventures</title>
   <link rel="stylesheet" href="/css/styles.css">
-  <style>
+  <style nonce="<%= cspNonce %>">
     .success-page {
       max-width: 700px;
       margin: 0 auto;
@@ -362,7 +362,7 @@
       </div>
   </div>
 
-  <script>
+  <script nonce="<%= cspNonce %>">
     // Optional: Track booking confirmation
     if (typeof gtag !== 'undefined') {
       gtag('event', 'booking_complete', {

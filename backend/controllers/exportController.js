@@ -75,7 +75,16 @@ exports.exportReport = async (req, res) => {
       case 'schools':
         headers = ['School Name', 'City', 'Region', 'Students', 'Service Status', 'Events Attended', 'Avg Attendance', 'Payment Reliability'];
         const { status } = req.query;
-        const schoolQuery = status ? { status } : {};
+        let schoolQuery = {};
+
+        if (status) {
+          if (status === 'active') {
+            schoolQuery = { $or: [{ status: 'active' }, { serviceStatus: 'active' }] };
+          } else {
+            schoolQuery = { $or: [{ status }, { serviceStatus: status }] };
+          }
+        }
+
         const schools = await School.find(schoolQuery);
         data = [];
         for (const school of schools) {

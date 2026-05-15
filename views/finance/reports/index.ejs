@@ -252,7 +252,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         function generateReport(type, period) {
             if (period === 'custom') {
                 document.getElementById('reportType').value = type;

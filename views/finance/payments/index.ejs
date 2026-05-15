@@ -6,7 +6,7 @@
     <title>Payment Management - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         .status-badge {
             font-size: 0.75rem;
             padding: 0.25rem 0.5rem;
@@ -233,7 +233,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         function updatePaymentStatus(paymentId, status) {
             if (confirm('Are you sure you want to mark this payment as ' + status + '?')) {
                 fetch('/finance/payments/' + paymentId + '/status', {

@@ -19,11 +19,11 @@ const staffSchema = new mongoose.Schema({
     country: { type: String, default: 'Kenya' }
   },
 
-  // Employment Information
+   // Employment Information
    role: {
      type: String,
      required: true,
-     enum: ['trainer', 'senior trainer', 'supervisor', 'admin', 'coordinator', 'school_admin'],
+     enum: ['founder', 'commissioner', 'training_officer', 'medical', 'rover', 'trainer', 'staff', 'senior trainer', 'supervisor', 'admin', 'coordinator', 'school_admin'],
      default: 'trainer'
    },
   status: {

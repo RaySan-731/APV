@@ -6,7 +6,7 @@
     <title><%= formTitle %> - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="icon" href="/favicon.ico" />
-    <style>
+    <style nonce="<%= cspNonce %>">
         .form-section {
             margin-bottom: 2rem;
             padding: 1.5rem;
@@ -247,7 +247,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         function showToast(message, type = 'info', duration = 3000) {
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
@@ -396,7 +396,7 @@
         });
     </script>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
       window.currentUserId = '<%= user._id %>';
     </script>
 
@@ -427,7 +427,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
       window.currentUserId = '<%= user.id %>';
     </script>
     <script src="/js/notifications.js"></script>

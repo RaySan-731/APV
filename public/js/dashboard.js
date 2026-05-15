@@ -2993,6 +2993,251 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// ============ STAFF ONBOARDING ============
+
+let currentStaffOnboardingStep = 0;
+let staffFormCache = {};
+
+function openAddStaffModal() {
+    currentStaffOnboardingStep = 0;
+    staffFormCache = {};
+
+    // Reset modal
+    document.getElementById('addStaffModalTitle').textContent = 'Add New Staff Member';
+    const messageEl = document.getElementById('staffOnboardingMessage');
+    if (messageEl) {
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
+    }
+    const form = document.getElementById('addStaffForm');
+    if (form) form.reset();
+
+    // Show modal and first step
+    document.getElementById('addStaffModal').style.display = 'flex';
+    showStaffOnboardingStep(0);
+    updateStaffOnboardingUI();
+
+    // Attach event listener to next button
+    const nextBtn = document.getElementById('staffNextStepBtn');
+    if (nextBtn) {
+        nextBtn.onclick = function(e) {
+            if (currentStaffOnboardingStep === 3) {
+                e.preventDefault();
+                submitStaffOnboarding();
+            } else {
+                changeStaffOnboardingStep(1);
+            }
+        };
+    }
+}
+
+function closeAddStaffModal() {
+    document.getElementById('addStaffModal').style.display = 'none';
+    const form = document.getElementById('addStaffForm');
+    if (form) form.reset();
+    currentStaffOnboardingStep = 0;
+    staffFormCache = {};
+    document.getElementById('addStaffModalTitle').textContent = 'Add New Staff Member';
+}
+
+function changeStaffOnboardingStep(delta) {
+    const totalSteps = 4;
+    const newStep = currentStaffOnboardingStep + delta;
+    if (newStep < 0 || newStep >= totalSteps) {
+        console.log('Staff step change out of bounds:', currentStaffOnboardingStep, '->', newStep);
+        return;
+    }
+
+    // Validate current step before moving forward
+    if (delta > 0 && !validateStaffOnboardingStep(currentStaffOnboardingStep)) {
+        console.log('Validation failed for step', currentStaffOnboardingStep);
+        return;
+    }
+
+    console.log('Changing staff step from', currentStaffOnboardingStep, 'to', newStep);
+    currentStaffOnboardingStep = newStep;
+    showStaffOnboardingStep(currentStaffOnboardingStep);
+    updateStaffOnboardingUI();
+}
+
+function showStaffOnboardingStep(stepIndex) {
+    document.querySelectorAll('#addStaffForm .onboarding-step').forEach((el, idx) => {
+        el.style.display = idx === stepIndex ? 'grid' : 'none';
+    });
+}
+
+function updateStaffOnboardingUI() {
+    // Update step indicators
+    for (let i = 0; i < 4; i++) {
+        const indicator = document.getElementById(`staff-step-indicator-${i}`);
+        if (indicator) {
+            indicator.style.fontWeight = i === currentStaffOnboardingStep ? 'bold' : 'normal';
+            indicator.style.color = i <= currentStaffOnboardingStep ? 'var(--primary)' : 'var(--muted-foreground)';
+        }
+    }
+
+    // Update buttons
+    const prevBtn = document.getElementById('staffPrevStepBtn');
+    const nextBtn = document.getElementById('staffNextStepBtn');
+    const submitBtn = document.getElementById('staffSubmitBtn');
+
+    if (prevBtn) prevBtn.style.display = currentStaffOnboardingStep === 0 ? 'none' : 'inline-block';
+    if (nextBtn) {
+        nextBtn.style.display = currentStaffOnboardingStep === 3 ? 'none' : 'inline-block';
+        nextBtn.textContent = 'Next Step';
+    }
+    if (submitBtn) submitBtn.style.display = currentStaffOnboardingStep === 3 ? 'inline-block' : 'none';
+
+    // Update summary on last step
+    if (currentStaffOnboardingStep === 3) {
+        updateStaffOnboardingSummary();
+    }
+}
+
+function validateStaffOnboardingStep(step) {
+    const stepElement = document.querySelector(`#staff-step-${step}`);
+    if (!stepElement) {
+        console.error('Staff step element not found for step', step);
+        return false;
+    }
+    const requiredInputs = stepElement.querySelectorAll('[required]');
+    for (let input of requiredInputs) {
+        if (!input.value.trim()) {
+            showToast('Please fill in all required fields', 'error');
+            input.focus();
+            return false;
+        }
+    }
+    return true;
+}
+
+function updateStaffOnboardingSummary() {
+    const form = document.getElementById('addStaffForm');
+    const summary = document.getElementById('staffOnboardingSummary');
+    if (!form || !summary) return;
+
+    const name = form.name.value || 'Not provided';
+    const email = form.email.value || 'Not provided';
+    const role = form.role.value || 'Not selected';
+    const department = form.department.value || 'Training';
+    const status = form.status.value || 'Active';
+    const phone = form.phone.value || 'N/A';
+    const city = form.city.value || 'N/A';
+    const emergencyName = form.emergencyContactName.value || 'None';
+
+    summary.innerHTML = `
+        <strong style="font-size: 1.05rem; color: var(--primary);">${name}</strong><br>
+        📧 ${email}<br>
+        📞 ${phone}<br>
+        👤 Role: ${role}<br>
+        🏢 Department: ${department}<br>
+        ✅ Status: ${status}<br>
+        📍 City: ${city}<br>
+        🆘 Emergency: ${emergencyName}<br>
+        <em style="color: var(--muted-foreground); margin-top: 0.5rem; display: block;">Please confirm all details are correct before submitting.</em>
+    `;
+}
+
+async function submitStaffOnboarding() {
+    const form = document.getElementById('addStaffForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    const messageEl = document.getElementById('staffOnboardingMessage');
+    if (messageEl) {
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
+    }
+
+    try {
+        const response = await fetch('/dashboard/staff/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.redirected) {
+            if (messageEl) {
+                messageEl.textContent = '✓ Staff added successfully! Redirecting...';
+                messageEl.style.backgroundColor = '#d4edda';
+                messageEl.style.color = '#155724';
+                messageEl.style.borderLeft = '4px solid #28a745';
+                messageEl.style.display = 'block';
+            }
+            setTimeout(() => { window.location.href = response.url; }, 1000);
+            return;
+        }
+
+        let result;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            result = await response.json();
+        } else {
+            // Handle plain text or HTML error messages
+            const text = await response.text();
+            result = { success: false, error: text };
+        }
+
+        if (result.success || response.ok) {
+            if (messageEl) {
+                messageEl.textContent = '✓ Staff added successfully! Redirecting...';
+                messageEl.style.backgroundColor = '#d4edda';
+                messageEl.style.color = '#155724';
+                messageEl.style.borderLeft = '4px solid #28a745';
+                messageEl.style.display = 'block';
+            }
+            setTimeout(() => { window.location.href = '/dashboard/staff'; }, 1500);
+        } else {
+            if (messageEl) {
+                const errorMsg = (result.error || 'Failed to add staff member').replace(/<[^>]*>/g, ''); // Strip HTML tags if any
+                messageEl.textContent = '✗ ' + errorMsg;
+                messageEl.style.backgroundColor = '#f8d7da';
+                messageEl.style.color = '#721c24';
+                messageEl.style.borderLeft = '4px solid #f5c6cb';
+                messageEl.style.display = 'block';
+            }
+        }
+     } catch (error) {
+         console.error('Error adding staff:', error);
+         if (messageEl) {
+             messageEl.textContent = '✗ Network error: ' + error.message;
+             messageEl.style.backgroundColor = '#f8d7da';
+             messageEl.style.color = '#721c24';
+             messageEl.style.borderLeft = '4px solid #f5c6cb';
+             messageEl.style.display = 'block';
+         }
+     }
+ }
+
+ // Close modal when clicking outside
+ document.addEventListener('click', function(event) {
+     const staffModal = document.getElementById('addStaffModal');
+     if (staffModal && event.target === staffModal) {
+         closeAddStaffModal();
+     }
+ });
+
+// Attach step indicator click handlers for navigation
+document.addEventListener('DOMContentLoaded', function() {
+    for (let i = 0; i < 4; i++) {
+        const indicator = document.getElementById(`staff-step-indicator-${i}`);
+        if (indicator) {
+            indicator.addEventListener('click', () => {
+                // Only allow navigating to previous steps or current+1 if validated
+                if (i <= currentStaffOnboardingStep + 1) {
+                    if (i < currentStaffOnboardingStep || validateStaffOnboardingStep(currentStaffOnboardingStep)) {
+                        currentStaffOnboardingStep = i;
+                        showStaffOnboardingStep(i);
+                        updateStaffOnboardingUI();
+                    }
+                }
+            });
+        }
+    }
+});
+
+// ============ END STAFF ONBOARDING ============
+
 // Export functions for inline handlers and other scripts
 window.DashboardUtils = {
     ...(window.DashboardUtils || {}),
@@ -3003,6 +3248,9 @@ window.DashboardUtils = {
     openOnboardingModal,
     closeOnboardingModal,
     changeOnboardingStep,
+    openAddStaffModal,
+    closeAddStaffModal,
+    changeStaffOnboardingStep,
     openAddScoutGroupModal,
     closeAddScoutGroupModal,
     saveScoutGroup,

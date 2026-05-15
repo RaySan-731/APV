@@ -466,8 +466,17 @@ async function sendEmail(options) {
     finalHtml = templated.html;
   }
 
-  // Normalize recipient to array
-  const recipients = Array.isArray(to) ? to : [to];
+   // Normalize recipient to array of objects with email and optional name
+   let recipients;
+   if (Array.isArray(to)) {
+     recipients = to.map(r => typeof r === 'string' ? { email: r } : r);
+   } else if (typeof to === 'string') {
+     recipients = [{ email: to }];
+   } else if (to && typeof to === 'object' && 'email' in to) {
+     recipients = [to];
+   } else {
+     recipients = [];
+   }
 
   // Create email log entry
   const emailLog = new EmailLog({

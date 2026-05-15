@@ -6,7 +6,7 @@
     <title>School Dashboard - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         .recent-students-section .recent-students-list {
             display: flex;
             flex-direction: column;
@@ -390,7 +390,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         document.addEventListener('DOMContentLoaded', function() {
             // Notification dropdown toggle
             const bell = document.getElementById('notificationBell');

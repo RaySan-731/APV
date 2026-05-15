@@ -208,7 +208,7 @@
 
     <!-- Load trainer events JavaScript -->
     <script src="/js/trainer_events.js"></script>
-    <script>
+    <script nonce="<%= cspNonce %>">
       window.currentUserId = '<%= user.id %>';
     </script>
     <script src="/js/notifications.js"></script>

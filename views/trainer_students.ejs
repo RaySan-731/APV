@@ -6,7 +6,7 @@
     <title>Students Management - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="icon" href="/favicon.ico" />
-    <style>
+    <style nonce="<%= cspNonce %>">
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -644,7 +644,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         function toggleExportMenu() {
             const menu = document.getElementById('exportMenu');
             menu.classList.toggle('show');
@@ -714,7 +714,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
       window.currentUserId = '<%= user.id %>';
     </script>
     <script src="/js/notifications.js"></script>

@@ -6,7 +6,7 @@
     <title>RSVP - <%= event.name %> | Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         .message {
             padding: 1rem;
             border-radius: var(--radius);
@@ -81,7 +81,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         document.getElementById('rsvpForm')?.addEventListener('submit', async function(e) {
             e.preventDefault();
             const form = e.target;

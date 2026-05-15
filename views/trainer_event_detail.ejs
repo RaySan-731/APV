@@ -345,7 +345,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         // Trainer detail page specific JS
         let currentEventId = '<%= event._id %>';
         let myTrainerAssignment = null;
@@ -496,7 +496,7 @@
         }
     </script>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
       window.currentUserId = '<%= user.id %>';
     </script>
     <script src="/js/notifications.js"></script>

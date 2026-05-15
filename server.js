@@ -11,10 +11,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
 const multer = require('multer');
-// connect-mongo is loaded only in production when MongoDB session persistence is enabled
-// const MongoStore = require('connect-mongo');
-// const bodyParser = require('body-parser');
-// const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config();
 
@@ -24,7 +23,10 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// Note: express.json() is applied per-route below to avoid breaking
+// GET requests (e.g. /api/schools/active) that receive
+// Content-Type: application/json from Angular HttpClient but carry no body.
+const parseJson = express.json();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -133,7 +135,7 @@ const sessionConfig = {
   cookie: {
     secure: process.env.NODE_ENV === 'production', // true in prod with HTTPS
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'strict',
     maxAge: process.env.SESSION_MAX_AGE ? parseInt(process.env.SESSION_MAX_AGE) : 7 * 24 * 60 * 60 * 1000 // 7 days default
   }
 };
@@ -154,9 +156,18 @@ if (process.env.MONGODB_URI && process.env.NODE_ENV === 'production') {
 
 app.use(session(sessionConfig));
 
+// Security headers
+app.use(helmet());
+
 // Set view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Generate CSP nonce for production (for inline scripts/styles)
+app.use((req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
 
 // Content Security Policy
 app.use((req, res, next) => {
@@ -164,9 +175,13 @@ app.use((req, res, next) => {
   const port = process.env.PORT || 3000;
   const origin = `http://127.0.0.1:${port}`;
   const localhost = `http://localhost:${port}`;
-  const csp = isProduction
-    ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self';"
-    : `default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${origin} ${localhost} http://127.0.0.1:3000 http://localhost:3000; font-src 'self';`;
+  let csp;
+  if (isProduction) {
+    const nonce = res.locals.cspNonce || '';
+    csp = `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; img-src 'self' data:; connect-src 'self'; font-src 'self';`;
+   } else {
+     csp = `default-src 'self' 'unsafe-inline' 'unsafe-eval' ${origin} ${localhost} http://127.0.0.1:3000 http://localhost:3000; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${origin} ${localhost} http://127.0.0.1:3000 http://localhost:3000; font-src 'self';`;
+   }
   res.setHeader('Content-Security-Policy', csp);
   next();
 });
@@ -274,6 +289,7 @@ const requirePermission = (permission) => {
     try {
       // Superuser bypass: admin and founder have all permissions
       if (['admin', 'founder'].includes(req.session.user.role)) {
+        console.log(`[requirePermission/${permission}] SUPERUSER bypass (${req.session.user.role})`);
         return next();
       }
 
@@ -735,6 +751,23 @@ function getDefaultKenyaHolidays() {
   return holidays;
 }
 
+// Rate limiting for critical authentication and staff management routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: 'Too many attempts, please try again after 15 minutes',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const staffAddLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // limit each IP to 10 requests per hour
+  message: 'Too many staff additions, please try again after an hour',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Routes
 app.get('/', (req, res) => {
   try {
@@ -747,7 +780,12 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  res.render('login', { user: req.session.user, next: req.query.next || '', portal: req.query.portal || '' });
+  res.render('login', {
+    user: req.session.user,
+    next: req.query.next || '',
+    portal: req.query.portal || '',
+    showDemo: process.env.NODE_ENV !== 'production'
+  });
 });
 
 async function loginUserByCredentials(email, password) {
@@ -778,9 +816,9 @@ async function loginUserByCredentials(email, password) {
     const school = await School.findOne({ 'contactPerson.email': normalizedEmail, status: 'active' });
     if (school) {
       schoolFallback = await Staff.findOneAndUpdate(
-        { email: normalizedEmail, role: 'school_admin' },
+        { email: normalizedEmail },
         {
-          $setOnInsert: {
+          $set: {
             name: school.contactPerson?.name || school.name || 'School Admin',
             email: normalizedEmail,
             role: 'school_admin',
@@ -799,7 +837,7 @@ async function loginUserByCredentials(email, password) {
             }
           }
         },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
+        { new: true, upsert: true }
       );
     }
   }
@@ -871,7 +909,7 @@ async function loginUserByCredentials(email, password) {
   };
 }
 
-app.post('/login', async (req, res) => {
+app.post('/login', authLimiter, parseJson, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -906,7 +944,7 @@ app.get('/school', (req, res) => {
   });
 });
 
-app.post('/school', async (req, res) => {
+app.post('/school', parseJson, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -971,7 +1009,7 @@ app.get('/contact', (req, res) => {
   res.render('index', { user: req.session.user, section: 'contact' });
 });
 
-app.post('/contact', (req, res) => {
+app.post('/contact', parseJson, (req, res) => {
   // In a production app, you would save this to a database or send an email
   const { name, email, subject, message } = req.body;
   console.log(`Contact form submission: ${name} (${email}) - ${subject}`);
@@ -1002,12 +1040,13 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       revenueCollected,
       outstandingPayments,
       staffList,
-      allPrograms
+      allPrograms,
+      staffStatsResult
     ] = await Promise.all([
       // Total schools
       School.countDocuments(),
-      // Active schools (status = active)
-      School.countDocuments({ status: 'active' }),
+      // Active schools (serviceStatus = active; fallback to status for legacy schools without serviceStatus)
+      School.countDocuments({ $or: [{ serviceStatus: 'active' }, { serviceStatus: { $exists: false }, status: 'active' }] }),
       // New schools this month
       School.countDocuments({
         createdAt: { $gte: startOfMonth }
@@ -1058,50 +1097,79 @@ app.get('/dashboard', requireAuth, async (req, res) => {
       Program.find({ status: 'active' })
         .select('_id name price duration')
         .sort({ name: 1 })
-        .lean()
+        .lean(),
+      // Staff stats for dashboard widgets
+      Staff.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalStaff: { $sum: 1 },
+            activeStaff: {
+              $sum: {
+                $cond: [{ $eq: ['$status', 'Active'] }, 1, 0]
+              }
+            },
+            onLeaveStaff: {
+              $sum: {
+                $cond: [{ $eq: ['$status', 'On Leave'] }, 1, 0]
+              }
+            },
+            avgAttendance: { $avg: '$performanceMetrics.averageAttendanceRate' }
+          }
+        }
+      ])
     ]);
 
     // Extract values from aggregations
     const totalRevenue = revenueCollected[0]?.total || 0;
     const totalOutstanding = outstandingPayments[0]?.total || 0;
+    const staffStats = staffStatsResult[0] || { totalStaff: 0, activeStaff: 0, onLeaveStaff: 0, avgAttendance: 0 };
 
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'dashboard',
-      stats: {
-        totalSchools,
-        activeSchools,
-        newSchoolsThisMonth,
-        totalStudents,
-        eventsThisMonth,
-        revenueCollected: totalRevenue,
-        outstandingPayments: totalOutstanding,
-        activeServiceSchools
-      },
-      staffList,
-      allPrograms
-    });
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'dashboard',
+       stats: {
+         totalSchools,
+         activeSchools,
+         newSchoolsThisMonth,
+         totalStudents,
+         eventsThisMonth,
+         revenueCollected: totalRevenue,
+         outstandingPayments: totalOutstanding,
+         activeServiceSchools,
+         totalStaff: staffStats.totalStaff,
+         activeStaff: staffStats.activeStaff,
+         onLeaveStaff: staffStats.onLeaveStaff,
+         avgAttendance: Math.round(staffStats.avgAttendance || 0)
+       },
+       staffList,
+       allPrograms
+     });
 
-  } catch (err) {
-    console.error('Dashboard error:', err);
-    // Render with empty data on error
-    res.render('dashboard', {
-      user: req.session.user,
-      page: 'dashboard',
-      stats: {
-        totalSchools: 0,
-        activeSchools: 0,
-        newSchoolsThisMonth: 0,
-        totalStudents: 0,
-        eventsThisMonth: 0,
-        revenueCollected: 0,
-        outstandingPayments: 0,
-        activeServiceSchools: 0
-      },
-      staffList: [],
-      allPrograms: []
-    });
-  }
+   } catch (err) {
+     console.error('Dashboard error:', err);
+     // Render with empty data on error
+     res.render('dashboard', {
+       user: req.session.user,
+       page: 'dashboard',
+       stats: {
+         totalSchools: 0,
+         activeSchools: 0,
+         newSchoolsThisMonth: 0,
+         totalStudents: 0,
+         eventsThisMonth: 0,
+         revenueCollected: 0,
+         outstandingPayments: 0,
+         activeServiceSchools: 0,
+         totalStaff: 0,
+         activeStaff: 0,
+         onLeaveStaff: 0,
+         avgAttendance: 0
+       },
+       staffList: [],
+       allPrograms: []
+     });
+   }
 });
 
 app.get('/trainer/dashboard', requireAuth, (req, res) => {
@@ -1467,7 +1535,7 @@ app.get('/api/trainer/schools', requireAuth, async (req, res) => {
 });
 
 // API: Trainer Profile Update
-app.post('/api/trainer/profile', requireAuth, async (req, res) => {
+app.post('/api/trainer/profile', requireAuth, parseJson, async (req, res) => {
   try {
     const currentStaff = await getCurrentStaff(req);
     if (!currentStaff) {
@@ -1516,7 +1584,7 @@ app.post('/api/trainer/profile', requireAuth, async (req, res) => {
 });
 
 // API: Add Certification
-app.post('/api/trainer/certifications', requireAuth, async (req, res) => {
+app.post('/api/trainer/certifications', requireAuth, parseJson, async (req, res) => {
   try {
     const currentStaff = await getCurrentStaff(req);
     if (!currentStaff) {
@@ -1617,7 +1685,7 @@ app.get('/trainer/events/:eventId', requireAuth, async (req, res) => {
 });
 
 // POST: Trainer accepts event assignment
-app.post('/trainer/events/:eventId/accept', requireAuth, async (req, res) => {
+app.post('/trainer/events/:eventId/accept', requireAuth, parseJson, async (req, res) => {
   try {
     const currentStaff = await getCurrentStaff(req);
     if (!currentStaff) {
@@ -1647,7 +1715,7 @@ app.post('/trainer/events/:eventId/accept', requireAuth, async (req, res) => {
 });
 
 // POST: Trainer declines event assignment
-app.post('/trainer/events/:eventId/decline', requireAuth, async (req, res) => {
+app.post('/trainer/events/:eventId/decline', requireAuth, parseJson, async (req, res) => {
   try {
     const { reason } = req.body;
     const currentStaff = await getCurrentStaff(req);
@@ -1694,7 +1762,7 @@ app.post('/trainer/events/:eventId/decline', requireAuth, async (req, res) => {
 });
 
 // POST: Trainer submits event report
-app.post('/trainer/events/:eventId/submit-report', requireAuth, async (req, res) => {
+app.post('/trainer/events/:eventId/submit-report', requireAuth, parseJson, async (req, res) => {
   try {
     const { trainerReport, actualAttendeeCount } = req.body;
     const currentStaff = await getCurrentStaff(req);
@@ -1863,7 +1931,7 @@ app.get('/book', async (req, res) => {
   }
 });
 
-app.post('/book/submit', async (req, res) => {
+app.post('/book/submit', parseJson, async (req, res) => {
   const { program, type, date, participants, notes, userEmail, name, email } = req.body;
 
   try {
@@ -1912,7 +1980,7 @@ app.get('/admin/users', requireAuth, requireFounder, async (req, res) => {
   }
 });
 
-app.post('/admin/users/create', requireAuth, requireFounder, async (req, res) => {
+app.post('/admin/users/create', requireAuth, requireFounder, parseJson, async (req, res) => {
   const { email, password, name, role } = req.body;
   if (!email || !password) return res.redirect('/admin/users');
 
@@ -1939,7 +2007,7 @@ app.post('/admin/users/create', requireAuth, requireFounder, async (req, res) =>
   }
 });
 
-app.post('/admin/users/delete', requireAuth, requireFounder, async (req, res) => {
+app.post('/admin/users/delete', requireAuth, requireFounder, parseJson, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.redirect('/admin/users');
   
@@ -1963,7 +2031,7 @@ app.get('/admin/bookings', requireAuth, requireFounder, async (req, res) => {
   }
 });
 
-app.post('/admin/bookings/delete', requireAuth, requireFounder, async (req, res) => {
+app.post('/admin/bookings/delete', requireAuth, requireFounder, parseJson, async (req, res) => {
   const { id } = req.body;
   if (!id) return res.redirect('/admin/bookings');
   
@@ -1977,7 +2045,7 @@ app.post('/admin/bookings/delete', requireAuth, requireFounder, async (req, res)
 });
 
 // Add staff from dashboard page
-app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'), async (req, res) => {
+app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'), staffAddLimiter, parseJson, async (req, res) => {
   try {
     const {
       idNumber, name, email, phone, role, status, department,
@@ -2021,7 +2089,7 @@ app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'
       },
       invitationToken,
       invitationExpires,
-      createdBy: req.session.user.id || req.session.user._id
+      createdBy: req.session.user.id
     };
 
     console.log('Staff data to save:', JSON.stringify(staffData, null, 2));
@@ -2035,7 +2103,6 @@ app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'
     await emailService.sendEmail({
       to: staff.email,
       subject: 'APV Staff Portal Invitation',
-      html: emailHtml,
       templateId: 'staff_invitation',
       templateData: { name: staff.name, activationUrl: invitationUrl },
       triggeredBy: req.session.user.id,
@@ -2105,19 +2172,43 @@ app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'
       sessionId: req.sessionID
     });
 
-    console.log('=== END STAFF ADD REQUEST ===\n');
+    res.json({ success: true, staffId: staff._id, name: staff.name, email: staff.email });
 
-    res.redirect('/dashboard/staff');
   } catch (err) {
     console.error('✗ Error saving staff:', err.message);
     console.error('Stack:', err.stack);
+
+    // Handle MongoDB duplicate key error (E11000)
+    if (err.code === 11000 || (err.message && err.message.includes('E11000'))) {
+      const dupKeyMatch = err.message.match(/dup key:\s*\{\s*(\w+):\s*"([^"]+)"\s*\}/);
+      if (dupKeyMatch) {
+        const field = dupKeyMatch[1];
+        const value = dupKeyMatch[2];
+        if (field === 'idNumber') {
+          return res.status(409).send(`Staff ID number "${value}" already exists. Please use a unique ID number.`);
+        } else if (field === 'email') {
+          return res.status(409).send(`Email "${value}" is already registered to another staff member.`);
+        }
+      }
+      return res.status(409).send('Duplicate value detected. This staff member already exists (same ID number, email, or other unique field).');
+    }
+
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+      const messages = [];
+      for (const [key, val] of Object.entries(err.errors)) {
+        messages.push(`${key}: ${val.message}`);
+      }
+      return res.status(400).send('Invalid data: ' + messages.join(', '));
+    }
+
     console.log('=== END STAFF ADD REQUEST ===\n');
     res.status(500).send('Error saving staff: ' + err.message);
   }
 });
 
 // Update staff member
-app.post('/dashboard/staff/update', requireAuth, requirePermission('canEditStaff'), async (req, res) => {
+app.post('/dashboard/staff/update', requireAuth, requirePermission('canEditStaff'), parseJson, async (req, res) => {
   try {
     const {
       staffId, idNumber, name, email, phone, role, status, department,
@@ -2220,13 +2311,59 @@ app.post('/dashboard/staff/update', requireAuth, requirePermission('canEditStaff
   } catch (err) {
     console.error('✗ Error updating staff:', err.message);
     console.error('Stack:', err.stack);
+
+    // Handle MongoDB duplicate key error (E11000)
+    if (err.code === 11000 || (err.message && err.message.includes('E11000'))) {
+      const fieldMatch = err.message.match(/index:\s*(\w+)_1/);
+      const dupKeyMatch = err.message.match(/dup key:\s*\{\s*(\w+):\s*"([^"]+)"\s*\}/);
+
+      if (dupKeyMatch) {
+        const field = dupKeyMatch[1];
+        const value = dupKeyMatch[2];
+
+        if (field === 'idNumber') {
+          return res.status(409).json({
+            success: false,
+            error: `Staff ID number "${value}" already exists. Please use a unique ID number.`,
+            field: 'idNumber',
+            suggestion: 'Check existing staff list or use a different ID number (e.g., TRN007)'
+          });
+        } else if (field === 'email') {
+          return res.status(409).json({
+            success: false,
+            error: `Email "${value}" is already registered to another staff member.`,
+            field: 'email',
+            suggestion: 'Use a different email address or check if the staff already exists'
+          });
+        }
+      }
+
+      return res.status(409).json({
+        success: false,
+        error: 'Duplicate value detected. This record already exists (same ID number, email, or other unique field).',
+        suggestion: 'Please check the staff ID number and email are unique'
+      });
+    }
+
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+      const messages = [];
+      for (const [key, val] of Object.entries(err.errors)) {
+        messages.push `${key}: ${val.message}`;
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid data: ' + messages.join(', ')
+      });
+    }
+
     console.log('=== END STAFF UPDATE REQUEST ===\n');
     res.status(500).json({ success: false, error: 'Error updating staff: ' + err.message });
   }
 });
 
 // Delete staff member
-app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteStaff'), async (req, res) => {
+app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteStaff'), parseJson, async (req, res) => {
   try {
     const { staffId } = req.body;
     console.log('=== STAFF DELETE REQUEST ===');
@@ -2262,14 +2399,37 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
 
     res.json({ success: true, message: 'Staff member deleted successfully' });
   } catch (err) {
-    console.error('✗ Error deleting staff:', err.message);
+    console.error('✗ Error saving staff:', err.message);
     console.error('Stack:', err.stack);
-    console.log('=== END STAFF DELETE REQUEST ===\n');
-    res.status(500).json({ success: false, error: 'Error deleting staff: ' + err.message });
+
+    // Handle MongoDB duplicate key error (E11000)
+    if (err.code === 11000 || (err.message && err.message.includes('E11000'))) {
+      const dupKeyMatch = err.message.match(/dup key:\s*\{\s*(\w+):\s*"([^"]+)"\s*\}/);
+      if (dupKeyMatch) {
+        const field = dupKeyMatch[1];
+        const value = dupKeyMatch[2];
+        if (field === 'idNumber') {
+          return res.status(409).send(`Staff ID number "${value}" already exists. Please use a unique ID number.`);
+        } else if (field === 'email') {
+          return res.status(409).send(`Email "${value}" is already registered to another staff member.`);
+        }
+      }
+      return res.status(409).send('Duplicate value detected. This staff member already exists (same ID number, email, or other unique field).');
+    }
+
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+      const messages = [];
+      for (const [key, val] of Object.entries(err.errors)) {
+        messages.push(`${key}: ${val.message}`);
+      }
+      return res.status(400).send('Invalid data: ' + messages.join(', '));
+    }
+
+    console.log('=== END STAFF ADD REQUEST ===\n');
+    res.status(500).send('Error saving staff: ' + err.message);
   }
 });
-
- // ============ STAFF MANAGEMENT ROUTES ============
 
  // Get staff details
  app.get('/api/staff/:staffId', requireAuth, async (req, res) => {
@@ -2297,7 +2457,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
  // ============ LEAVE MANAGEMENT ROUTES ============
 
  // Trainer submits leave request
- app.post('/api/trainer/leave/request', requireAuth, async (req, res) => {
+  app.post('/api/trainer/leave/request', requireAuth, parseJson, async (req, res) => {
    try {
      if (req.session.user.role !== 'trainer') {
        return res.status(403).json({ success: false, error: 'Only trainers can request leave' });
@@ -2355,7 +2515,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
  });
 
  // Founder/Admin approves/declines/postpones leave request
- app.post('/api/staff/leave/:staffId/action', requireAuth, async (req, res) => {
+  app.post('/api/staff/leave/:staffId/action', requireAuth, parseJson, async (req, res) => {
    try {
      // Check permissions - only admin/founder/supervisor/coordinator can approve leaves
      if (!['admin', 'founder', 'supervisor', 'coordinator'].includes(req.session.user.role)) {
@@ -2386,17 +2546,12 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
        return res.status(400).json({ success: false, error: `Leave request is already ${leave.status} and cannot be modified` });
      }
 
-     leave.status = action;
-     if (notes) leave.notes = (leave.notes || '') + `\n\nAdmin note: ${notes}`;
-     leave.approvedBy = new mongoose.Types.ObjectId(req.session.user.id);
-     leave.approvedDate = new Date();
+      leave.status = action;
+      if (notes) leave.notes = (leave.notes || '') + `\n\nAdmin note: ${notes}`;
+      leave.approvedBy = req.session.user.id;
+      leave.approvedDate = new Date();
 
-     await staff.save();
-     if (notes) leave.notes = (leave.notes || '') + `\n\nAdmin note: ${notes}`;
-     leave.approvedBy = req.session.user.id;
-     leave.approvedDate = new Date();
-
-     await staff.save();
+      await staff.save();
 
      // Notify staff member about the decision
      await Notification.create({
@@ -2468,7 +2623,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
    });
 
    // API: Update school profile
-   app.post('/api/school/profile', requireAuth, requireSchoolAdmin, async (req, res) => {
+    app.post('/api/school/profile', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
      const schoolController = require('./backend/controllers/schoolController');
      schoolController.updateSchoolProfile(req, res);
    });
@@ -2479,17 +2634,13 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
      schoolController.getStudentsData(req, res);
    });
 
-   app.post('/api/school/students', requireAuth, requireSchoolAdmin, async (req, res) => {
-     const schoolController = require('./backend/controllers/schoolController');
-     schoolController.addStudent(req, res);
-   });
+    app.post('/api/school/students', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
+      const schoolController = require('./backend/controllers/schoolController');
+      schoolController.addStudent(req, res);
+    });
 
-   app.put('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, async (req, res) => {
-     const schoolController = require('./backend/controllers/schoolController');
-     schoolController.updateStudent(req, res);
-   });
-
-    app.put('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, async (req, res) => {
+     // API: Update student
+    app.put('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
       const schoolController = require('./backend/controllers/schoolController');
       schoolController.updateStudent(req, res);
     });
@@ -2507,7 +2658,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
   // API: Update event attendance/RSVP
-  app.post('/api/school/events/:eventId/attendance', requireAuth, requireSchoolAdmin, async (req, res) => {
+  app.post('/api/school/events/:eventId/attendance', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.updateEventAttendance(req, res);
   });
@@ -2525,7 +2676,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
   // API: Raise payment query
-  app.post('/api/school/invoices/:invoiceId/query', requireAuth, requireSchoolAdmin, async (req, res) => {
+  app.post('/api/school/invoices/:invoiceId/query', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.raisePaymentQuery(req, res);
   });
@@ -2537,7 +2688,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
   // API: Upload document
-   app.post('/api/school/documents', requireAuth, requireSchoolAdmin, uploadDocument.single('document'), async (req, res) => {
+    app.post('/api/school/documents', requireAuth, requireSchoolAdmin, uploadDocument.single('document'), parseJson, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.uploadDocument(req, res);
   });
@@ -2549,7 +2700,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
   // API: Send message to founder
-  app.post('/api/school/messages', requireAuth, requireSchoolAdmin, async (req, res) => {
+  app.post('/api/school/messages', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.sendMessage(req, res);
   });
@@ -2561,7 +2712,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   });
 
    // API: Mark notification as read
-   app.post('/api/school/notifications/:notificationId/read', requireAuth, requireSchoolAdmin, async (req, res) => {
+    app.post('/api/school/notifications/:notificationId/read', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
      const schoolController = require('./backend/controllers/schoolController');
      schoolController.markNotificationRead(req, res);
    });
@@ -2573,13 +2724,13 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
    });
 
    // API: Enroll in a program
-   app.post('/api/school/programs/enroll', requireAuth, requireSchoolAdmin, async (req, res) => {
+    app.post('/api/school/programs/enroll', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
      const schoolController = require('./backend/controllers/schoolController');
      schoolController.enrollProgram(req, res);
    });
 
    // API: Remove program enrollment
-   app.post('/api/school/programs/remove', requireAuth, requireSchoolAdmin, async (req, res) => {
+    app.post('/api/school/programs/remove', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
      const schoolController = require('./backend/controllers/schoolController');
      schoolController.removeProgram(req, res);
    });
@@ -2964,7 +3115,7 @@ app.get('/api/permissions/:role', requireAuth, requirePermission('canManagePermi
 });
 
 // Update permissions for a role
-app.post('/api/permissions/update', requireAuth, requirePermission('canManagePermissions'), async (req, res) => {
+app.post('/api/permissions/update', requireAuth, requirePermission('canManagePermissions'), parseJson, async (req, res) => {
   try {
     const { role, permissions } = req.body;
 
@@ -3006,7 +3157,7 @@ app.get('/activate/:token', async (req, res) => {
   }
 });
 
-app.post('/activate/:token', async (req, res) => {
+app.post('/activate/:token', parseJson, async (req, res) => {
   try {
     const { token } = req.params;
     const { password, confirmPassword } = req.body;
@@ -3059,7 +3210,7 @@ app.post('/activate/:token', async (req, res) => {
 });
 
 // Password reset request
-app.post('/forgot-password', async (req, res) => {
+app.post('/forgot-password', authLimiter, parseJson, async (req, res) => {
   try {
     const { email } = req.body;
     const staff = await Staff.findOne({ email: email.toLowerCase() });
@@ -3080,7 +3231,6 @@ app.post('/forgot-password', async (req, res) => {
     await emailService.sendEmail({
       to: staff.email,
       subject: 'APV Password Reset',
-      html: emailHtml,
       templateId: 'password_reset',
       templateData: { name: staff.name, resetUrl: resetUrl },
       triggeredBy: null, // System-generated
@@ -3117,7 +3267,7 @@ app.get('/reset-password/:token', async (req, res) => {
   }
 });
 
-app.post('/reset-password/:token', async (req, res) => {
+app.post('/reset-password/:token', parseJson, async (req, res) => {
   try {
     const { token } = req.params;
     const { password, confirmPassword } = req.body;
@@ -3163,7 +3313,7 @@ app.post('/reset-password/:token', async (req, res) => {
 // ============ LEAVE MANAGEMENT ROUTES ============
 
 // Submit leave request
-app.post('/api/leave/request', requireAuth, async (req, res) => {
+app.post('/api/leave/request', requireAuth, parseJson, async (req, res) => {
   try {
     const { startDate, endDate, type, notes } = req.body;
     const staffId = req.session.user.id;
@@ -3201,7 +3351,7 @@ app.post('/api/leave/request', requireAuth, async (req, res) => {
 });
 
 // Approve/Reject leave
-app.post('/api/leave/approve', requireAuth, requirePermission('canEditStaff'), async (req, res) => {
+app.post('/api/leave/approve', requireAuth, requirePermission('canEditStaff'), parseJson, async (req, res) => {
   try {
     const { staffId, leaveId, action, notes } = req.body;
 
@@ -3257,7 +3407,7 @@ app.post('/api/leave/approve', requireAuth, requirePermission('canEditStaff'), a
 // ============ AVAILABILITY MANAGEMENT ROUTES ============
 
 // Update availability
-app.post('/api/availability/update', requireAuth, async (req, res) => {
+app.post('/api/availability/update', requireAuth, parseJson, async (req, res) => {
   try {
     const { date, status, notes } = req.body;
     const staffId = req.session.user.id;
@@ -3381,7 +3531,7 @@ app.get('/dashboard/audit-logs', requireAuth, requirePermission('canViewAuditLog
 // ============ PERFORMANCE MANAGEMENT ROUTES ============
 
 // Update performance metrics
-app.post('/api/performance/update', requireAuth, requirePermission('canEditStaff'), async (req, res) => {
+app.post('/api/performance/update', requireAuth, requirePermission('canEditStaff'), parseJson, async (req, res) => {
   try {
     const { staffId, eventsCompleted, reportsSubmitted, schoolsVisited, averageAttendanceRate, averageFeedbackRating } = req.body;
 
@@ -3408,7 +3558,7 @@ app.post('/api/performance/update', requireAuth, requirePermission('canEditStaff
 // ============ PERMISSIONS MANAGEMENT ROUTES ============
 
 // Initialize default permissions
-app.post('/api/permissions/init', requireAuth, requirePermission('canManagePermissions'), async (req, res) => {
+app.post('/api/permissions/init', requireAuth, requirePermission('canManagePermissions'), parseJson, async (req, res) => {
   try {
     const defaultPermissions = [
       {
@@ -3511,7 +3661,7 @@ app.post('/api/permissions/init', requireAuth, requirePermission('canManagePermi
 // ============ TRAINER MANAGEMENT ROUTES ============
 
 // Add new trainer
-app.post('/dashboard/trainer/add', requireAuth, requirePermission('canCreateStaff'), async (req, res) => {
+app.post('/dashboard/trainer/add', requireAuth, requirePermission('canCreateStaff'), parseJson, async (req, res) => {
   try {
     console.log('=== START ADD TRAINER REQUEST ===');
     const { idNumber, name, email, phone, status, password } = req.body;
@@ -3566,7 +3716,7 @@ app.post('/dashboard/trainer/add', requireAuth, requirePermission('canCreateStaf
 });
 
 // Update trainer
-app.post('/dashboard/trainer/update', requireAuth, requirePermission('canEditStaff'), async (req, res) => {
+app.post('/dashboard/trainer/update', requireAuth, requirePermission('canEditStaff'), parseJson, async (req, res) => {
   try {
     console.log('=== START UPDATE TRAINER REQUEST ===');
     const { trainerId, idNumber, name, email, phone, status } = req.body;
@@ -3606,16 +3756,62 @@ app.post('/dashboard/trainer/update', requireAuth, requirePermission('canEditSta
       message: 'Trainer updated successfully',
       trainer: updatedTrainer 
     });
-  } catch (err) {
-    console.error('✗ Error updating trainer:', err.message);
-    console.error('Stack:', err.stack);
-    console.log('=== END UPDATE TRAINER REQUEST ===\n');
-    res.status(500).json({ success: false, error: 'Error updating trainer: ' + err.message });
-  }
+   } catch (err) {
+     console.error('✗ Error updating trainer:', err.message);
+     console.error('Stack:', err.stack);
+
+     // Handle MongoDB duplicate key error (E11000)
+     if (err.code === 11000 || (err.message && err.message.includes('E11000'))) {
+       const fieldMatch = err.message.match(/index:\s*(\w+)_1/);
+       const dupKeyMatch = err.message.match(/dup key:\s*\{\s*(\w+):\s*"([^"]+)"\s*\}/);
+
+       if (dupKeyMatch) {
+         const field = dupKeyMatch[1];
+         const value = dupKeyMatch[2];
+
+         if (field === 'idNumber') {
+           return res.status(409).json({
+             success: false,
+             error: `Trainer ID number "${value}" already exists. Please use a unique ID number.`,
+             field: 'idNumber',
+             suggestion: 'Check existing trainers or use a different ID number (e.g., TRN007)'
+           });
+         } else if (field === 'email') {
+           return res.status(409).json({
+             success: false,
+             error: `Email "${value}" is already registered to another trainer.`,
+             field: 'email',
+             suggestion: 'Use a different email address or check if the trainer already exists'
+           });
+         }
+       }
+
+       return res.status(409).json({
+         success: false,
+         error: 'Duplicate value detected. This trainer already exists (same ID number or email).',
+         suggestion: 'Please check the trainer ID number and email are unique'
+       });
+     }
+
+     // Handle validation errors
+     if (err.name === 'ValidationError') {
+       const messages = [];
+       for (const [key, val] of Object.entries(err.errors)) {
+         messages.push(`${key}: ${val.message}`);
+       }
+       return res.status(400).json({
+         success: false,
+         error: 'Invalid data: ' + messages.join(', ')
+       });
+     }
+
+     console.log('=== END UPDATE TRAINER REQUEST ===\n');
+     res.status(500).json({ success: false, error: 'Error updating trainer: ' + err.message });
+   }
 });
 
 // Delete trainer
-app.post('/dashboard/trainer/delete', requireAuth, requirePermission('canDeleteStaff'), async (req, res) => {
+app.post('/dashboard/trainer/delete', requireAuth, requirePermission('canDeleteStaff'), parseJson, async (req, res) => {
   try {
     console.log('=== START DELETE TRAINER REQUEST ===');
     const { trainerId } = req.body;
@@ -3837,7 +4033,7 @@ app.get('/trainer/students/:studentId/edit', requireAuth, async (req, res) => {
 });
 
 // POST create student
-app.post('/api/trainer/students', requireAuth, async (req, res) => {
+app.post('/api/trainer/students', requireAuth, parseJson, async (req, res) => {
   if (!req.session.user || req.session.user.role !== 'trainer') {
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
@@ -4408,7 +4604,7 @@ app.get('/dashboard/trainer/:trainerId/schools', requireAuth, async (req, res) =
 });
 
 // Allocate schools to trainer
-app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('canAssignTrainers'), parseJson, async (req, res) => {
   try {
     console.log('=== START ALLOCATE SCHOOLS REQUEST ===');
     const { trainerId, schoolIds } = req.body;
@@ -5067,6 +5263,80 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
    } catch (err) {
     console.error('Update school error:', err);
     res.status(500).json({ success: false, error: 'Failed to update school: ' + err.message });
+  }
+});
+
+// POST: Quick update school status (status + serviceStatus)
+app.post('/api/schools/:schoolId/status', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { status, serviceStatus } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    const allowedStatuses = ['active', 'inactive', 'pending'];
+    const allowedServiceStatuses = ['active', 'on_hold', 'churned'];
+
+    if (status && allowedStatuses.includes(status)) {
+      school.status = status;
+    }
+    if (serviceStatus && allowedServiceStatuses.includes(serviceStatus)) {
+      school.serviceStatus = serviceStatus;
+    }
+
+    await school.save();
+
+    res.json({ success: true, school: { status: school.status, serviceStatus: school.serviceStatus } });
+  } catch (err) {
+    console.error('Error updating school status:', err);
+    res.status(500).json({ success: false, error: 'Failed to update school status: ' + err.message });
+  }
+});
+
+// POST: Delete a school (admin/founder only)
+app.post('/api/schools/:schoolId/delete', requireAuth, requirePermission('canDeleteSchools'), async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid school ID' });
+    }
+
+    const school = await School.findById(schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+
+    const schoolName = school.name;
+
+    // Remove school from all programs' enrolled lists
+    const programIds = (school.programsEnrolled || []).map(id => id.toString());
+    if (programIds.length > 0) {
+      await Program.updateMany(
+        { _id: { $in: programIds } },
+        { $pull: { schools: new mongoose.Types.ObjectId(schoolId) } }
+      );
+    }
+
+    await School.findByIdAndDelete(schoolId);
+
+    await logAudit('school_deleted', 'school', schoolId, schoolName, {}, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      userEmail: req.session.user.email
+    });
+
+    res.json({ success: true, message: `School "${schoolName}" deleted successfully` });
+  } catch (err) {
+    console.error('Error deleting school:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete school: ' + err.message });
   }
 });
 
@@ -5914,6 +6184,13 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
       modelData.trainersList = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } }).sort({ createdAt: -1 }).lean();
       console.log('=== TRAINERS PAGE FETCH ===');
       console.log('Found trainers:', modelData.trainersList.length);
+      // Provide default values for audit logs and pagination to prevent template errors
+      modelData.auditLogs = [];
+      modelData.totalPages = 0;
+      modelData.currentPage = 1;
+      modelData.auditActionFilter = '';
+      modelData.auditEntityFilter = '';
+      modelData.auditSearch = '';
     }
 
     if (page === 'permissions') {
@@ -6312,7 +6589,7 @@ app.get('/api/programs/:programId', requireAuth, async (req, res) => {
 });
 
 // PUT update program details
-app.put('/api/programs/:programId', requireAuth, requirePermission('canEditPrograms'), async (req, res) => {
+app.put('/api/programs/:programId', requireAuth, requirePermission('canEditPrograms'), parseJson, async (req, res) => {
   try {
     const { programId } = req.params;
     const {
@@ -8068,8 +8345,9 @@ app.get('/api/schools/list', requireAuth, requirePermission('canViewSchools'), a
 
 // Get all active schools with full details (for reports, modals)
 app.get('/api/schools/active', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
+  console.log('[/api/schools/active] req.user:', req.session.user?.role, '| canViewSchools permission check...');
   try {
-    const schools = await School.find({ status: 'active' })
+    const schools = await School.find({ $or: [{ serviceStatus: 'active' }, { serviceStatus: { $exists: false }, status: 'active' }] })
       .populate('programsEnrolled', 'name category price duration')
       .select('name address city zone region contactPerson studentCount serviceStatus servicePackage programsEnrolled participationMetrics createdAt')
       .sort({ name: 1 })
@@ -9461,49 +9739,295 @@ const initializePermissions = async () => {
           canManagePermissions: false
         },
         description: 'Senior trainer with event creation and trainer assignment capabilities'
-      },
-      {
-        role: 'coordinator',
-        permissions: {
-          canViewStaff: true,
-          canCreateStaff: false,
-          canEditStaff: false,
-          canDeleteStaff: false,
-          canInviteStaff: false,
-          canResetPasswords: false,
-          canViewSchools: true,
-          canCreateSchools: false,
-          canEditSchools: false,
-          canDeleteSchools: false,
-          canAssignTrainers: true,
-          canViewEvents: true,
-          canCreateEvents: true,
-          canEditEvents: true,
-          canDeleteEvents: true,
-          canScheduleEvents: true,
-          canViewPrograms: true,
-          canCreatePrograms: true,
-          canEditPrograms: true,
-          canDeletePrograms: false,
-          canViewBookings: true,
-          canCreateBookings: true,
-          canEditBookings: true,
-          canDeleteBookings: false,
-          canApproveBookings: true,
-          canViewFinancials: false,
-          canManageBudgets: false,
-          canViewAnalytics: true,
-          canGenerateReports: true,
-          canExportData: false,
-          canScheduleReports: false,
-          canApproveReports: false,
-          canManageSystem: false,
-          canViewAuditLogs: false,
-          canManagePermissions: false
-        },
-        description: 'Coordinator for scheduling and assignments'
-      }
-    ];
+       },
+       {
+         role: 'coordinator',
+         permissions: {
+           canViewStaff: true,
+           canCreateStaff: false,
+           canEditStaff: false,
+           canDeleteStaff: false,
+           canInviteStaff: false,
+           canResetPasswords: false,
+           canViewSchools: true,
+           canCreateSchools: false,
+           canEditSchools: false,
+           canDeleteSchools: false,
+           canAssignTrainers: true,
+           canViewEvents: true,
+           canCreateEvents: true,
+           canEditEvents: true,
+           canDeleteEvents: true,
+           canScheduleEvents: true,
+           canViewPrograms: true,
+           canCreatePrograms: true,
+           canEditPrograms: true,
+           canDeletePrograms: false,
+           canViewBookings: true,
+           canCreateBookings: true,
+           canEditBookings: true,
+           canDeleteBookings: false,
+           canApproveBookings: true,
+           canViewFinancials: false,
+           canManageBudgets: false,
+           canViewAnalytics: true,
+           canGenerateReports: true,
+           canExportData: false,
+           canScheduleReports: false,
+           canApproveReports: false,
+           canManageSystem: false,
+           canViewAuditLogs: false,
+           canManagePermissions: false
+         },
+         description: 'Coordinator for scheduling and assignments'
+       },
+       {
+         role: 'supervisor',
+         permissions: {
+           canViewStaff: true,
+           canCreateStaff: false,
+           canEditStaff: true,
+           canDeleteStaff: false,
+           canInviteStaff: false,
+           canResetPasswords: false,
+           canViewSchools: true,
+           canCreateSchools: false,
+           canEditSchools: false,
+           canDeleteSchools: false,
+           canAssignTrainers: true,
+           canViewEvents: true,
+           canCreateEvents: true,
+           canEditEvents: true,
+           canDeleteEvents: false,
+           canScheduleEvents: true,
+           canViewPrograms: true,
+           canCreatePrograms: false,
+           canEditPrograms: false,
+           canDeletePrograms: false,
+           canViewBookings: true,
+           canCreateBookings: false,
+           canEditBookings: false,
+           canDeleteBookings: false,
+           canApproveBookings: false,
+           canViewFinancials: false,
+           canManageBudgets: false,
+           canViewAnalytics: true,
+           canGenerateReports: true,
+           canExportData: false,
+           canScheduleReports: false,
+           canApproveReports: false,
+           canManageSystem: false,
+           canViewAuditLogs: false,
+           canManagePermissions: false
+         },
+         description: 'Supervisor with oversight of trainers and events'
+       },
+       {
+         role: 'school_admin',
+         permissions: {
+           canViewStaff: false,
+           canCreateStaff: false,
+           canEditStaff: false,
+           canDeleteStaff: false,
+           canInviteStaff: false,
+           canResetPasswords: false,
+           canViewSchools: true,
+           canCreateSchools: false,
+           canEditSchools: true,
+           canDeleteSchools: false,
+           canAssignTrainers: false,
+           canViewEvents: true,
+           canCreateEvents: true,
+           canEditEvents: true,
+           canDeleteEvents: false,
+           canScheduleEvents: true,
+           canViewPrograms: true,
+           canCreatePrograms: false,
+           canEditPrograms: false,
+           canDeletePrograms: false,
+           canViewBookings: true,
+           canCreateBookings: true,
+           canEditBookings: true,
+           canDeleteBookings: false,
+           canApproveBookings: false,
+           canViewFinancials: false,
+           canManageBudgets: false,
+           canViewAnalytics: true,
+           canGenerateReports: true,
+           canExportData: false,
+           canScheduleReports: false,
+           canApproveReports: false,
+           canManageSystem: false,
+           canViewAuditLogs: false,
+           canManagePermissions: false
+         },
+         description: 'School administrator with management privileges for own school'
+       },
+       {
+         role: 'admin',
+         permissions: {
+           canViewStaff: true,
+           canCreateStaff: true,
+           canEditStaff: true,
+           canDeleteStaff: true,
+           canInviteStaff: true,
+           canResetPasswords: true,
+           canViewSchools: true,
+           canCreateSchools: true,
+           canEditSchools: true,
+           canDeleteSchools: true,
+           canAssignTrainers: true,
+           canViewEvents: true,
+           canCreateEvents: true,
+           canEditEvents: true,
+           canDeleteEvents: true,
+           canScheduleEvents: true,
+           canViewPrograms: true,
+           canCreatePrograms: true,
+           canEditPrograms: true,
+           canDeletePrograms: true,
+           canViewBookings: true,
+           canCreateBookings: true,
+           canEditBookings: true,
+           canDeleteBookings: true,
+           canApproveBookings: true,
+           canViewFinancials: true,
+           canManageBudgets: true,
+           canViewAnalytics: true,
+           canGenerateReports: true,
+           canExportData: true,
+           canScheduleReports: true,
+           canApproveReports: true,
+           canManageSystem: true,
+           canViewAuditLogs: true,
+           canManagePermissions: true
+         },
+         description: 'Full administrative access to all system features'
+       },
+       {
+         role: 'commissioner',
+         permissions: {
+           canViewStaff: true,
+           canCreateStaff: false,
+           canEditStaff: false,
+           canDeleteStaff: false,
+           canInviteStaff: false,
+           canResetPasswords: false,
+           canViewSchools: true,
+           canCreateSchools: false,
+           canEditSchools: false,
+           canDeleteSchools: false,
+           canAssignTrainers: true,
+           canViewEvents: true,
+           canCreateEvents: true,
+           canEditEvents: true,
+           canDeleteEvents: false,
+           canScheduleEvents: true,
+           canViewPrograms: true,
+           canCreatePrograms: false,
+           canEditPrograms: false,
+           canDeletePrograms: false,
+           canViewBookings: true,
+           canCreateBookings: false,
+           canEditBookings: false,
+           canDeleteBookings: false,
+           canApproveBookings: false,
+           canViewFinancials: false,
+           canManageBudgets: false,
+           canViewAnalytics: true,
+           canGenerateReports: true,
+           canExportData: false,
+           canScheduleReports: false,
+           canApproveReports: false,
+           canManageSystem: false,
+           canViewAuditLogs: false,
+           canManagePermissions: false
+         },
+         description: 'Commissioner with regional oversight and event management'
+       },
+       {
+         role: 'training_officer',
+         permissions: {
+           canViewStaff: true,
+           canCreateStaff: false,
+           canEditStaff: false,
+           canDeleteStaff: false,
+           canInviteStaff: false,
+           canResetPasswords: false,
+           canViewSchools: true,
+           canCreateSchools: false,
+           canEditSchools: false,
+           canDeleteSchools: false,
+           canAssignTrainers: true,
+           canViewEvents: true,
+           canCreateEvents: true,
+           canEditEvents: true,
+           canDeleteEvents: false,
+           canScheduleEvents: true,
+           canViewPrograms: true,
+           canCreatePrograms: true,
+           canEditPrograms: true,
+           canDeletePrograms: false,
+           canViewBookings: true,
+           canCreateBookings: false,
+           canEditBookings: false,
+           canDeleteBookings: false,
+           canApproveBookings: false,
+           canViewFinancials: false,
+           canManageBudgets: false,
+           canViewAnalytics: true,
+           canGenerateReports: true,
+           canExportData: false,
+           canScheduleReports: false,
+           canApproveReports: false,
+           canManageSystem: false,
+           canViewAuditLogs: false,
+           canManagePermissions: false
+         },
+         description: 'Training officer responsible for program development and trainer coordination'
+       },
+       {
+         role: 'medical',
+         permissions: {
+           canViewStaff: false,
+           canCreateStaff: false,
+           canEditStaff: false,
+           canDeleteStaff: false,
+           canInviteStaff: false,
+           canResetPasswords: false,
+           canViewSchools: true,
+           canCreateSchools: false,
+           canEditSchools: false,
+           canDeleteSchools: false,
+           canAssignTrainers: false,
+           canViewEvents: true,
+           canCreateEvents: false,
+           canEditEvents: false,
+           canDeleteEvents: false,
+           canScheduleEvents: false,
+           canViewPrograms: true,
+           canCreatePrograms: false,
+           canEditPrograms: false,
+           canDeletePrograms: false,
+           canViewBookings: false,
+           canCreateBookings: false,
+           canEditBookings: false,
+           canDeleteBookings: false,
+           canApproveBookings: false,
+           canViewFinancials: false,
+           canManageBudgets: false,
+           canViewAnalytics: false,
+           canGenerateReports: false,
+           canExportData: false,
+           canScheduleReports: false,
+           canApproveReports: false,
+           canManageSystem: false,
+           canViewAuditLogs: false,
+           canManagePermissions: false
+         },
+         description: 'Medical staff with limited access to event and program information'
+       }
+     ];
 
     for (const perm of defaultPermissions) {
       await Permission.findOneAndUpdate(

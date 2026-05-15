@@ -110,7 +110,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
     function toggleFields() {
         const type = document.getElementById('invoiceType').value;
         document.getElementById('eventFields').style.display = type === 'event' ? 'block' : 'none';

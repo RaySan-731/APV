@@ -6,7 +6,7 @@
     <title>Dashboard - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
       /* Notifications Dropdown Compose Form Styles */
       .notification-dropdown .form-grid {
         display: grid;
@@ -603,7 +603,9 @@
                                         <option value="name-desc">Name (Z-A)</option>
                                         <option value="id-asc">ID (Low-High)</option>
                                         <option value="id-desc">ID (High-Low)</option>
-                                    </select>
+                                        </select>
+                                        <button class="btn btn-primary" onclick="openAddStaffModal()" style="white-space: nowrap;">+ Add Staff</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -648,48 +650,96 @@
                             </table>
                         </div>
                     </div>
-                    <div class="content-card">
-                        <div class="card-header"><h3>Add New Staff Member</h3></div>
-                        <div class="card-content">
-                            <form action="/dashboard/staff/add" method="POST" class="form-grid">
-                                <!-- Basic Information -->
-                                <label>ID Number<input type="text" name="idNumber" placeholder="Optional staff ID"></label>
-                                <label>Name<input type="text" name="name" required></label>
-                                <label>Email<input type="email" name="email" required></label>
-                                <label>Phone<input type="tel" name="phone"></label>
-                                <label>Role<select name="role" required>
-                                    <option value="">Select Role</option>
-                                    <option value="trainer">Trainer</option>
-                                    <option value="senior trainer">Senior Trainer</option>
-                                    <option value="supervisor">Supervisor</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="coordinator">Coordinator</option>
-                                </select></label>
-                                <label>Department<input type="text" name="department" value="Training"></label>
-                                <label>Status<select name="status">
-                                    <option value="Active">Active</option>
-                                    <option value="On Leave">On Leave</option>
-                                    <option value="Inactive">Inactive</option>
-                                    <option value="Suspended">Suspended</option>
-                                </select></label>
 
-                                <!-- Address Information -->
-                                <label>Street Address<input type="text" name="street"></label>
-                                <label>City<input type="text" name="city"></label>
-                                <label>State<input type="text" name="state"></label>
-                                <label>Zip Code<input type="text" name="zipCode"></label>
-                                <label>Country<input type="text" name="country" value="Kenya"></label>
+                    <!-- Add Staff Wizard Modal -->
+                    <div id="addStaffModal" class="modal" style="display: none; z-index: 9999;">
+                        <div class="modal-content large-modal" style="max-width: 800px;">
+                            <div class="modal-header">
+                                <h3 id="addStaffModalTitle">Add New Staff Member</h3>
+                                <button type="button" class="close-btn" onclick="closeAddStaffModal()">×</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="addStaffForm" onsubmit="event.preventDefault();">
+                                    <!-- Progress indicator -->
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; position: relative;">
+                                        <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border); z-index: 0;"></div>
+                                        <div id="staff-step-indicator-0" style="position: relative; z-index: 1; background: white; padding: 0.5rem 1rem; border-radius: 1rem; font-size: 0.85rem; font-weight: bold; color: var(--primary);">Basic Info</div>
+                                        <div id="staff-step-indicator-1" style="position: relative; z-index: 1; background: white; padding: 0.5rem 1rem; border-radius: 1rem; font-size: 0.85rem; font-weight: normal; color: var(--muted-foreground);">Contact</div>
+                                        <div id="staff-step-indicator-2" style="position: relative; z-index: 1; background: white; padding: 0.5rem 1rem; border-radius: 1rem; font-size: 0.85rem; font-weight: normal; color: var(--muted-foreground);">Emergency</div>
+                                        <div id="staff-step-indicator-3" style="position: relative; z-index: 1; background: white; padding: 0.5rem 1rem; border-radius: 1rem; font-size: 0.85rem; font-weight: normal; color: var(--muted-foreground);">Review</div>
+                                    </div>
 
-                                <!-- Emergency Contact -->
-                                <label>Emergency Contact Name<input type="text" name="emergencyContactName"></label>
-                                <label>Emergency Contact Relationship<input type="text" name="emergencyContactRelationship"></label>
-                                <label>Emergency Contact Phone<input type="tel" name="emergencyContactPhone"></label>
-                                <label>Emergency Contact Email<input type="email" name="emergencyContactEmail"></label>
+                                    <div class="form-grid">
+                                        <!-- Step 1: Basic Information -->
+                                        <div id="staff-step-0" class="onboarding-step" style="display: grid;">
+                                            <h4>Basic Information</h4>
+                                            <label>ID Number (Optional)<input type="text" name="idNumber" placeholder="Staff ID"></label>
+                                            <label>Full Name *<input type="text" name="name" required placeholder="John Doe"></label>
+                                            <label>Email Address *<input type="email" name="email" required placeholder="john@example.com"></label>
+                                            <label>Phone Number<input type="tel" name="phone" placeholder="+254700000000"></label>
+                                            <label>Role *
+                                                <select name="role" required>
+                                                    <option value="">Select Role</option>
+                                                    <option value="trainer">Trainer</option>
+                                                    <option value="senior trainer">Senior Trainer</option>
+                                                    <option value="supervisor">Supervisor</option>
+                                                    <option value="admin">Admin</option>
+                                                    <option value="coordinator">Coordinator</option>
+                                                </select>
+                                            </label>
+                                            <label>Department<input type="text" name="department" value="Training" placeholder="e.g., Training Department"></label>
+                                            <label>Status
+                                                <select name="status">
+                                                    <option value="Active">Active</option>
+                                                    <option value="On Leave">On Leave</option>
+                                                    <option value="Inactive">Inactive</option>
+                                                    <option value="Suspended">Suspended</option>
+                                                </select>
+                                            </label>
+                                        </div>
 
-                                <div class="form-actions">
-                                    <button type="submit" class="btn btn-primary">Add Staff & Send Invitation</button>
-                                </div>
-                            </form>
+                                        <!-- Step 2: Address Information -->
+                                        <div id="staff-step-1" class="onboarding-step" style="display: none; grid;">
+                                            <h4>Address Information</h4>
+                                            <label>Street Address<input type="text" name="street" placeholder="123 Main St"></label>
+                                            <label>City<input type="text" name="city" placeholder="Nairobi"></label>
+                                            <label>State/County<input type="text" name="state" placeholder="Nairobi County"></label>
+                                            <label>Zip/Postal Code<input type="text" name="zipCode" placeholder="00100"></label>
+                                            <label>Country<input type="text" name="country" value="Kenya"></label>
+                                        </div>
+
+                                        <!-- Step 3: Emergency Contact -->
+                                        <div id="staff-step-2" class="onboarding-step" style="display: none; grid;">
+                                            <h4>Emergency Contact</h4>
+                                            <p style="font-size: 0.85rem; color: var(--muted-foreground); margin-bottom: 1rem;">Contact information for emergencies</p>
+                                            <label>Contact Name<input type="text" name="emergencyContactName" placeholder="Jane Doe"></label>
+                                            <label>Relationship<input type="text" name="emergencyContactRelationship" placeholder="e.g., Spouse, Parent"></label>
+                                            <label>Contact Phone<input type="tel" name="emergencyContactPhone" placeholder="+254700000000"></label>
+                                            <label>Contact Email<input type="email" name="emergencyContactEmail" placeholder="emergency@example.com"></label>
+                                        </div>
+
+                                        <!-- Step 4: Review & Submit -->
+                                        <div id="staff-step-3" class="onboarding-step" style="display: none; grid;">
+                                            <h4>Review & Submit</h4>
+                                            <p style="font-size: 0.85rem; color: var(--muted-foreground); margin-bottom: 1rem;">Please verify all information before submitting.</p>
+                                            <div id="staffOnboardingSummary" style="background: var(--muted); padding: 1rem; border-radius: var(--radius); font-size: 0.9rem; line-height: 1.6;">
+                                                <!-- Summary populated by JS -->
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div id="staffOnboardingMessage" class="message" style="display: none; margin-top: 1rem;"></div>
+
+                                    <div class="modal-footer" style="justify-content: space-between;">
+                                        <button type="button" class="btn btn-secondary" id="staffPrevStepBtn" onclick="changeStaffOnboardingStep(-1)" style="display: none;">Previous</button>
+                                        <div>
+                                            <button type="button" class="btn btn-secondary" onclick="closeAddStaffModal()">Cancel</button>
+                                            <button type="button" class="btn btn-primary" id="staffNextStepBtn" onclick="changeStaffOnboardingStep(1)">Next Step</button>
+                                            <button type="button" class="btn btn-primary" id="staffSubmitBtn" onclick="submitStaffOnboarding()" style="display: none;">Add Staff & Send Invitation</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
 
@@ -987,35 +1037,48 @@
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <span class="<%= school.serviceStatus === 'active' ? 'badge badge-success' : school.serviceStatus === 'on_hold' ? 'badge badge-warning' : 'badge badge-secondary' %>">
-                                                        <%= school.serviceStatus ? school.serviceStatus.replace('_', ' ') : school.status %>
-                                                    </span>
+                                                    <%
+                                                    const serviceStatusVal = school.serviceStatus || school.status || 'active';
+                                                    let badgeCls = 'badge-secondary';
+                                                    if (serviceStatusVal === 'active') badgeCls = 'badge-success';
+                                                    else if (serviceStatusVal === 'on_hold') badgeCls = 'badge-warning';
+                                                    %>
+                                                    <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+                                                        <div class="school-status-wrapper">
+                                                            <span class="badge <%= badgeCls %> school-status-badge" data-school-id="<%= school._id %>" data-status="<%= school.status || '' %>" data-service-status="<%= school.serviceStatus || '' %>" onclick="toggleSchoolStatusDropdown(this)">
+                                                                <%= serviceStatusVal.replace('_', ' ') %>
+                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-left:4px;vertical-align:middle;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                                            </span>
+                                                            <div class="school-status-dropdown">
+                                                                <div class="status-dropdown-section">
+                                                                    <small>Service Status</small>
+                                                                    <button class="<%= serviceStatusVal === 'active' ? 'dropdown-active' : '' %>" onclick="updateSchoolStatus('<%= school._id %>', 'active', 'serviceStatus', this)">Active</button>
+                                                                    <button class="<%= serviceStatusVal === 'on_hold' ? 'dropdown-active' : '' %>" onclick="updateSchoolStatus('<%= school._id %>', 'on_hold', 'serviceStatus', this)">On Hold</button>
+                                                                    <button class="<%= serviceStatusVal === 'churned' ? 'dropdown-active' : '' %>" onclick="updateSchoolStatus('<%= school._id %>', 'churned', 'serviceStatus', this)">Churned</button>
+                                                                </div>
+                                                                <div class="status-dropdown-section">
+                                                                    <small>Account Status</small>
+                                                                    <button class="<%= school.status === 'active' ? 'dropdown-active' : '' %>" onclick="updateSchoolStatus('<%= school._id %>', 'active', 'status', this)">Active</button>
+                                                                    <button class="<%= school.status === 'inactive' ? 'dropdown-active' : '' %>" onclick="updateSchoolStatus('<%= school._id %>', 'inactive', 'status', this)">Inactive</button>
+                                                                    <button class="<%= school.status === 'pending' ? 'dropdown-active' : '' %>" onclick="updateSchoolStatus('<%= school._id %>', 'pending', 'status', this)">Pending</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    <% } else { %>
+                                                        <span class="<%= badgeCls %>"><%= serviceStatusVal.replace('_', ' ') %></span>
+                                                    <% } %>
                                                 </td>
                                                 <td>
-                                                    <div class="action-buttons">
-                                                        <button class="btn btn-sm btn-outline" onclick="window.location.href='/dashboard/schools/<%= school._id %>'">
-                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                                                <circle cx="12" cy="12" r="3"></circle>
-                                                            </svg>
-                                                            View Profile
-                                                        </button>
-                                                        <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
-                                                            <button class="btn btn-sm btn-outline" onclick="openOnboardingModal('<%= school._id %>')">
-                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                                </svg>
-                                                                Edit
-                                                            </button>
-                                                             <button class="btn btn-sm btn-primary" onclick="openProgramAllocationModal('<%= school._id %>', '<%= school.name %>', [<%= school.programsEnrolled ? school.programsEnrolled.map(p => `'${p._id}'`).join(',') : '' %>])">
-                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                                                </svg>
-                                                                Allocate Programs
-                                                            </button>
-                                                        <% } %>
+                                                    <div class="action-dropdown">
+                                                        <button type="button" class="btn btn-sm btn-outline action-toggle" data-school-id="<%= school._id %>" aria-label="School actions">Actions ▾</button>
+                                                        <div class="action-menu" style="display: none;">
+                                                            <button type="button" class="action-item" onclick="window.location.href='/dashboard/schools/<%= school._id %>'">View Profile</button>
+                                                            <% if (['admin', 'founder', 'commissioner', 'supervisor'].includes(user.role)) { %>
+                                                              <button type="button" class="action-item" onclick="openOnboardingModal('<%= school._id %>')">Edit</button>
+                                                              <button type="button" class="action-item" onclick="openProgramAllocationModal('<%= school._id %>', '<%= school.name %>', [<%= school.programsEnrolled ? school.programsEnrolled.map(p => `'${p._id}'`).join(',') : '' %>])">Allocate Programs</button>
+                                                              <button type="button" class="action-item text-danger" onclick="openDeleteSchoolModal('<%= school._id %>', '<%= school.name.replace(/'/g, "\\'") %>')">Delete</button>
+                                                            <% } %>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1025,6 +1088,27 @@
                                     <% } %>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Delete School Modal -->
+                    <div id="deleteSchoolModal" class="modal" style="display: none;">
+                        <div class="modal-content" style="max-width: 440px;">
+                            <div class="modal-header" style="border-bottom: 2px solid #dc2626;">
+                                <h3 style="color: #dc2626;">Delete School</h3>
+                                <button type="button" class="close-btn" onclick="closeDeleteSchoolModal()">×</button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Are you sure you want to delete <strong id="deleteSchoolName"></strong>?</p>
+                                <p style="color: var(--muted-foreground); font-size: 0.875rem; margin-top: 0.5rem;">
+                                    This action will permanently remove the school record and all associated data. This <em>cannot</em> be undone.
+                                </p>
+                                <input type="hidden" id="deleteSchoolId">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeDeleteSchoolModal()">Cancel</button>
+                                <button type="button" class="btn btn-danger" onclick="deleteSchool()" style="background: #dc2626; border-color: #dc2626;">Delete School</button>
+                            </div>
                         </div>
                     </div>
                     
@@ -1058,7 +1142,73 @@
                         </div>
                     </div>
                     
-                    <script>
+                    <script nonce="<%= cspNonce %>">
+function toggleSchoolStatusDropdown(badgeEl) {
+    var dropdown = badgeEl.parentElement.querySelector('.school-status-dropdown');
+    var isOpen = dropdown.classList.contains('show');
+    document.querySelectorAll('.school-status-dropdown.show').forEach(function(d) { d.classList.remove('show'); });
+    document.querySelectorAll('.school-status-badge.dropdown-open').forEach(function(b) { b.classList.remove('dropdown-open'); });
+    if (!isOpen) {
+        dropdown.classList.add('show');
+        badgeEl.classList.add('dropdown-open');
+    }
+}
+
+async function updateSchoolStatus(schoolId, newValue, field, btnEl) {
+    try {
+        var res = await fetch('/api/schools/' + schoolId + '/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [field]: newValue })
+        });
+        var data = await res.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Failed to update status: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error updating status: ' + err.message);
+    }
+}
+
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.school-status-wrapper')) {
+        document.querySelectorAll('.school-status-dropdown.show').forEach(function(d) { d.classList.remove('show'); });
+        document.querySelectorAll('.school-status-badge.dropdown-open').forEach(function(b) { b.classList.remove('dropdown-open'); });
+    }
+});
+
+// ---------- DELETE SCHOOL ----------
+function openDeleteSchoolModal(schoolId, schoolName) {
+    document.getElementById('deleteSchoolId').value = schoolId;
+    document.getElementById('deleteSchoolName').textContent = schoolName;
+    document.getElementById('deleteSchoolModal').style.display = 'flex';
+}
+
+function closeDeleteSchoolModal() {
+    document.getElementById('deleteSchoolModal').style.display = 'none';
+}
+
+async function deleteSchool() {
+    const schoolId = document.getElementById('deleteSchoolId').value;
+    if (!confirm('Are you sure you want to permanently delete this school from the platform? This cannot be undone.')) return;
+    try {
+        const res = await fetch('/api/schools/' + schoolId + '/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.href = '/dashboard/schools';
+        } else {
+            alert('Failed to delete school: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error deleting school: ' + err.message);
+    }
+}
+
 function openProgramAllocationModal(schoolId, schoolName, allocatedProgramIds) {
   document.getElementById('modalSchoolName').textContent = schoolName;
   document.getElementById('programAllocationSchoolId').value = schoolId;
@@ -1210,7 +1360,7 @@ async function saveProgramAllocation() {
                             </form>
                         </div>
                     </div>
-                    <script>
+                    <script nonce="<%= cspNonce %>">
                         document.getElementById('schoolEditForm').addEventListener('submit', async function(e) {
                             e.preventDefault();
                             const formData = new FormData(this);
@@ -2039,7 +2189,7 @@ async function saveProgramAllocation() {
                         </div>
                     </div>
                     
-                    <script>
+                    <script nonce="<%= cspNonce %>">
 function openSchoolAllocationModal(programId, programName, allocatedSchoolIds) {
   document.getElementById('modalProgramName').textContent = programName;
   document.getElementById('schoolAllocationProgramId').value = programId;
@@ -2804,7 +2954,7 @@ async function saveSchoolAllocation() {
                          </div>
                      </div>
 
-                     <script>
+                     <script nonce="<%= cspNonce %>">
          // Expose current user and programs to client-side scripts
          window.currentUser = <%- JSON.stringify({
            id: user.id,
@@ -2816,7 +2966,7 @@ async function saveSchoolAllocation() {
        </script>
 
       <!-- Notifications Dropdown JavaScript -->
-      <script>
+      <script nonce="<%= cspNonce %>">
         (function() {
           'use strict';
 
@@ -3389,7 +3539,7 @@ async function saveSchoolAllocation() {
        </script>
 
        <!-- School Onboarding Modal JavaScript -->
-       <script>
+       <script nonce="<%= cspNonce %>">
          (function() {
            'use strict';
 
@@ -3418,82 +3568,83 @@ async function saveSchoolAllocation() {
              });
              prevStepBtn.style.display = index === 0 ? 'none' : 'inline-block';
              nextStepBtn.textContent = index === steps.length - 1 ? 'Save School' : 'Next Step';
-           }
+            }
 
-           // Open modal for creating new school or editing existing
-           window.DashboardUtils.openOnboardingModal = function(schoolId = null) {
-             editingSchoolId = schoolId;
-             if (schoolId) {
-               onboardingTitle.textContent = 'Edit School';
-               // Fetch school data and pre-fill form
-               fetch(`/api/schools/${schoolId}`)
-                 .then(res => res.json())
-                 .then(data => {
-                   const school = data.school || data;
-                   if (school && school._id) {
-                     // Populate form fields
-                     document.querySelector('[name="name"]').value = school.name || '';
-                     document.querySelector('[name="street"]').value = school.address?.street || '';
-                     document.querySelector('[name="city"]').value = school.address?.city || '';
-                     document.querySelector('[name="state"]').value = school.address?.state || '';
-                     document.querySelector('[name="zipCode"]').value = school.address?.zipCode || '';
-                     document.querySelector('[name="country"]').value = school.address?.country || 'Kenya';
-                     document.querySelector('[name="zone"]').value = school.zone || '';
-                     document.querySelector('[name="region"]').value = school.region || '';
-                     document.querySelector('[name="studentCount"]').value = school.studentCount || 0;
+            let isEditingMode = false;
 
-                     // Contact info
-                     document.querySelector('[name="contactName"]').value = school.contactPerson?.name || '';
-                     document.querySelector('[name="contactEmail"]').value = school.contactPerson?.email || '';
-                     document.querySelector('[name="contactPhone"]').value = school.contactPerson?.phone || '';
-                     document.querySelector('[name="contactPosition"]').value = school.contactPerson?.position || '';
-                     document.querySelector('[name="notes"]').value = school.notes || '';
+            // Open modal for creating new school or editing existing
+            window.DashboardUtils.openOnboardingModal = function(schoolId = null) {
+              editingSchoolId = schoolId;
 
-                     // Program (select first matching if any)
-                     if (school.programsEnrolled && school.programsEnrolled.length > 0) {
-                       const programSelect = document.getElementById('programSelect');
-                       // Find first program that exists in the dropdown
-                       const firstProgramId = school.programsEnrolled[0]._id.toString();
-                       const optionExists = Array.from(programSelect.options).some(opt => opt.value === firstProgramId);
-                       if (optionExists) {
-                         programSelect.value = firstProgramId;
-                         programSelect.dispatchEvent(new Event('change'));
-                       }
-                     }
+              if (schoolId) {
+                isEditingMode = true;
+                onboardingTitle.textContent = 'Edit School';
 
-                     // Trainer (use first assigned staff member's staffId)
-                     if (school.assignedStaff && school.assignedStaff.length > 0) {
-                       const trainer = school.assignedStaff[0];
-                       const trainerSelect = document.querySelector('[name="primaryTrainerId"]');
-                       if (trainerSelect && trainer.staffId) {
-                         const trainerId = trainer.staffId.toString();
-                         const optionExists = Array.from(trainerSelect.options).some(opt => opt.value === trainerId);
-                         if (optionExists) {
-                           trainerSelect.value = trainerId;
-                         }
-                       }
-                     }
+                // Fetch school data via the onboarding-data endpoint (flat field names matching the form)
+                fetch(`/api/schools/${schoolId}/onboard-data`)
+                  .then(res => {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                  })
+                  .then(result => {
+                    if (!result.success) throw new Error(result.error || 'Failed');
 
-                     showStep(0);
-                   }
-                 })
-                 .catch(err => {
-                   console.error('Error loading school:', err);
-                   showMessage('Failed to load school data', true);
-                 });
-               } else {
-                 onboardingTitle.textContent = 'Onboard New School';
-                 onboardingForm.reset();
-                 showStep(0);
-               }
-             onboardingModal.style.display = 'flex';
-           };
+                    const data = result.data;
+                    document.querySelector('[name="name"]').value = data.name || '';
+                    document.querySelector('[name="street"]').value = data.street || '';
+                    document.querySelector('[name="city"]').value = data.city || '';
+                    document.querySelector('[name="state"]').value = data.state || '';
+                    document.querySelector('[name="zipCode"]').value = data.zipCode || '';
+                    document.querySelector('[name="country"]').value = data.country || 'Kenya';
+                    document.querySelector('[name="zone"]').value = data.zone || '';
+                    document.querySelector('[name="region"]').value = data.region || '';
+                    document.querySelector('[name="studentCount"]').value = data.studentCount || 0;
 
-           function closeOnboardingModal() {
-             onboardingModal.style.display = 'none';
-             editingSchoolId = null;
-             messageEl.style.display = 'none';
-           }
+                    document.querySelector('[name="contactName"]').value = data.contactName || '';
+                    document.querySelector('[name="contactEmail"]').value = data.contactEmail || '';
+                    document.querySelector('[name="contactPhone"]').value = data.contactPhone || '';
+                    document.querySelector('[name="contactPosition"]').value = data.contactPosition || '';
+
+                    document.querySelector('[name="notes"]').value = data.notes || '';
+
+                    if (data.programId) {
+                      const programSelect = document.getElementById('programSelect');
+                      programSelect.value = data.programId;
+                      programSelect.dispatchEvent(new Event('change'));
+                      if (data.ratePerStudent) {
+                        document.getElementById('ratePerStudent').value = data.ratePerStudent;
+                      }
+                    }
+                    document.querySelector('[name="primaryTrainerId"]').value = data.primaryTrainerId || '';
+                    showStep(0);
+                  })
+                  .catch(err => {
+                    console.error('Error loading school:', err);
+                    // Reset edit state so submit always routes to the correct endpoint
+                    editingSchoolId = null;
+                    isEditingMode = false;
+                    showMessage('Failed to load school data: ' + err.message, true);
+                    // Return to clean create mode
+                    onboardingTitle.textContent = 'Onboard New School';
+                    onboardingForm.reset();
+                    showStep(0);
+                  });
+              } else {
+                editingSchoolId = null;
+                isEditingMode = false;
+                onboardingTitle.textContent = 'Onboard New School';
+                onboardingForm.reset();
+                showStep(0);
+              }
+              onboardingModal.style.display = 'flex';
+            };
+
+            function closeOnboardingModal() {
+              onboardingModal.style.display = 'none';
+              editingSchoolId = null;
+              isEditingMode = false;
+              messageEl.style.display = 'none';
+            }
            window.closeOnboardingModal = closeOnboardingModal;
 
            function showMessage(msg, isError = false) {
@@ -3576,9 +3727,9 @@ async function saveSchoolAllocation() {
                primaryTrainerId: document.querySelector('[name="primaryTrainerId"]').value || null
              };
 
-             try {
-               let url, method, data;
-               if (editingSchoolId) {
+              try {
+                let url, method, data;
+                if (editingSchoolId && isEditingMode) {
                  url = `/api/schools/${editingSchoolId}/update`;
                  method = 'POST';
                  data = formData;
@@ -3600,17 +3751,19 @@ async function saveSchoolAllocation() {
                    closeOnboardingModal();
                    window.location.reload();
                  }, 1000);
-               } else {
-                 showMessage(result.error || 'Operation failed', true);
-               }
-             } catch (err) {
-               console.error('Error saving school:', err);
-               showMessage('Network error', true);
-             }
-           }
+                } else {
+                  showMessage(result.error || 'Operation failed', true);
+                }
+              } catch (err) {
+                console.error('Error saving school:', err);
+                editingSchoolId = null;
+                isEditingMode = false;
+                showMessage('Network error', true);
+              }
+            }
 
-           // Initialize: show first step
-           showStep(0);
+            // Initialize: show first step
+            showStep(0);
 
          })();
 
@@ -3711,27 +3864,17 @@ async function saveSchoolAllocation() {
                   </thead>
                   <tbody id="activeSchoolsTableBody">
                     <!-- Data populated by JS -->
-                                 </tbody>
-                             </table>
-                                 </div>
-                        </div>
-                    </div>
-                    </div>
-                    </div>
-                    </div>
-                    </div>
-                    </div>
+                  </tbody>
+                </table>
+              </div>
+            </div>
             <div id="activeSchoolsEmpty" style="display: none; text-align: center; padding: 2rem;">
               <p class="placeholder-text">No active schools found.</p>
             </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeActiveSchoolsModal()">Close</button>
-          </div>
-         </div>
-       </div>
-
-      <script>
+        </div>
+      </div>
+      <script nonce="<%= cspNonce %>">
         // Active Schools Modal functionality
         function openActiveSchoolsModal() {
           const modal = document.getElementById('activeSchoolsModal');

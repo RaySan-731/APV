@@ -202,6 +202,76 @@ body {
     border: 1px solid var(--border);
 }
 
+/* ========== SCHOOL STATUS DROPDOWN ========== */
+.school-status-wrapper {
+    position: relative;
+    display: inline-block;
+}
+.school-status-badge {
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.school-status-badge svg {
+    opacity: 0.6;
+    transition: transform 0.2s;
+}
+.school-status-badge.dropdown-open svg {
+    transform: rotate(180deg);
+}
+.school-status-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    z-index: 1000;
+    min-width: 190px;
+    overflow: hidden;
+}
+.school-status-dropdown.show {
+    display: block;
+}
+.status-dropdown-section {
+    padding: 6px 0;
+}
+.status-dropdown-section + .status-dropdown-section {
+    border-top: 1px solid var(--border);
+}
+.status-dropdown-section small {
+    display: block;
+    padding: 2px 12px;
+    font-size: 0.7rem;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.status-dropdown-section button {
+    display: block;
+    width: 100%;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.85rem;
+    color: var(--foreground);
+    transition: background 0.15s;
+}
+.status-dropdown-section button:hover {
+    background: var(--accent);
+}
+.status-dropdown-section button.dropdown-active {
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(var(--primary-rgb), 0.08);
+}
+
 /* ========== NOTIFICATION BELL & PANEL ========== */
 .notification-bell {
     display: flex;

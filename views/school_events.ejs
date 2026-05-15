@@ -6,7 +6,7 @@
     <title>Events - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         .event-card { border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; margin-bottom:1rem; background:var(--card); }
         .event-card h3 { margin:0 0 0.5rem 0; font-size:1.15rem; color:var(--foreground); }
         .event-meta { display:flex; flex-wrap:wrap; gap:1rem; font-size:0.9rem; color:var(--muted-foreground); margin-bottom:0.75rem; }
@@ -99,7 +99,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         document.addEventListener('DOMContentLoaded', function() {
             const filterBtns = document.querySelectorAll('.filter-btn');
             const upcomingDiv = document.getElementById('upcomingEvents');

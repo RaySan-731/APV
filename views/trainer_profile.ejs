@@ -6,7 +6,7 @@
     <title>My Profile - Trainer Portal</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         /* Profile page specific styles */
         .profile-header {
             display: flex;
@@ -833,7 +833,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         function showToast(message, type = 'info', duration = 3000) {
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
@@ -997,7 +997,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
       window.currentUserId = '<%= user.id %>';
     </script>
     <script src="/js/notifications.js"></script>

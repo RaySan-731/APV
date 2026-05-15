@@ -6,7 +6,7 @@
     <title>Payments - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         .invoice-card { border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; margin-bottom:1rem; background:var(--card); display:flex; justify-content:space-between; align-items:flex-start; }
         .invoice-info h3 { margin:0 0 0.5rem 0; font-size:1.1rem; }
         .invoice-meta { font-size:0.9rem; color:var(--muted-foreground); margin-bottom:0.5rem; }
@@ -129,7 +129,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         document.addEventListener('DOMContentLoaded', function() {
             // Filter invoices
             const filterBtns = document.querySelectorAll('.filter-btn');

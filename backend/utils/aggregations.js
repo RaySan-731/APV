@@ -379,97 +379,126 @@ async function getSchoolEngagement(filters = {}) {
   const daysAgo = dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 365;
   const startDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
 
-  // Get schools list
-  const schoolMatch = {};
-   if (schoolId) schoolMatch._id = new mongoose.Types.ObjectId(schoolId);
-  const schools = await School.find(schoolMatch).lean();
+  // Build match stage for schools
+  const matchStage = schoolId ? { _id: new mongoose.Types.ObjectId(schoolId) } : {};
 
-  const results = [];
-  for (const school of schools) {
-    // Events attended in date range
-    const eventsAttended = await Event.countDocuments({
-      'targetSchools.schoolId': school._id,
-      status: 'completed',
-      startDate: { $gte: startDate }
-    });
+  const pipeline = [
+    { $match: matchStage },
+    // Lookup completed events attended by this school in date range
+    {
+      $lookup: {
+        from: 'events',
+        let: { schoolId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$status', 'completed'] },
+                  { $gte: ['$startDate', startDate] },
+                  { $in: ['$$schoolId', '$targetSchools.schoolId'] }
+                ]
+              }
+            }
+          }
+        ],
+        as: 'events'
+      }
+    },
+    { $addFields: { eventsAttended: { $size: '$events' } } },
+    // Lookup payments for the school
+    {
+      $lookup: {
+        from: 'payments',
+        localField: '_id',
+        foreignField: 'schoolId',
+        as: 'payments'
+      }
+    },
+    {
+      $addFields: {
+        totalPayments: { $size: '$payments' },
+        onTimePayments: {
+          $size: {
+            $filter: {
+              input: '$payments',
+              as: 'p',
+              cond: {
+                $and: [
+                  { $ne: ['$$p.paidDate', null] },
+                  { $ne: ['$$p.dueDate', null] },
+                  { $lte: ['$$p.paidDate', '$$p.dueDate'] }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    // Lookup feedbacks for the school
+    {
+      $lookup: {
+        from: 'feedbacks',
+        localField: '_id',
+        foreignField: 'schoolId',
+        as: 'feedbacks'
+      }
+    },
+    {
+      $addFields: {
+        avgFeedback: {
+          $avg: {
+            $map: {
+              input: '$feedbacks',
+              as: 'f',
+              in: {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ['$$f.engagementLevel', 'high'] }, then: 3 },
+                    { case: { $eq: ['$$f.engagementLevel', 'medium'] }, then: 2 },
+                    { case: { $eq: ['$$f.engagementLevel', 'low'] }, then: 1 }
+                  ],
+                  default: 0
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ];
 
-    // Payment metrics
-    const paymentStats = await Payment.aggregate([
-      { $match: { schoolId: school._id } },
-      {
-        $group: {
-          _id: null,
-          totalPayments: { $sum: 1 },
-          onTimePayments: {
-            $sum: {
+  // Final projection to compute engagement score and desired fields
+  pipeline.push({
+    $project: {
+      _id: 1,
+      schoolId: '$_id',
+      schoolName: '$name',
+      studentCount: { $ifNull: ['$studentCount', 0] },
+      serviceStatus: 1,
+      eventsAttended: 1,
+      totalPayments: 1,
+      onTimePayments: 1,
+      avgFeedback: { $ifNull: ['$avgFeedback', 0] },
+      engagementScore: {
+        $round: {
+          $add: [
+            { $min: [{ $multiply: ['$eventsAttended', 10] }, 40] },
+            {
               $cond: [
-                {
-                  $and: [
-                    { $ne: ['$paidDate', null] },
-                    { $ne: ['$dueDate', null] },
-                    { $lte: ['$paidDate', '$dueDate'] }
-                  ]
-                },
-                1,
+                { $gt: ['$totalPayments', 0] },
+                { $multiply: [{ $divide: ['$onTimePayments', '$totalPayments'] }, 30] },
                 0
               ]
-            }
-          }
+            },
+            { $multiply: [{ $divide: [{ $ifNull: ['$avgFeedback', 0] }, 3] }, 10] }
+          ]
         }
       }
-    ]);
+    }
+  });
 
-    const paymentData = paymentStats[0] || { totalPayments: 0, onTimePayments: 0 };
-
-    // Feedback average - numeric conversion
-    const avgFeedbackResult = await Feedback.aggregate([
-      { $match: { schoolId: school._id } },
-      {
-        $project: {
-          numericRating: {
-            $switch: {
-              branches: [
-                { case: { $eq: ['$engagementLevel', 'high'] }, then: 3 },
-                { case: { $eq: ['$engagementLevel', 'medium'] }, then: 2 },
-                { case: { $eq: ['$engagementLevel', 'low'] }, then: 1 }
-              ],
-              default: 0
-            }
-          }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          avg: { $avg: '$numericRating' }
-        }
-      }
-    ]);
-
-    const avgFeedback = avgFeedbackResult[0]?.avg || 0;
-
-    // Calculate engagement score (0-100)
-    const attendanceScore = Math.min(eventsAttended * 10, 40); // max 40
-    const paymentScore = paymentData.totalPayments > 0
-      ? (paymentData.onTimePayments / paymentData.totalPayments) * 30
-      : 0;
-    const feedbackScore = (avgFeedback / 3) * 10; // normalize to 10 points
-    const engagementScore = Math.round(attendanceScore + paymentScore + feedbackScore);
-
-    results.push({
-      schoolId: school._id,
-      schoolName: school.name,
-      eventsAttended,
-      totalPayments: paymentData.totalPayments,
-      onTimePayments: paymentData.onTimePayments,
-      avgFeedback,
-      engagementScore,
-      studentCount: school.studentCount || 0,
-      serviceStatus: school.serviceStatus
-    });
-  }
-
-  return results;
+  return await School.aggregate(pipeline);
 }
 
 /**

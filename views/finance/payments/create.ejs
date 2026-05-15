@@ -6,7 +6,7 @@
     <title>Record Payment - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         .invoice-preview {
             background-color: #f8f9fa;
             border: 1px solid #dee2e6;
@@ -178,7 +178,7 @@
         </main>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         // Payment method selection
         document.querySelectorAll('.payment-method-card').forEach(card => {
             card.addEventListener('click', function() {

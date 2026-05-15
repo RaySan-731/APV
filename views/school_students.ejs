@@ -6,7 +6,7 @@
     <title>Students & Groups - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
         .student-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; background: var(--card); transition: var(--transition-base); }
         .student-card:hover { box-shadow: var(--shadow-soft); }
         .student-name { font-weight: 600; font-size: 1.1rem; color: var(--foreground); }
@@ -198,7 +198,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         document.addEventListener('DOMContentLoaded', function() {
             // Tab switching
             const tabs = document.querySelectorAll('.tab-btn');

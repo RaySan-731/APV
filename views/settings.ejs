@@ -6,7 +6,7 @@
     <title>Settings - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style>
+    <style nonce="<%= cspNonce %>">
       /* Tabs */
       .tabs-nav {
         display: flex;
@@ -863,7 +863,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= cspNonce %>">
         // Permission flag
         const canManageSystem = <%= permission.canManageSystem || false %>;
 

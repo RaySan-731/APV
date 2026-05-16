@@ -168,7 +168,9 @@ exports.createInvoice = async (req, res) => {
 
       for (const event of events) {
         if (!event.costPerParticipant && !ratePerStudent) continue;
-        const quantity = event.review?.actualAttendeeCount || event.estimatedScoutCount || 0;
+        // Invoice amount should be based on the number of students in the selected school
+        // (admin-defined per-event `costPerParticipant` from the event creation flow).
+        const quantity = school.studentCount || 0;
         if (quantity <= 0) continue;
 
         const rate = ratePerStudent || event.costPerParticipant || 0;

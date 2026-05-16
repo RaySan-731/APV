@@ -40,14 +40,14 @@
                 </button>
                 <h1 class="page-title">Students & Groups</h1>
                 <div class="header-actions">
-                     <button type="button" class="btn btn-primary" id="addStudentBtn">+ Add Student</button>
+                    <button type="button" class="btn btn-primary" id="addStudentBtn">+ Add Student</button>
                 </div>
             </header>
 
             <div class="dashboard-content">
                 <div class="stats-section" style="margin-bottom: 1.5rem;">
                     <div class="stat-card" style="flex:1;max-width:200px;">
-                         <span class="stat-value" id="totalStudents"><%= students ? students.length : 0 %></span>
+                        <span class="stat-value" id="totalStudents"><%= students ? students.length : 0 %></span>
                         <span class="stat-label">Total Students</span>
                     </div>
                     <div class="stat-card" style="flex:1;max-width:200px;">
@@ -61,6 +61,7 @@
                     <button class="tab-btn" data-tab="students">All Students</button>
                 </div>
 
+                <!-- Groups Tab -->
                 <div id="groupsTab" class="tab-panel active">
                     <% if (!groups || groups.length === 0) { %>
                         <div class="empty-state">
@@ -74,86 +75,103 @@
                         </div>
                     <% } else { %>
                         <div class="groups-list">
-                            <% if (groups && groups.length > 0) { %>
-                                <% groups.forEach(group => { %>
+                            <% groups.forEach(group => { %>
                                 <div class="student-card">
                                     <div class="group-header">
                                         <div>
                                             <h3 class="student-name"><%= group.name %></h3>
-                                             <div class="student-meta">
-                                                 Leader: <%= group.leaderName || 'Not assigned' %> • <%= group.memberCount || 0 %> members • <%= group.advancementLevel || 'N/A' %>
-                                             </div>
-                                             <% if (group.meetingSchedule) { %>
-                                                 <div class="student-meta">Meets: <%= group.meetingSchedule.day || 'TBD' %> at <%= group.meetingSchedule.time || 'TBD' %> (<%= group.meetingSchedule.location || 'TBD' %>)</div>
-                                             <% } %>
+
+                                            <div class="student-meta">
+                                                Leader: <%= group.leaderName || 'Not assigned' %> • <%= group.memberCount || 0 %> members • <%= group.advancementLevel || 'N/A' %>
+                                            </div>
+
+                                            <% if (group.meetingSchedule) { %>
+                                                <div class="student-meta">
+                                                    Meets: <%= group.meetingSchedule.day || 'TBD' %> at <%= group.meetingSchedule.time || 'TBD' %>
+                                                    (<%= group.meetingSchedule.location || 'TBD' %>)
+                                                </div>
+                                            <% } %>
                                         </div>
+
                                         <div class="group-stats">
-                                             <span class="badge badge-primary"><%= group.memberCount || 0 %> students</span>
+                                            <span class="badge badge-primary"><%= group.memberCount || 0 %> students</span>
                                             <span class="badge badge-secondary"><%= group.advancementLevel || 'N/A' %></span>
                                         </div>
                                     </div>
                                 </div>
-                        <% }) %>
-                        <% } else { %>
-                            <div class="empty-state">
-                                 <p>No students found.</p>
-                            </div>
-                        <% } %>
-                    </div>
-                        <% } %>
-                    </div>
+                            <% }) %>
+                        </div>
                     <% } %>
                 </div>
 
+                <!-- Students Tab -->
                 <div id="studentsTab" class="tab-panel">
                     <div class="students-list" id="studentsList">
                         <% if (students && students.length > 0) { %>
                             <% students.forEach(student => { %>
-                            <div class="student-card" data-id="<%= student._id %>">
-                                <div class="student-header">
-                                    <h3 class="student-name"><%= student.fullName || 'Unnamed Student' %></h3>
-                                    <span class="badge badge-primary"><%= student.scoutSection || 'Unassigned' %></span>
-                                </div>
-                                <div class="student-meta">
-                                    Gender: <%= student.gender || 'N/A' %> • DOB: <%= student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : 'N/A' %> • Age: <%= student.dateOfBirth ? Math.floor((new Date() - new Date(student.dateOfBirth)) / (365.25*24*60*60*1000)) : 'N/A' %>
-                                </div>
-                                <div class="student-meta">
-                                    Parent: <%= student.parentContact?.name || 'Unknown' %> (<a href="tel:<%= student.parentContact?.phone || '' %>"><%= student.parentContact?.phone || 'N/A' %></a>)
-                                </div>
-                                <div class="student-meta">
-                                    Trainer: <%= student.assignedTrainerName || 'Unassigned' %>
-                                </div>
-                                <div class="action-btns">
-                                    <button class="btn btn-sm btn-outline edit-student-btn"
+                                <div class="student-card" data-id="<%= student._id %>">
+                                    <div class="student-header">
+                                        <h3 class="student-name"><%= student.fullName || 'Unnamed Student' %></h3>
+                                        <span class="badge badge-primary"><%= student.scoutSection || 'Unassigned' %></span>
+                                    </div>
+
+                                    <div class="student-meta">
+                                        Gender: <%= student.gender || 'N/A' %> • DOB: <%= student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : 'N/A' %> • Age:
+                                        <%= student.dateOfBirth ? Math.floor((new Date() - new Date(student.dateOfBirth)) / (365.25*24*60*60*1000)) : 'N/A' %>
+                                    </div>
+
+                                    <div class="student-meta">
+                                        Parent:
+                                        <%= student.parentContact?.name || 'Unknown' %>
+                                        (<a href="tel:<%= student.parentContact?.phone || '' %>"><%= student.parentContact?.phone || 'N/A' %></a>)
+                                    </div>
+
+                                    <div class="student-meta">
+                                        Trainer: <%= student.assignedTrainerName || 'Unassigned' %>
+                                    </div>
+
+                                    <div class="action-btns">
+                                        <button
+                                            class="btn btn-sm btn-outline edit-student-btn"
                                             data-id="<%= student._id %>"
                                             data-name="<%= student.fullName %>"
                                             data-yeargroup="<%= student.scoutSection %>"
                                             data-trainer="<%= student.assignedTrainer?._id || student.assignedTrainer || '' %>">
-                                        Edit
-                                    </button>
+                                            Edit
+                                        </button>
+                                    </div>
                                 </div>
+                            <% }) %>
+                        <% } else { %>
+                            <div class="empty-state">
+                                <p>No students found.</p>
                             </div>
-                        <% }) %>
+                        <% } %>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-     <!-- Add/Edit Student Modal -->
-    <div id="studentModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+    <!-- Add/Edit Student Modal -->
+    <div id="studentModal" class="modal"
+         style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
         <div class="modal-content" style="background:var(--card);padding:2rem;border-radius:var(--radius);max-width:500px;width:90%;max-height:90vh;overflow-y:auto;">
             <h3 id="modalTitle">Add Student</h3>
+
             <form id="studentForm" class="form-grid" style="gap:0.75rem;margin-top:1rem;">
                 <input type="hidden" id="studentId">
+
                 <div class="form-group">
                     <label for="fullName">Full Name *</label>
                     <input type="text" id="fullName" name="fullName" class="form-input" required>
                 </div>
+
                 <div class="form-group">
                     <label for="dateOfBirth">Date of Birth *</label>
                     <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-input" required>
                 </div>
+
                 <div class="form-group">
                     <label for="gender">Gender *</label>
                     <select id="gender" name="gender" class="form-input" required>
@@ -162,53 +180,68 @@
                         <option value="Other">Other</option>
                     </select>
                 </div>
+
                 <div class="form-group">
                     <label for="parentName">Parent/Guardian Name</label>
                     <input type="text" id="parentName" name="parentName" class="form-input">
                 </div>
+
                 <div class="form-group">
                     <label for="parentPhone">Parent Phone *</label>
                     <input type="tel" id="parentPhone" name="parentPhone" class="form-input" required>
                 </div>
+
                 <div class="form-group">
                     <label for="parentEmail">Parent Email *</label>
                     <input type="email" id="parentEmail" name="parentEmail" class="form-input" required>
                 </div>
-                  <div class="form-group">
-                      <label for="yearGroup">Year Group *</label>
-                      <select id="yearGroup" name="scoutSection" class="form-input" required>
-                          <option value="Sungura">Sungura</option>
-                          <option value="Chipukizi">Chipukizi</option>
-                          <option value="Mwamba">Mwamba</option>
-                          <option value="Rover">Rover</option>
-                      </select>
-                  </div>
-                 <div class="form-group">
-                     <label for="assignedTrainer">Assigned Trainer</label>
-                     <select id="assignedTrainer" name="assignedTrainer" class="form-input">
-                         <option value="">— Unassigned —</option>
-                         <!-- Trainers will be populated by JavaScript -->
-                     </select>
-                 </div>
+
+                <div class="form-group">
+                    <label for="yearGroup">Year Group *</label>
+                    <select id="yearGroup" name="scoutSection" class="form-input" required>
+                        <option value="Sungura">Sungura</option>
+                        <option value="Chipukizi">Chipukizi</option>
+                        <option value="Mwamba">Mwamba</option>
+                        <option value="Rover">Rover</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="assignedTrainer">Assigned Trainer</label>
+                    <select id="assignedTrainer" name="assignedTrainer" class="form-input">
+                        <option value="">— Unassigned —</option>
+                        <!-- Trainers will be populated by JavaScript -->
+                    </select>
+                </div>
+
                 <div class="form-actions" style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:flex-end;">
-                     <button type="button" class="btn btn-secondary" id="cancelStudentBtn">Cancel</button>
+                    <button type="button" class="btn btn-secondary" id="cancelStudentBtn">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Avoid EJS-in-JS parsing issues: embed JSON safely -->
+    <script type="application/json" id="trainersData">
+        <%- JSON.stringify(trainers || []) %>
+    </script>
+
     <script nonce="<%= cspNonce %>">
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // Tab switching
             const tabs = document.querySelectorAll('.tab-btn');
             const panels = document.querySelectorAll('.tab-panel');
+
             tabs.forEach(tab => {
                 tab.addEventListener('click', () => {
                     tabs.forEach(t => t.classList.remove('active'));
                     panels.forEach(p => p.classList.remove('active'));
+
                     tab.classList.add('active');
-                    document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+
+                    const panelId = tab.dataset.tab === 'groups' ? 'groupsTab' : 'studentsTab';
+                    document.getElementById(panelId)?.classList.add('active');
                 });
             });
 
@@ -221,48 +254,56 @@
             const trainerSelect = document.getElementById('assignedTrainer');
 
             // Populate trainers dropdown
-            const trainers = <%- JSON.stringify(trainers || []) %>;
+            const trainersEl = document.getElementById('trainersData');
+            const trainers = trainersEl ? JSON.parse(trainersEl.textContent || '[]') : [];
             trainers.forEach(trainer => {
-              const option = document.createElement('option');
-              option.value = trainer._id;
-              option.textContent = trainer.name;
-              trainerSelect.appendChild(option);
+                const option = document.createElement('option');
+                option.value = trainer._id;
+                option.textContent = trainer.name;
+                trainerSelect.appendChild(option);
             });
 
             function openModal() { modal.style.display = 'flex'; }
-            function closeModal() { modal.style.display = 'none'; form.reset(); document.getElementById('studentId').value=''; }
+            function closeModal() {
+                modal.style.display = 'none';
+                form.reset();
+                document.getElementById('studentId').value = '';
+            }
 
             addBtn?.addEventListener('click', () => {
-              trainerSelect.value = ''; // Reset to unassigned for new students
-              openModal();
+                trainerSelect.value = '';
+                openModal();
             });
+
             cancelBtn?.addEventListener('click', closeModal);
             window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
             editButtons.forEach(btn => {
-              btn.addEventListener('click', async () => {
-                const id = btn.dataset.id;
-                const name = btn.dataset.name;
-                const yeargroup = btn.dataset.yeargroup;
-                document.getElementById('studentId').value = id;
-                document.getElementById('fullName').value = name;
-                document.getElementById('yearGroup').value = yeargroup;
-                // Prefill trainer if available
-                const trainerId = btn.dataset.trainer || '';
-                trainerSelect.value = trainerId;
-                openModal();
-              });
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    const name = btn.dataset.name;
+                    const yeargroup = btn.dataset.yeargroup;
+
+                    document.getElementById('studentId').value = id;
+                    document.getElementById('fullName').value = name;
+                    document.getElementById('yearGroup').value = yeargroup;
+
+                    const trainerId = btn.dataset.trainer || '';
+                    trainerSelect.value = trainerId;
+
+                    openModal();
+                });
             });
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
+
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData.entries());
                 const studentId = data.studentId;
 
-                // Convert empty assignedTrainer to null
                 if (data.assignedTrainer === '') {
-                  data.assignedTrainer = null;
+                    data.assignedTrainer = null;
                 }
 
                 const url = studentId ? `/api/school/students/${studentId}` : '/api/school/students';
@@ -287,4 +328,3 @@
     </script>
 </body>
 </html>
-

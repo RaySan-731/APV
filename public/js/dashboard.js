@@ -2178,6 +2178,16 @@ async function openManageEventModal(eventId) {
                         <strong>${school?.name || 'Unknown School'}</strong>
                         <br><small>${school?.address?.city || 'No city'} | RSVP: <span class="badge ${badgeClass}">${inv.rsvpStatus.replace('_', ' ')}</span> | Deadline: ${inv.rsvpDeadline ? new Date(inv.rsvpDeadline).toLocaleDateString() : 'None'}</small>
                         ${inv.numberOfParticipants ? `<br><small>Participants: ${inv.numberOfParticipants}</small>` : ''}
+                        ${
+                          typeof event.costPerParticipant !== 'undefined'
+                            ? (() => {
+                                const studentCount = Number(school?.studentCount || 0);
+                                const costPer = Number(event.costPerParticipant || 0);
+                                const amount = studentCount * costPer;
+                                return `<br><small><strong>Amount to invoice:</strong> KES ${amount.toLocaleString()}</small>`;
+                              })()
+                            : ''
+                        }
                     </div>
                 `;
                 schoolsList.appendChild(item);

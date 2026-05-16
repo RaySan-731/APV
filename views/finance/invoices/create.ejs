@@ -33,7 +33,7 @@
                                 <select name="schoolId" class="form-select" required>
                                     <option value="">Select school</option>
                                     <% schools.forEach(s => { %>
-                                        <option value="<%= s._id %>"><%= s.name %></option>
+                                        <option value="<%= s._id %>" data-student-count="<%= s.studentCount || 0 %>"><%= s.name %></option>
                                     <% }); %>
                                 </select>
                             </div>
@@ -73,8 +73,21 @@
 
                             <div id="customFields">
                                 <div class="mb-3">
+                                    <label class="form-label">Select Events to build Custom Line Items</label>
+                                    <select id="customEventSelect" class="form-select" multiple size="5">
+                                        <% events.forEach(ev => { %>
+                                            <option
+                                                value="<%= ev._id %>"
+                                                data-cost-per-participant="<%= ev.costPerParticipant || 0 %>"
+                                            ><%= ev.name %> - <%= ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date' %></option>
+                                        <% }); %>
+                                    </select>
+                                    <small class="text-muted">Hold Ctrl/Cmd to select multiple events. Custom JSON will be generated automatically.</small>
+                                </div>
+
+                                <div class="mb-3">
                                     <label class="form-label">Custom Line Items (JSON)</label>
-                                    <textarea name="customItems" class="form-control" rows="4" placeholder='[{"description":"Item","quantity":1,"unitPrice":100}]'></textarea>
+                                    <textarea name="customItems" id="customItemsTextarea" class="form-control" rows="4" placeholder=''></textarea>
                                 </div>
                             </div>
 
@@ -116,9 +129,59 @@
         document.getElementById('eventFields').style.display = type === 'event' ? 'block' : 'none';
         document.getElementById('packageFields').style.display = type === 'service_package' ? 'block' : 'none';
         document.getElementById('customFields').style.display = type === 'custom' ? 'block' : 'none';
+
+        if (type === 'custom') {
+            updateCustomItemsTextarea();
+        }
     }
+
+    function getSelectedStudentCount() {
+        const schoolSelect = document.querySelector('select[name="schoolId"]');
+        const selected = schoolSelect ? schoolSelect.options[schoolSelect.selectedIndex] : null;
+        return selected && selected.dataset ? (parseFloat(selected.dataset.studentCount || '0') || 0) : 0;
+    }
+
+    function buildCustomItemsFromSelectedEvents() {
+        const schoolStudentCount = getSelectedStudentCount();
+
+        const selectEl = document.getElementById('customEventSelect');
+        if (!selectEl) return [];
+
+        const selectedOptions = Array.from(selectEl.selectedOptions || []);
+        const quantity = schoolStudentCount > 0 ? schoolStudentCount : 1;
+
+        const items = selectedOptions.map(opt => {
+            const name = opt.textContent.trim();
+            const costPerParticipant = parseFloat(opt.dataset.costPerParticipant || '0') || 0;
+
+            return {
+                description: `Event: ${name}`,
+                quantity,
+                unitPrice: costPerParticipant
+            };
+        });
+
+        return items;
+    }
+
+    function updateCustomItemsTextarea() {
+        const type = document.getElementById('invoiceType').value;
+        const textarea = document.getElementById('customItemsTextarea');
+        if (!textarea) return;
+
+        if (type !== 'custom') return;
+
+        const items = buildCustomItemsFromSelectedEvents();
+        textarea.value = JSON.stringify(items);
+    }
+
     // Initialize
     toggleFields();
+    updateCustomItemsTextarea();
+
+    // Wiring: regenerate JSON whenever school or event selection changes
+    document.querySelector('select[name="schoolId"]').addEventListener('change', () => updateCustomItemsTextarea());
+    document.getElementById('customEventSelect').addEventListener('change', () => updateCustomItemsTextarea());
     </script>
 
     <script src="/js/main.js"></script>

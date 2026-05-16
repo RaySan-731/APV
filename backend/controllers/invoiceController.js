@@ -161,27 +161,36 @@ exports.createInvoice = async (req, res) => {
       const events = await Event.find({
         _id: { $in: relatedEvents },
         'targetSchools.schoolId': schoolId,
-        status: 'completed'
+        status: { $in: ['completed', 'in_progress'] }
       });
 
       const ratePerStudent = school.paymentTerms?.ratePerStudent || 0;
 
       for (const event of events) {
-        if (!event.costPerParticipant && !ratePerStudent) continue;
-        // Invoice amount should be based on the number of students in the selected school
-        // (admin-defined per-event `costPerParticipant` from the event creation flow).
-        const quantity = school.studentCount || 0;
-        if (quantity <= 0) continue;
+        // Prefer event-specific attendee count when available; fall back to school.studentCount.
+        const eventQuantity =
+          event.review?.actualAttendeeCount ||
+          event.review?.actualParticipantCount ||
+          event.review?.actualScoutCount ||
+          event.estimatedScoutCount ||
+          school.studentCount ||
+          0;
+
+        if (eventQuantity <= 0) continue;
 
         const rate = ratePerStudent || event.costPerParticipant || 0;
-        const total = rate * quantity;
+        if (rate <= 0) continue;
+
+        const total = rate * eventQuantity;
+
         items.push({
-          description: `Event: ${event.name} (${event.startDate ? event.startDate.toLocaleDateString() : 'No date'}) - ${quantity} participants`,
-          quantity,
+          description: `Event: ${event.name} (${event.startDate ? event.startDate.toLocaleDateString() : 'No date'}) - ${eventQuantity} participants`,
+          quantity: eventQuantity,
           unitPrice: rate,
           total,
           eventId: event._id
         });
+
         subtotal += total;
       }
     } else if (invoiceType === 'service_package' && servicePackageId) {

@@ -1623,7 +1623,7 @@ function initFormValidation() {
 
 function validateField(field) {
     const label = field.closest('label');
-    const errorEl = label.querySelector('.field-error');
+    const errorEl = label ? label.querySelector('.field-error') : null;
 
     // Remove existing error
     if (errorEl) {
@@ -1632,7 +1632,7 @@ function validateField(field) {
     field.classList.remove('error');
 
     // Check required
-    if (field.hasAttribute('required') && !field.value.trim()) {
+    if (field.hasAttribute('required') && !String(field.value || '').trim()) {
         showFieldError(field, 'This field is required');
         return false;
     }
@@ -1669,11 +1669,96 @@ function validateField(field) {
 
 function showFieldError(field, message) {
     const label = field.closest('label');
+    if (!label) return;
     const errorEl = document.createElement('small');
     errorEl.className = 'field-error';
     errorEl.textContent = message;
     label.appendChild(errorEl);
     field.classList.add('error');
+}
+
+// Collect missing required inputs and return user-friendly labels.
+// Used on BOTH create + edit submission for the events modal.
+function getMissingRequiredEventFields() {
+    const form = document.getElementById('eventForm');
+    if (!form) return [];
+
+    const requiredFields = form.querySelectorAll('[required]');
+    const missing = [];
+
+    requiredFields.forEach(field => {
+        const val = String(field.value || '').trim();
+        const isMissing = !val;
+
+        if (!isMissing) return;
+
+        const labelEl = field.closest('label');
+        let labelText = '';
+
+        // Most fields are wrapped like: <label><span>Event Name</span><input .../></label>
+        // or: <label class="required-field"><span>...</span><input .../></label>
+        const span = labelEl ? labelEl.querySelector('span') : null;
+        if (span && span.textContent) {
+            labelText = span.textContent.trim();
+        }
+
+        // Fallbacks for dynamic equipment/prerequisite inputs
+        if (!labelText) {
+            if (field.getAttribute('placeholder')) labelText = field.getAttribute('placeholder').trim();
+            else if (field.name) labelText = field.name;
+            else labelText = field.id || 'Required field';
+        }
+
+        // Avoid duplicates (e.g., if multiple inputs fail but represent same label)
+        missing.push(labelText);
+    });
+
+    // Unique while preserving order
+    return missing.filter((x, i, arr) => arr.indexOf(x) === i);
+}
+
+function showEventFormMissingFieldsError(missingFields) {
+    const errorBox = document.getElementById('eventFormError');
+    if (!errorBox) return;
+
+    if (!missingFields || missingFields.length === 0) {
+        errorBox.style.display = 'none';
+        errorBox.textContent = '';
+        return;
+    }
+
+    const list = missingFields.map(f => `• ${f}`).join('<br>');
+    errorBox.innerHTML = `Missing required input(s):<br>${list}`;
+    errorBox.style.display = 'block';
+    errorBox.classList.add('alert-error');
+}
+
+function focusFirstMissingEventField() {
+    const form = document.getElementById('eventForm');
+    if (!form) return;
+
+    const requiredFields = form.querySelectorAll('[required]');
+    for (const field of requiredFields) {
+        const val = String(field.value || '').trim();
+        if (!val) {
+            // remove stale errors
+            form.querySelectorAll('.field-error').forEach(el => el.remove());
+            requiredFields.forEach(f => f.classList.remove('error'));
+
+            // show per-field message for better UX
+            validateField(field);
+
+            // Ensure the exact missing field is visible to the user
+            try {
+                field.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            } catch (e) {
+                // ignore
+            }
+
+            field.focus();
+            return;
+        }
+    }
 }
 
 // Remove equipment row with animation
@@ -1899,6 +1984,7 @@ function collectPrerequisitesData() {
 function initEventFormHandler() {
     const form = document.getElementById('eventForm');
     if (!form) return;
+
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -1932,13 +2018,29 @@ function initEventFormHandler() {
         };
 
         // Handle coordinates
-        const coords = document.getElementById('coordinates').value;
+        const coordsEl = document.getElementById('coordinates');
+        const coords = coordsEl ? coordsEl.value : '';
         if (coords && coords.includes(',')) {
             const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()));
             if (!isNaN(lat) && !isNaN(lng)) {
                 formData.locationLatitude = lat;
                 formData.locationLongitude = lng;
             }
+        }
+
+        // Specific client-side validation for missing required fields (Create + Edit)
+        const missingFields = getMissingRequiredEventFields();
+        if (missingFields.length > 0) {
+            showEventFormMissingFieldsError(missingFields);
+            focusFirstMissingEventField();
+            return;
+        }
+
+        // Clear any previous modal error
+        const errorBox = document.getElementById('eventFormError');
+        if (errorBox) {
+            errorBox.style.display = 'none';
+            errorBox.textContent = '';
         }
 
         try {

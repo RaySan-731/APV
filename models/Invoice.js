@@ -212,7 +212,6 @@ invoiceSchema.pre('save', function(next) {
 invoiceSchema.index({ schoolId: 1, issueDate: -1 });
 invoiceSchema.index({ status: 1 });
 invoiceSchema.index({ dueDate: 1 });
-invoiceSchema.index({ invoiceNumber: 1 });
 invoiceSchema.index({ 'issuedBy': 1 });
 invoiceSchema.index({ createdAt: -1 });
 

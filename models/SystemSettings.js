@@ -123,7 +123,4 @@ systemSettingsSchema.pre('findOneAndDelete', function(next) {
   next(new Error('Global settings cannot be deleted'));
 });
 
-// Index for fast retrieval
-systemSettingsSchema.index({ _id: 1 });
-
 module.exports = mongoose.model('SystemSettings', systemSettingsSchema);

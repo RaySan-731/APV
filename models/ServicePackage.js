@@ -96,7 +96,6 @@ servicePackageSchema.pre('save', function(next) {
 });
 
 // Indexes
-servicePackageSchema.index({ name: 1 });
 servicePackageSchema.index({ isActive: 1 });
 
 module.exports = mongoose.model('ServicePackage', servicePackageSchema);

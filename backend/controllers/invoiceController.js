@@ -164,22 +164,23 @@ exports.createInvoice = async (req, res) => {
         status: 'completed'
       });
 
-      for (const event of events) {
-        // Determine pricing - could be from event.costPerParticipant or service package rate
-        const rate = school.paymentTerms.ratePerStudent || event.costPerParticipant || 0;
-        const quantity = event.review?.actualAttendeeCount || event.estimatedScoutCount || 0;
+      const ratePerStudent = school.paymentTerms?.ratePerStudent || 0;
 
-        if (rate > 0 && quantity > 0) {
-          const total = rate * quantity;
-          items.push({
-            description: `Event: ${event.name} (${event.startDate.toLocaleDateString()}) - ${quantity} participants`,
-            quantity,
-            unitPrice: rate,
-            total,
-            eventId: event._id
-          });
-          subtotal += total;
-        }
+      for (const event of events) {
+        if (!event.costPerParticipant && !ratePerStudent) continue;
+        const quantity = event.review?.actualAttendeeCount || event.estimatedScoutCount || 0;
+        if (quantity <= 0) continue;
+
+        const rate = ratePerStudent || event.costPerParticipant || 0;
+        const total = rate * quantity;
+        items.push({
+          description: `Event: ${event.name} (${event.startDate ? event.startDate.toLocaleDateString() : 'No date'}) - ${quantity} participants`,
+          quantity,
+          unitPrice: rate,
+          total,
+          eventId: event._id
+        });
+        subtotal += total;
       }
     } else if (invoiceType === 'service_package' && servicePackageId) {
       // Invoice based on service package
@@ -203,14 +204,23 @@ exports.createInvoice = async (req, res) => {
       subtotal = items[0].total;
     } else if (customItems) {
       // Manual line items
-      items = JSON.parse(customItems).map(item => ({
-        description: item.description,
-        quantity: parseFloat(item.quantity) || 1,
-        unitPrice: parseFloat(item.unitPrice) || 0,
-        total: (parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0),
-        notes: item.notes
-      }));
-      subtotal = items.reduce((sum, item) => sum + item.total, 0);
+      try {
+        const parsed = JSON.parse(customItems);
+        if (!Array.isArray(parsed)) {
+          return res.status(400).json({ success: false, error: 'Custom items must be a JSON array' });
+        }
+        items = parsed.map(item => ({
+          description: item.description || 'Unnamed item',
+          quantity: parseFloat(item.quantity) || 1,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          total: (parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0),
+          notes: item.notes || ''
+        }));
+        subtotal = items.reduce((sum, item) => sum + item.total, 0);
+      } catch (parseErr) {
+        console.error('Error parsing customItems JSON:', parseErr.message);
+        return res.status(400).json({ success: false, error: 'Invalid JSON format for custom line items' });
+      }
     }
 
     if (items.length === 0) {

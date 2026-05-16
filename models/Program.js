@@ -101,6 +101,5 @@ programSchema.index({ category: 1 });
 programSchema.index({ status: 1 });
 programSchema.index({ 'ageGroup.min': 1, 'ageGroup.max': 1 });
 programSchema.index({ schools: 1 });
-programSchema.index({ schools: 1 });
 
 module.exports = mongoose.model('Program', programSchema);

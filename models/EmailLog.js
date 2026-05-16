@@ -136,7 +136,6 @@ emailLogSchema.index({ 'to.email': 1, sentAt: -1 });
 emailLogSchema.index({ status: 1, sentAt: -1 });
 emailLogSchema.index({ entityType: 1, entityId: 1 });
 emailLogSchema.index({ triggeredBy: 1, createdAt: -1 });
-emailLogSchema.index({ messageId: 1 });
 emailLogSchema.index({ createdAt: -1 });
 emailLogSchema.index({ status: 1, createdAt: -1 });
 

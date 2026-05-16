@@ -172,7 +172,7 @@ app.use((req, res, next) => {
 // Content Security Policy
 app.use((req, res, next) => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3001;
   const origin = `http://127.0.0.1:${port}`;
   const localhost = `http://localhost:${port}`;
   let csp;
@@ -180,8 +180,8 @@ app.use((req, res, next) => {
     const nonce = res.locals.cspNonce || '';
     csp = `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; img-src 'self' data:; connect-src 'self'; font-src 'self';`;
    } else {
-     csp = `default-src 'self' 'unsafe-inline' 'unsafe-eval' ${origin} ${localhost} http://127.0.0.1:3000 http://localhost:3000; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${origin} ${localhost} http://127.0.0.1:3000 http://localhost:3000; font-src 'self';`;
-   }
+      csp = `default-src 'self' 'unsafe-inline' 'unsafe-eval' ${origin} ${localhost}; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${origin} ${localhost}; font-src 'self';`;
+    }
   res.setHeader('Content-Security-Policy', csp);
   next();
 });
@@ -254,69 +254,10 @@ if (process.env.MONGODB_URI) {
   console.log('No MONGODB_URI provided in .env file');
 }
 
+// Import portable auth middleware
+const { requireAuth, requirePermission } = require('./backend/middleware/auth');
+
 // Middleware functions
-const requireAuth = (req, res, next) => {
-  if (!req.session.user) {
-    const isApiRequest = req.xhr ||
-                         req.headers.accept?.includes('application/json') ||
-                         req.headers['content-type']?.includes('application/json') ||
-                         req.path.startsWith('/api/');
-    if (isApiRequest) {
-      return res.status(401).json({ success: false, error: 'Authentication required' });
-    }
-    return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
-  }
-  next();
-};
-
-const requirePermission = (permission) => {
-  return async (req, res, next) => {
-    if (!req.session.user) {
-      const isApiRequest = req.xhr ||
-                           req.headers.accept?.includes('application/json') ||
-                           req.headers['content-type']?.includes('application/json') ||
-                           req.path.startsWith('/api/') ||
-                           (req.path.startsWith('/dashboard/') && (
-                             req.method === 'POST' ||
-                             req.headers['content-type']?.includes('application/json')
-                           ));
-      if (isApiRequest) {
-        return res.status(401).json({ success: false, error: 'Authentication required' });
-      }
-      return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
-    }
-
-    try {
-      // Superuser bypass: admin and founder have all permissions
-      if (['admin', 'founder'].includes(req.session.user.role)) {
-        console.log(`[requirePermission/${permission}] SUPERUSER bypass (${req.session.user.role})`);
-        return next();
-      }
-
-      const staffPermissions = await Permission.findOne({ role: req.session.user.role });
-      if (!staffPermissions || !staffPermissions.permissions || !staffPermissions.permissions[permission]) {
-        const isApiRequest = req.xhr ||
-                             req.headers.accept?.includes('application/json') ||
-                             req.headers['content-type']?.includes('application/json') ||
-                             req.path.startsWith('/api/') ||
-                             req.path.startsWith('/dashboard/') ||
-                             (req.method === 'POST' && req.headers['content-type']?.includes('application/json'));
-        if (isApiRequest) {
-          return res.status(403).json({ success: false, error: 'Access denied. Insufficient permissions.' });
-        }
-        return res.status(403).render('404', {
-          user: req.session.user,
-          error: 'Access denied. Insufficient permissions.'
-        });
-      }
-      next();
-    } catch (err) {
-      console.error('Permission check error:', err);
-      res.status(500).json({ success: false, error: 'Permission check failed' });
-    }
-  };
-};
-
 // School Admin authentication & authorization middleware
 const requireSchoolAdmin = async (req, res, next) => {
   if (!req.session.user) {
@@ -2640,12 +2581,18 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     });
 
      // API: Update student
-    app.put('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
-      const schoolController = require('./backend/controllers/schoolController');
-      schoolController.updateStudent(req, res);
-    });
+     app.put('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
+       const schoolController = require('./backend/controllers/schoolController');
+       schoolController.updateStudent(req, res);
+     });
 
-    // API: Get events
+     // API: Delete student
+     app.delete('/api/school/students/:studentId', requireAuth, requireSchoolAdmin, async (req, res) => {
+       const schoolController = require('./backend/controllers/schoolController');
+       schoolController.deleteStudent(req, res);
+     });
+
+     // API: Get events
   app.get('/api/school/events', requireAuth, requireSchoolAdmin, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.getEvents(req, res);
@@ -2883,7 +2830,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
       try {
        const schoolId = req.schoolId;
         const [groups, students, schoolWithStaff] = await Promise.all([
-          ScoutGroup.find({ schoolId }).sort({ name: 1 }).lean(),
+          ScoutGroup.find({ schoolId, status: 'active' }).sort({ name: 1 }).lean(),
           Student.find({ school: schoolId, status: 'active' })
             .sort({ fullName: 1 })
             .populate('assignedTrainer', 'name')
@@ -2895,19 +2842,34 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
         ]);
 
         // Transform students to include readable trainer names
-        const transformedStudents = students.map(student => ({
-          ...student,
-          assignedTrainerName: student.assignedTrainer?.name || 'Unassigned',
-          addedByName: student.addedBy?.trainerId?.name || 'Unknown'
-        }));
+        const transformedStudents = (students || []).map(student => {
+          const p = student.parentContact || {};
+          return {
+            _id: student._id,
+            fullName: student.fullName || 'Unnamed Student',
+            gender: student.gender || 'N/A',
+            dateOfBirth: student.dateOfBirth || null,
+            scoutSection: student.scoutSection || 'Unassigned',
+            status: student.status || 'active',
+            assignedTrainer: student.assignedTrainer || null,
+            assignedTrainerName: student.assignedTrainer?.name || 'Unassigned',
+            addedBy: student.addedBy || null,
+            addedByName: student.addedBy?.trainerId?.name || 'Unknown',
+            parentContact: {
+              name: p.name || 'Unknown',
+              phone: p.phone || 'N/A',
+              email: p.email || ''
+            }
+          };
+        });
 
-       // Extract trainers array from assignedStaff
-       const trainers = (schoolWithStaff?.assignedStaff || [])
-         .filter(assignment => assignment.status === 'active')
-         .map(assignment => ({
-           _id: assignment.staffId._id,
-           name: assignment.staffId.name
-         }));
+        // Extract trainers array from assignedStaff
+        const trainers = (schoolWithStaff?.assignedStaff || [])
+          .filter(assignment => assignment.status === 'active')
+          .map(assignment => ({
+            _id: assignment.staffId?._id?.toString() || assignment.staffId?.toString() || '',
+            name: assignment.staffId?.name || assignment.staffId || ''
+          }));
 
          res.render('school_students', {
            user: req.session.user,
@@ -9644,6 +9606,10 @@ function requireFounder(req, res, next) {
   if (req.session && req.session.user && req.session.user.role === 'founder') return next();
   return res.status(403).send('Forbidden: founder role required');
 }
+
+// ============ TABLE EXPORT ROUTES ============
+const tableExportRoutes = require('./backend/routes/tableExport');
+app.use('/api', tableExportRoutes);
 
 // ============ FINANCE ROUTES ============
 const financeRoutes = require('./backend/routes/finance');

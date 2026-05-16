@@ -9,7 +9,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <%- include('../partials/sidebar', { user, page: 'finance/invoices' }) %>
+        <%- include('../../partials/sidebar', { user, page: 'finance/invoices' }) %>
 
         <main class="main-content">
             <header class="dashboard-header">
@@ -49,10 +49,10 @@
 
                             <div id="eventFields" style="display:none;">
                                 <div class="mb-3">
-                                    <label class="form-label">Select Completed Events</label>
+                                    <label class="form-label">Select Events (completed or in progress)</label>
                                     <select name="relatedEvents" class="form-select" multiple size="5">
-                                        <% events.filter(e => e.status === 'completed').forEach(ev => { %>
-                                            <option value="<%= ev._id %>"><%= ev.name %> - <%= new Date(ev.startDate).toLocaleDateString() %></option>
+                                        <% events.forEach(ev => { %>
+                                            <option value="<%= ev._id %>"><%= ev.name %> - <%= ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date' %></option>
                                         <% }); %>
                                     </select>
                                     <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
@@ -124,3 +124,4 @@
     <script src="/js/main.js"></script>
 </body>
 </html>
+

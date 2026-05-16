@@ -495,6 +495,49 @@ exports.addStudent = async (req, res) => {
   }
 };
 
+// DELETE: Remove a student
+exports.deleteStudent = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    const student = await Student.findOne({
+      _id: studentId,
+      school: req.schoolId,
+      status: 'active'
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    const studentName = student.fullName;
+    student.status = 'inactive';
+    await student.save();
+
+    // Log audit
+    await logAudit(
+      'student_deleted',
+      'student',
+      studentId,
+      studentName,
+      { reason: 'Deleted by school admin' },
+      {
+        userId: req.staff._id,
+        userName: req.staff.name,
+        userEmail: req.staff.email,
+        userRole: req.staff.role,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }
+    );
+
+    res.json({ success: true, message: `Student "${studentName}" removed successfully` });
+  } catch (err) {
+    console.error('Delete student error:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete student' });
+  }
+};
+
 // POST: Enroll school in a program
 exports.enrollProgram = async (req, res) => {
   try {

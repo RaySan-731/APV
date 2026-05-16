@@ -119,7 +119,6 @@ const notificationPreferenceSchema = new mongoose.Schema({
 });
 
 // Indexes
-notificationPreferenceSchema.index({ staffId: 1 }, { unique: true });
 notificationPreferenceSchema.index({ 'channels.email.digest': 1 });
 
 // Update updatedAt before saving

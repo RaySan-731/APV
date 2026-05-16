@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
      const staffTable = document.getElementById('staffTable')?.querySelector('tbody');
      const staffSearch = document.getElementById('staffSearch');
      const roleFilter = document.getElementById('roleFilter');
-     const staffStatusFilter = document.getElementById('statusFilter');
+     const staffStatusElement = document.getElementById('statusFilter');
 
      if (staffSelect && staffTable) {
         staffSelect.addEventListener('change', function() {
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Normal filtering
         const searchTerm = staffSearch?.value.trim().toLowerCase() || '';
         const roleValue = roleFilter?.value || '';
-         const statusValue = staffStatusFilter?.value || '';
+         const statusValue = staffStatusElement?.value || '';
 
         let visibleCount = 0;
         staffRows.forEach(row => {
@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     if (roleFilter) roleFilter.addEventListener('change', filterStaffTable);
-     if (staffStatusFilter) staffStatusFilter.addEventListener('change', filterStaffTable);
+     if (staffStatusElement) staffStatusElement.addEventListener('change', filterStaffTable);
 
     // Action Dropdown Toggle
     document.addEventListener('click', function(e) {

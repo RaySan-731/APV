@@ -60,17 +60,17 @@ class NotificationScheduler {
   }
 
   start() {
-    // Check for overdue reports every hour (with load check)
-    this.schedule('0 * * * *', this.checkOverdueReports.bind(this), 'overdue_reports');
+    // Check for overdue reports less frequently to reduce DB load
+    this.schedule('0 */3 * * *', this.checkOverdueReports.bind(this), 'overdue_reports');
 
-    // Check for upcoming events (48 hours) every 6 hours
+    // Check for upcoming events (48 hours) less frequently
     this.schedule('0 */6 * * *', this.checkUpcomingEvents.bind(this), 'upcoming_events');
 
-    // Check for unresolved conflicts every 2 hours
-    this.schedule('0 */2 * * *', this.checkUnresolvedConflicts.bind(this), 'conflict_escalation');
+    // Check for unresolved conflicts less frequently
+    this.schedule('0 */4 * * *', this.checkUnresolvedConflicts.bind(this), 'conflict_escalation');
 
-    // Process scheduled announcements every 5 minutes (with concurrency limit)
-    this.schedule('*/5 * * * *', this.processScheduledAnnouncements.bind(this), 'announcements');
+    // Process scheduled announcements less frequently to reduce system load
+    this.schedule('*/15 * * * *', this.processScheduledAnnouncements.bind(this), 'announcements');
 
     console.log('Notification scheduler started');
   }
@@ -119,7 +119,7 @@ class NotificationScheduler {
       })
       .populate('trainers.trainerId', 'name email role')
       .select('name endDate trainers')
-      .limit(20); // Limit to prevent overload
+      .limit(10); // Lower limit to reduce load
 
       if (overdueEvents.length === 0) return;
 
@@ -223,7 +223,7 @@ class NotificationScheduler {
       })
       .populate('trainers.trainerId', 'name email role')
       .select('name startDate trainers')
-      .limit(15);
+      .limit(8);
 
       if (upcomingEvents.length === 0) return;
 
@@ -378,14 +378,14 @@ class NotificationScheduler {
         status: 'scheduled',
         scheduledAt: { $lte: now }
       })
-      .limit(10); // Limit to prevent overload
+      .limit(5); // Lower limit to reduce overload
 
       if (dueAnnouncements.length === 0) return;
 
       console.log(`[Notification] Processing ${dueAnnouncements.length} scheduled announcements`);
 
-      // Process announcements in parallel with concurrency limit
-      await this.processInBatches(dueAnnouncements, 2, async (announcement) => {
+      // Process announcements in parallel with lower concurrency limit
+      await this.processInBatches(dueAnnouncements, 1, async (announcement) => {
         await this.deliverAnnouncement(announcement);
         // Yield between announcements
         await new Promise(resolve => setImmediate(resolve));
@@ -454,7 +454,7 @@ class NotificationScheduler {
       }
 
       // Create notifications in parallel with concurrency limit
-      const notificationPromises = recipients.slice(0, 50).map(async (recipient) => {
+      const notificationPromises = recipients.slice(0, 25).map(async (recipient) => {
         try {
           await Notification.create({
             recipientId: recipient._id,
@@ -473,10 +473,12 @@ class NotificationScheduler {
 
       await Promise.all(notificationPromises);
 
+
       // Send emails asynchronously without blocking
       if (announcement.sendEmail) {
         setTimeout(async () => {
-          const emailPromises = recipients.slice(0, 50).map(async (recipient) => {
+          // Lower recipient batch size to reduce email/DB load
+          const emailPromises = recipients.slice(0, 15).map(async (recipient) => {
             if (!recipient.email) return;
             try {
               await Promise.race([
@@ -496,6 +498,7 @@ class NotificationScheduler {
           await Promise.all(emailPromises);
         }, 0);
       }
+
 
       announcement.status = 'sent';
       announcement.sentAt = new Date();

@@ -86,13 +86,23 @@ body {
     --sidebar-accent-foreground: hsl(0, 0%, 100%);
     --sidebar-border: hsl(150, 50%, 30%);
     --sidebar-ring: hsl(150, 90%, 65%);     /* Bright accent for active indicator glow */
-}
+    --sidebar-border: hsl(150, 50%, 30%);
 
-/* Utility Classes */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1rem;
+    /* ===== Stat Card Accent Colors (one per metric type) ===== */
+    --stat-schools:        hsl(160, 70%, 37%);
+    --stat-schools-light:  hsl(160, 70%, 92%);
+    --stat-students:       hsl(210, 70%, 45%);
+    --stat-students-light: hsl(210, 70%, 93%);
+    --stat-revenue:        hsl(35, 82%, 48%);
+    --stat-revenue-light:  hsl(35, 80%, 93%);
+    --stat-payments:       hsl(340, 72%, 52%);
+    --stat-payments-light: hsl(340, 70%, 93%);
+    --stat-events:         hsl(195, 70%, 40%);
+    --stat-events-light:   hsl(195, 72%, 93%);
+    --stat-active:         hsl(142, 72%, 36%);
+    --stat-active-light:   hsl(142, 75%, 93%);
+    --stat-service:        hsl(270, 55%, 40%);
+    --stat-service-light:  hsl(270, 50%, 93%);
 }
 
 .btn {
@@ -202,6 +212,12 @@ body {
     border: 1px solid var(--border);
 }
 
+/* Smaller badge variant for dense tables */
+.badge-sm {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
 /* ========== SCHOOL STATUS DROPDOWN ========== */
 .school-status-wrapper {
     position: relative;
@@ -214,11 +230,21 @@ body {
     align-items: center;
     gap: 4px;
 }
-.school-status-badge svg {
+.school-status-badge svg:not(.status-dropdown-chevron) {
     opacity: 0.6;
     transition: transform 0.2s;
 }
-.school-status-badge.dropdown-open svg {
+.school-status-badge .status-dropdown-chevron {
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    opacity: 0.55;
+    transition: transform 0.2s, opacity 0.2s;
+}
+.school-status-badge:hover .status-dropdown-chevron {
+    opacity: 0.85;
+}
+.school-status-badge.dropdown-open .status-dropdown-chevron {
     transform: rotate(180deg);
 }
 .school-status-dropdown {
@@ -552,15 +578,6 @@ body {
     border-radius: var(--radius);
     box-shadow: var(--shadow-card);
     overflow: hidden;
-}
-
-.card-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.card-content {
-    padding: 1.5rem;
 }
 
 /* Trainer-Specific Styles (Scoped) */
@@ -929,6 +946,243 @@ body {
 .stat-label {
     color: var(--muted-foreground);
     font-size: 0.875rem;
+}
+
+/* ===================== ENHANCED STAT CARD TYPE SYSTEM ===================== */
+/* Each card type gets a unique accent color drawn from CSS custom properties */
+
+.stat-card--schools {
+    border-top: 3.5px solid var(--stat-schools);
+    box-shadow: 0 8px 32px -8px hsl(160, 70%, 37% / 0.18), var(--shadow-card);
+}
+.stat-card--schools:hover {
+    box-shadow: 0 14px 44px -10px hsl(160, 70%, 37% / 0.28), var(--shadow-card);
+}
+
+.stat-card--students {
+    border-top: 3.5px solid var(--stat-students);
+    box-shadow: 0 8px 32px -8px hsl(210, 70%, 45% / 0.18), var(--shadow-card);
+}
+.stat-card--students:hover {
+    box-shadow: 0 14px 44px -10px hsl(210, 70%, 45% / 0.28), var(--shadow-card);
+}
+
+.stat-card--revenue {
+    border-top: 3.5px solid var(--stat-revenue);
+    box-shadow: 0 8px 32px -8px hsl(35, 82%, 48% / 0.18), var(--shadow-card);
+}
+.stat-card--revenue:hover {
+    box-shadow: 0 14px 44px -10px hsl(35, 82%, 48% / 0.28), var(--shadow-card);
+}
+
+.stat-card--payments {
+    border-top: 3.5px solid var(--stat-payments);
+    box-shadow: 0 8px 32px -8px hsl(340, 72%, 52% / 0.18), var(--shadow-card);
+}
+.stat-card--payments:hover {
+    box-shadow: 0 14px 44px -10px hsl(340, 72%, 52% / 0.28), var(--shadow-card);
+}
+
+.stat-card--events {
+    border-top: 3.5px solid var(--stat-events);
+    box-shadow: 0 8px 32px -8px hsl(195, 70%, 40% / 0.18), var(--shadow-card);
+}
+.stat-card--events:hover {
+    box-shadow: 0 14px 44px -10px hsl(195, 70%, 40% / 0.28), var(--shadow-card);
+}
+
+.stat-card--active {
+    border-top: 3.5px solid var(--stat-active);
+    box-shadow: 0 8px 32px -8px hsl(142, 72%, 36% / 0.18), var(--shadow-card);
+}
+.stat-card--active:hover {
+    box-shadow: 0 14px 44px -10px hsl(142, 72%, 36% / 0.28), var(--shadow-card);
+}
+
+.stat-card--service {
+    border-top: 3.5px solid var(--stat-service);
+    box-shadow: 0 8px 32px -8px hsl(270, 55%, 40% / 0.18), var(--shadow-card);
+}
+.stat-card--service:hover {
+    box-shadow: 0 14px 44px -10px hsl(270, 55%, 40% / 0.28), var(--shadow-card);
+}
+
+/* Clickable stat-card specifically for the Active Schools card */
+.stat-card[role="button"] {
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+.stat-card[role="button"]:hover {
+    transform: translateY(-2px);
+}
+.stat-card[role="button"]:active {
+    transform: translateY(0);
+}
+
+/* Trend indicator badge injected above the stat number */
+.stat-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
+    margin-bottom: 0.35rem;
+}
+.stat-trend--up {
+    color: #166534;
+    background: #dcfce7;
+}
+.stat-trend--down {
+    color: #991b1b;
+    background: #fef2f2;
+}
+.stat-trend--neutral {
+    color: #374151;
+    background: #f3f4f6;
+}
+.stat-trend svg {
+    width: 0.85em;
+    height: 0.85em;
+    flex-shrink: 0;
+}
+
+/* Status pill accessory at bottom of card  (For revenue / payments card) */
+.stat-sub {
+    margin-top: 0.3rem;
+    font-size: 0.775rem;
+    color: var(--muted-foreground);
+    font-weight: 500;
+}
+.stat-sub strong {
+    color: var(--foreground);
+    font-weight: 600;
+}
+
+/* Services Ring — small visual indicator inside a card */
+.stat-ring {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+}
+.stat-ring svg {
+    width: 2.2rem;
+    height: 2.2rem;
+    transform: rotate(-90deg);
+}
+.stat-ring-bar {
+    transition: stroke-dashoffset 0.8s ease;
+}
+
+/* ===================== FILTER / SEARCH BAR ===================== */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+}
+.filter-bar__label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--foreground);
+    flex-shrink: 0;
+}
+.filter-bar__spacer {
+    flex: 1;
+    min-width: 1rem;
+}
+.filter-bar__group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Shared search-input style applied inside .filter-bar */
+.filter-input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--card);
+    color: var(--foreground);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    min-width: 160px;
+}
+.filter-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+.filter-input--wider {
+    min-width: 200px;
+}
+.filter-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--card);
+    color: var(--foreground);
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+/* Layout helper: align + + button to the right of the label */
+.filter-bar-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.filter-bar-actions .btn {
+    white-space: nowrap;
+}
+
+/* ===================== EMPTY STATE ===================== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    text-align: center;
+    color: var(--muted-foreground);
+}
+.empty-state__icon {
+    font-size: 2.75rem;
+    margin-bottom: 1rem;
+    opacity: 0.55;
+    line-height: 1;
+}
+.empty-state__title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+.empty-state__desc {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    max-width: 380px;
+}
+.empty-state__action {
+    margin-top: 1.25rem;
 }
 
 /* Programs Section */
@@ -1401,7 +1655,63 @@ body {
 }
 
 .dashboard-content {
-    padding: 2rem;
+    padding: 1.75rem 2rem;
+}
+
+/* ---- Page header helper (breadcrumb + actions row) ---- */
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.page-header__left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+.page-header__breadcrumb {
+    font-size: 0.78rem;
+    color: var(--muted-foreground);
+}
+.page-header__breadcrumb a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+.page-header__breadcrumb a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+.page-header__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Section header at the top of a card (replaces some inline styles) */
+.card-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.card-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--foreground);
+    font-family: var(--font-heading);
+    letter-spacing: -0.01em;
+}
+.card-content {
+    padding: 1.5rem;
 }
 
 .stats-grid {
@@ -1448,6 +1758,79 @@ body {
     color: var(--accent);
     font-size: 0.75rem;
     font-weight: 500;
+}
+
+/* ======== Modal Overlay (alternative, shared with JS toggle) ======== */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 40, 30, 0.52);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    animation: fadeIn 0.2s ease-out;
+}
+.modal-overlay.m-hidden {
+    display: none;
+}
+
+/* ---- Trainer / staff list items ---- */
+.trainer-list {
+    margin-top: 0.5rem;
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+}
+.trainer-list__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    background: var(--secondary);
+    border-radius: 0.5rem;
+    transition: background-color 0.15s;
+    font-size: 0.85rem;
+}
+.trainer-list__item:hover {
+    background: hsl(30, 35%, 88%);
+}
+.trainer-list__item.is-unassigned {
+    background: none;
+    padding-left: 0;
+    color: var(--muted-foreground);
+    font-style: italic;
+}
+
+/* ---- Trainer list in school profile card ---- */
+.trainer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+/* ---- Placeholder / empty state text ---- */
+.placeholder-text {
+    color: var(--muted-foreground);
+    font-style: italic;
+    padding: 1.5rem;
+    text-align: center;
+    display: block;
+}
+
+/* Inline action links (table cell, card text) */
+.link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+.link:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
 }
 
 /* Trainer Dashboard Stats Override */
@@ -1504,21 +1887,6 @@ body {
     overflow: hidden;
 }
 
-.card-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.card-header h3 {
-    font-size: 1.25rem;
-    font-weight: bold;
-    color: var(--foreground);
-}
-
-.card-content {
-    padding: 1.5rem;
-}
-
 .activity-list {
     display: flex;
     flex-direction: column;
@@ -1560,6 +1928,223 @@ body {
 .placeholder-text {
     color: var(--muted-foreground);
     font-style: italic;
+    padding: 1.5rem;
+    text-align: center;
+    display: block;
+}
+
+/* ====== Activity feed helpers ====== */
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: background-color 0.15s;
+}
+.activity-item:hover {
+    background: var(--muted);
+}
+.activity-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    margin-top: 0.5rem;
+    flex-shrink: 0;
+}
+.activity-dot--event   { background: var(--stat-events); }
+.activity-dot--school  { background: var(--stat-schools); }
+.activity-dot--staff   { background: var(--stat-revenue); }
+.activity-dot--finance { background: var(--stat-service); }
+.activity-dot--system  { background: var(--muted-foreground); }
+.activity-body { flex: 1; min-width: 0; }
+.activity-text {
+    font-size: 0.9rem;
+    color: var(--foreground);
+    line-height: 1.5;
+}
+.activity-text strong { font-weight: 600; }
+.activity-time {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* ====== User info pill in header ====== */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.375rem 0.625rem 0.375rem 0.375rem;
+    background: var(--secondary);
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--foreground);
+}
+.user-info__avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+.user-info__name {
+    max-width: 13rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ====== Action icon buttons group in table cells ====== */
+.action-buttons-group {
+    display: inline-flex;
+    gap: 0.375rem;
+    flex-wrap: nowrap;
+}
+.action-buttons-group .btn {
+    white-space: nowrap;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.625rem;
+}
+.action-buttons-group .btn svg {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+.btn-danger-outline {
+    border-color: hsl(0, 84%, 60%);
+    color: hsl(0, 84%, 60%);
+}
+.btn-danger-outline:hover {
+    background: hsl(0, 84%, 60%);
+    color: white;
+    border-color: hsl(0, 84%, 60%);
+}
+
+/* Utility: margin-bottom shortcut */
+.mb-1 { margin-bottom: 1rem; }
+
+/* Small visit-log entries (school profile page) */
+.visit-log {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+}
+.visit-log:last-child {
+    border-bottom: none;
+}
+.visit-log__body {
+    flex: 1;
+    min-width: 0;
+}
+.visit-log__purpose {
+    font-weight: 500;
+    color: var(--foreground);
+}
+.visit-log__meta {
+    font-size: 0.85rem;
+    color: var(--muted-foreground);
+    margin-top: 0.2rem;
+}
+
+/* Assigned trainer card in school profile */
+.assigned-trainer-item {
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    background: var(--card);
+    font-size: 0.95rem;
+}
+.assigned-trainer-item small {
+    color: var(--muted-foreground);
+    font-size: 0.82rem;
+}
+
+/* Scout group row in school profile */
+.scout-group-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    background: var(--card);
+    transition: background-color 0.15s;
+}
+.scout-group-item:hover {
+    background: var(--muted);
+}
+.scout-group-item__body {
+    flex: 1;
+    min-width: 0;
+}
+.scout-group-item__name {
+    font-weight: 600;
+    color: var(--foreground);
+}
+.scout-group-item__meta {
+    font-size: 0.84rem;
+    color: var(--muted-foreground);
+}
+
+/* School profile page helpers */
+.school-profile-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    background: linear-gradient(135deg, hsl(150, 60%, 20%) 0%, hsl(150, 65%, 28%) 100%);
+    color: white;
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.school-profile-header__inner {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.75rem 2rem;
+}
+.school-profile-header__name {
+    margin: 0;
+    font-size: 1.65rem;
+    font-weight: 800;
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+.school-profile-header__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-size: 0.9rem;
+    opacity: 0.88;
+}
+.school-profile-header__meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.school-profile-header__highlight {
+    color: hsl(160, 80%, 75%);
 }
 
 /* Tables, forms and cards */
@@ -1573,29 +2158,73 @@ body {
 .table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius);
+    /* subtle scrollbar styling */
+    --table-scroll-thumb: var(--muted-foreground);
+}
+.table-responsive::-webkit-scrollbar {
+    height: 6px;
+}
+.table-responsive::-webkit-scrollbar-track {
+    background: var(--muted);
+    border-radius: 3px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 3px;
+    opacity: 0.4;
 }
 
-/* Ensure tables shrink within responsive wrapper */
-.table-responsive .data-table {
-    min-width: 800px;
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 1rem;
+    font-size: 0.9rem;
 }
 
 .data-table th,
 .data-table td {
-    border: 1px solid var(--border);
-    padding: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border-bottom: 1px solid var(--border);
     text-align: left;
+    vertical-align: middle;
 }
 
+/* Sticky sticky-header variant */
+.data-table.sticky-header th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: hsl(30, 35%, 92%);
+}
 .data-table th {
     background: var(--secondary);
     color: var(--foreground);
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    white-space: nowrap;
+    user-select: none;
 }
 
-.data-table tr:hover {
+.data-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+.data-table tbody tr:hover {
     background: var(--muted);
+}
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.data-table tbody tr.hidden {
+    display: none;
+}
+
+/* Ensure tables respect responsive wrapper min-width */
+.table-responsive .data-table {
+    min-width: 800px;
 }
 
 .form-grid {
@@ -1633,11 +2262,226 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(15, 40, 30, 0.55);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 9999;
+    padding: 1.5rem;
+    animation: fadeIn 0.22s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+    from { opacity: 0; transform: translateY(22px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal.active,
+.modal[style*="display: flex"],
+.modal[style*="display: block"] {
+    display: flex !important;
+}
+
+.modal-content {
+    background: var(--card);
+    border-radius: 1rem;
+    box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255,255,255,0.05);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 0;
+    position: relative;
+    animation: modalSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: var(--foreground);
+    font-size: 1.2rem;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.modal-content form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.modal-content label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: var(--foreground);
+    font-size: 0.9rem;
+}
+
+.modal-content input,
+.modal-content textarea,
+.modal-content select {
+    padding: 0.625rem 0.875rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.5rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: var(--background);
+    color: var(--foreground);
+}
+.modal-content input:focus,
+.modal-content textarea:focus,
+.modal-content select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.modal-content textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--secondary);
+    border-radius: 1rem 1rem 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: var(--foreground);
+    font-family: var(--font-heading);
+    font-weight: 700;
+}
+
+.close-btn {
+    background: rgba(0, 0, 0, 0.06);
+    border: none;
+    color: var(--muted-foreground);
+    font-size: 1.35rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.close-btn:hover {
+    background: rgba(0, 0, 0, 0.12);
+    color: var(--destructive);
+    transform: scale(1.05);
+}
+
+.close {
+    background: rgba(0, 0, 0, 0.06);
+    border: none;
+    color: var(--muted-foreground);
+    font-size: 1.35rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+.close:hover {
+    background: rgba(0, 0, 0, 0.12);
+    color: var(--destructive);
+    transform: scale(1.05);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    background: var(--secondary);
+    border-radius: 0 0 1rem 1rem;
+}
+
+.modal-footer .btn {
+    min-width: 120px;
+}
+
+/* Large Modal for Profiles */
+.modal-content.large-modal {
+    max-width: 800px;
+    max-height: 90vh;
+}
+
+/* Export bar shared style */
+.table-export-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    background: var(--secondary);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    font-size: 0.85rem;
+    color: var(--muted-foreground);
+}
+.table-export-bar + .table-responsive {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+.table-export-actions {
+    display: flex;
+    gap: 0.375rem;
+}
+.table-export-actions .btn {
+    white-space: nowrap;
+}
+
+/* Status light inside table-export-bar counter */
+.table-export-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.table-export-label::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: inline-block;
+    flex-shrink: 0;
 }
 
 .modal.active,

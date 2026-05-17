@@ -1335,12 +1335,25 @@ async function loadEvents() {
         const data = await response.json();
 
         if (data.success) {
-            currentEvents = data.events;
-            updateEventStats(data.events);
+            const searchTerm = document.getElementById('eventSearch')?.value?.toLowerCase().trim();
+            let filteredEvents = data.events;
+
+            // Apply client-side text search filter (API ignores 'search' param on purpose)
+            if (searchTerm) {
+                filteredEvents = filteredEvents.filter(event =>
+                    (event.name && event.name.toLowerCase().includes(searchTerm)) ||
+                    (event.location && (event.location.name || event.location).toLowerCase().includes(searchTerm)) ||
+                    (event.status && event.status.toLowerCase().includes(searchTerm)) ||
+                    (event.eventType && event.eventType.toLowerCase().includes(searchTerm))
+                );
+            }
+
+            currentEvents = filteredEvents;
+            updateEventStats(filteredEvents);
             if (currentEventView === 'table') {
-                renderEventsTable(data.events);
+                renderEventsTable(filteredEvents);
             } else {
-                renderCalendar(data.events);
+                renderCalendar(filteredEvents);
             }
         }
     } catch (error) {
@@ -1409,10 +1422,10 @@ function updateEventStats(events) {
     const confirmed = events.reduce((acc, e) => {
         return acc + (e.targetSchools?.filter(s => s.rsvpStatus === 'confirmed').length || 0);
     }, 0);
-    // Total students confirmed across all events (sum of numberOfParticipants from confirmed RSVPs)
+    // Total students confirmed across all events (sum of numberOfParticipants/attendance.registered from confirmed RSVPs)
     const studentsConfirmed = events.reduce((acc, e) => {
         return acc + (e.targetSchools?.reduce((sum, s) => {
-            return sum + (s.rsvpStatus === 'confirmed' ? (Number(s.numberOfParticipants || 0)) : 0);
+            return sum + (s.rsvpStatus === 'confirmed' ? (Number(s.numberOfParticipants || Number(s.attendance?.registered || 0))) : 0);
         }, 0) || 0);
     }, 0);
     const thisWeek = events.filter(e => {

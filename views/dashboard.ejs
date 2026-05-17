@@ -1556,25 +1556,29 @@ async function saveProgramAllocation() {
                         </div>
                     </div>
                  <% } else if (page === 'events') { %>
-                    <!-- Events Management Page -->
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">📅</div>
-                            <div><div class="stat-number" id="upcomingEventsCount">0</div><div class="stat-label">Upcoming Events</div></div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📨</div>
-                            <div><div class="stat-number" id="pendingInvitationsCount">0</div><div class="stat-label">Pending Invitations</div></div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">✅</div>
-                            <div><div class="stat-number" id="confirmedSchoolsCount">0</div><div class="stat-label">Confirmed Schools</div></div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🚩</div>
-                            <div><div class="stat-number" id="eventsThisWeekCount">0</div><div class="stat-label">Events This Week</div></div>
-                        </div>
-                    </div>
+                     <!-- Events Management Page -->
+                     <div class="stats-grid">
+                         <div class="stat-card">
+                             <div class="stat-icon">📅</div>
+                             <div><div class="stat-number" id="upcomingEventsCount">0</div><div class="stat-label">Upcoming Events</div></div>
+                         </div>
+                         <div class="stat-card">
+                             <div class="stat-icon">📨</div>
+                             <div><div class="stat-number" id="pendingInvitationsCount">0</div><div class="stat-label">Pending Invitations</div></div>
+                         </div>
+                         <div class="stat-card">
+                             <div class="stat-icon">✅</div>
+                             <div><div class="stat-number" id="confirmedSchoolsCount">0</div><div class="stat-label">Confirmed Schools</div></div>
+                         </div>
+                         <div class="stat-card">
+                             <div class="stat-icon">👨‍🎓</div>
+                             <div><div class="stat-number" id="confirmedStudentsCount">0</div><div class="stat-label">Students Confirmed</div></div>
+                         </div>
+                         <div class="stat-card">
+                             <div class="stat-icon">🚩</div>
+                             <div><div class="stat-number" id="eventsThisWeekCount">0</div><div class="stat-label">Events This Week</div></div>
+                         </div>
+                     </div>
 
                     <!-- Filters & Controls -->
                     <div class="content-card" style="margin-bottom: 1.5rem;">
@@ -1636,6 +1640,7 @@ async function saveProgramAllocation() {
                                         <th>Status</th>
                                         <th>Trainers</th>
                                         <th>RSVP</th>
+                                        <th>Students</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -2015,21 +2020,24 @@ async function saveProgramAllocation() {
 
                                     <!-- School Invitations Section -->
                                     <div class="manage-section">
-                                        <h4>School Invitations</h4>
-                                        <div id="invitedSchoolsList" style="margin-bottom: 1rem; max-height: 200px; overflow-y: auto;"></div>
-                                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
-                                            <select id="schoolSelect" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); min-width: 200px;">
-                                                <option value="">Select a school...</option>
-                                            </select>
-                                            <label style="display: flex; align-items: center; gap: 0.5rem;">RSVP Deadline<input type="date" id="inviteRsvpDeadline"></label>
-                                            <button class="btn btn-primary" onclick="inviteSchool()">Send Invitation</button>
+                                        <h4>School Invitations &amp; Attendance</h4>
+                                        <div id="invitedSchoolsList" style="margin-bottom: 1rem; max-height: 280px; overflow-y: auto;"></div>
+                                        <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 0.5rem;">
+                                            <p style="font-size: 0.85rem; color: var(--muted-foreground); margin-bottom: 0.75rem;">Invite a new school to this event. They will receive a notification with an RSVP deadline and a link to confirm their participation and student attendance count.</p>
+                                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                                                <select id="schoolSelect" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); min-width: 200px;">
+                                                    <option value="">Select a school...</option>
+                                                </select>
+                                                <label style="display: flex; align-items: center; gap: 0.5rem;">RSVP Deadline<input type="date" id="inviteRsvpDeadline"></label>
+                                                <button class="btn btn-primary" onclick="inviteSchool()">Send Invitation</button>
+                                            </div>
                                         </div>
                                     </div>
 
                                     <!-- Invitation Reminders -->
                                     <div class="manage-section">
                                         <h4>Send Reminders</h4>
-                                        <p style="font-size: 0.875rem; color: var(--muted-foreground);">Send automated reminders to schools that haven't responded.</p>
+                                        <p style="font-size: 0.875rem; color: var(--muted-foreground);">Send reminders to schools that haven't responded to their invitation.</p>
                                         <div style="display: flex; gap: 0.5rem;">
                                             <button class="btn btn-secondary" onclick="sendReminders('3d')">Remind in 3 days</button>
                                             <button class="btn btn-secondary" onclick="sendReminders('1w')">Remind in 1 week</button>

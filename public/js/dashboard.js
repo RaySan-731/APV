@@ -1409,6 +1409,12 @@ function updateEventStats(events) {
     const confirmed = events.reduce((acc, e) => {
         return acc + (e.targetSchools?.filter(s => s.rsvpStatus === 'confirmed').length || 0);
     }, 0);
+    // Total students confirmed across all events (sum of numberOfParticipants from confirmed RSVPs)
+    const studentsConfirmed = events.reduce((acc, e) => {
+        return acc + (e.targetSchools?.reduce((sum, s) => {
+            return sum + (s.rsvpStatus === 'confirmed' ? (Number(s.numberOfParticipants || 0)) : 0);
+        }, 0) || 0);
+    }, 0);
     const thisWeek = events.filter(e => {
         const d = new Date(e.startDate);
         return d >= thisWeekStart && d < thisWeekEnd;
@@ -1417,11 +1423,13 @@ function updateEventStats(events) {
     const upcomingEl = document.getElementById('upcomingEventsCount');
     const pendingEl = document.getElementById('pendingInvitationsCount');
     const confirmedEl = document.getElementById('confirmedSchoolsCount');
+    const studentsEl = document.getElementById('confirmedStudentsCount');
     const thisWeekEl = document.getElementById('eventsThisWeekCount');
 
     if (upcomingEl) upcomingEl.textContent = upcoming;
     if (pendingEl) pendingEl.textContent = pending;
     if (confirmedEl) confirmedEl.textContent = confirmed;
+    if (studentsEl) studentsEl.textContent = studentsConfirmed;
     if (thisWeekEl) thisWeekEl.textContent = thisWeek;
 }
 
@@ -1433,9 +1441,10 @@ function renderEventsTable(events) {
     tbody.innerHTML = '';
 
     if (!events || events.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="placeholder-text">No events match your criteria.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="placeholder-text">No events match your criteria.</td></tr>';
         return;
     }
+
 
     events.forEach(event => {
         const row = document.createElement('tr');
@@ -1445,6 +1454,10 @@ function renderEventsTable(events) {
         // RSVP summary
         const confirmedCount = event.targetSchools?.filter(s => s.rsvpStatus === 'confirmed').length || 0;
         const invitedCount = event.targetSchools?.length || 0;
+        // Confirmed participants (total students from confirmed schools)
+        const totalParticipants = event.targetSchools?.reduce((sum, s) => {
+            return sum + (s.rsvpStatus === 'confirmed' ? (Number(s.numberOfParticipants || Number(s.attendance?.registered || 0))) : 0);
+        }, 0) || 0;
 
         // Format dates
         const start = event.startDate ? new Date(event.startDate) : null;
@@ -1464,6 +1477,7 @@ function renderEventsTable(events) {
             <td><span class="badge ${statusClass}">${event.status.replace('_', ' ')}</span></td>
             <td>${trainerCount} assigned</td>
             <td>${confirmedCount}/${invitedCount} confirmed</td>
+            <td>${totalParticipants} student${totalParticipants !== 1 ? 's' : ''}</td>
             <td>
                 <button class="btn btn-sm btn-outline" onclick="openManageEventModal('${event._id}')">Manage</button>
                 <button class="btn btn-sm btn-outline" onclick="openEditEventModal('${event._id}')">Edit</button>
@@ -2066,6 +2080,10 @@ function initEventFormHandler() {
                 loadEvents();
             } else {
                 showToast('Error: ' + (result.error || 'Failed to save event'), 'error');
+                if (result.error && /missing required/i.test(result.error)) {
+                    showEventFormMissingFieldsError(getMissingRequiredEventFields());
+                    focusFirstMissingEventField();
+                }
             }
         } catch (error) {
             console.error('Error saving event:', error);
@@ -2262,32 +2280,60 @@ async function openManageEventModal(eventId) {
             trainersList.innerHTML = '<p class="placeholder-text">No trainers assigned yet.</p>';
         }
 
-        // Render invited schools with RSVP status
+        // Render invited schools with RSVP status and confirmed attendance
         const schoolsList = document.getElementById('invitedSchoolsList');
         schoolsList.innerHTML = '';
         if (event.targetSchools && event.targetSchools.length > 0) {
             event.targetSchools.forEach(inv => {
                 const school = inv.schoolId;
                 let badgeClass = 'badge-info';
-                if (inv.rsvpStatus === 'confirmed') badgeClass = 'badge-success';
-                else if (inv.rsvpStatus === 'declined') badgeClass = 'badge-danger';
-                else if (inv.rsvpStatus === 'pending' || inv.rsvpStatus === 'invited') badgeClass = 'badge-warning';
+                let badgeLabel = 'Invited';
+                if (inv.rsvpStatus === 'confirmed') {
+                    badgeClass = 'badge-success';
+                    badgeLabel = 'Confirmed';
+                } else if (inv.rsvpStatus === 'declined') {
+                    badgeClass = 'badge-danger';
+                    badgeLabel = 'Declined';
+                } else if (inv.rsvpStatus === 'pending') {
+                    badgeClass = 'badge-warning';
+                    badgeLabel = 'Pending';
+                } else if (inv.rsvpStatus === 'no_response') {
+                    badgeClass = 'badge-secondary';
+                    badgeLabel = 'No Response';
+                }
+
+                // Confirmed student attendance count
+                const attendingCount = inv.rsvpStatus === 'confirmed'
+                    ? (inv.numberOfParticipants || inv.attendance?.recorded || inv.attendance?.registered || 0)
+                    : (inv.rsvpStatus === 'pending' || inv.rsvpStatus === 'invited')
+                        ? (inv.numberOfParticipants || 0)
+                        : 0;
+
+                const deadlineStr = inv.rsvpDeadline ? new Date(inv.rsvpDeadline).toLocaleDateString() : 'Not set';
+                const respondedDate = inv.rsvpResponseDate ? new Date(inv.rsvpResponseDate).toLocaleDateString() : null;
 
                 const item = document.createElement('div');
-                item.style.cssText = 'padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;';
+                item.style.cssText = 'padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem;';
                 item.innerHTML = `
-                    <div>
-                        <strong>${school?.name || 'Unknown School'}</strong>
-                        <br><small>${school?.address?.city || 'No city'} | RSVP: <span class="badge ${badgeClass}">${inv.rsvpStatus.replace('_', ' ')}</span> | Deadline: ${inv.rsvpDeadline ? new Date(inv.rsvpDeadline).toLocaleDateString() : 'None'}</small>
-                        ${inv.numberOfParticipants ? `<br><small>Participants: ${inv.numberOfParticipants}</small>` : ''}
-                        ${
-                          typeof event.costPerParticipant !== 'undefined'
-                            ? (() => {
-                                const studentCount = Number(school?.studentCount || 0);
-                                const costPer = Number(event.costPerParticipant || 0);
-                                const amount = studentCount * costPer;
-                                return `<br><small><strong>Amount to invoice:</strong> KES ${amount.toLocaleString()}</small>`;
-                              })()
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
+                                <strong>${school?.name || 'Unknown School'}</strong>
+                                <span class="badge ${badgeClass}">${badgeLabel}</span>
+                            </div>
+                            <small style="color: var(--muted-foreground);">
+                                ${school?.address?.city || 'City unknown'} |
+                                RSVP Deadline: ${deadlineStr}
+                                ${respondedDate ? `| Responded: ${respondedDate}` : ''}
+                            </small>
+                            ${inv.numberOfParticipants !== undefined && inv.numberOfParticipants !== null
+                                ? `<br><small><strong>Students confirmed:</strong> ${attendingCount}</small>`
+                                : `<br><small class="muted-text">No attendance count submitted yet</small>`
+                            }
+                            ${inv.attendance?.notes ? `<br><small style="color: var(--muted-foreground);"><em>Notes:</em> ${escapeHtml(String(inv.attendance.notes))}</small>` : ''}
+                        </div>
+                        ${event.costPerParticipant && attendingCount > 0
+                            ? `<small style="color: var(--muted-foreground); text-align: right; white-space: nowrap;"><strong>Billable:</strong><br>KES ${(attendingCount * event.costPerParticipant).toLocaleString()}</small>`
                             : ''
                         }
                     </div>
@@ -2295,7 +2341,7 @@ async function openManageEventModal(eventId) {
                 schoolsList.appendChild(item);
             });
         } else {
-            schoolsList.innerHTML = '<p class="placeholder-text">No schools invited yet.</p>';
+            schoolsList.innerHTML = '<p class="placeholder-text">No schools invited yet. Use the section below to invite schools.</p>';
         }
 
         // ===== POST-EVENT REVIEW HANDLING =====

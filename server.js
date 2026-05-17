@@ -6699,7 +6699,7 @@ app.get('/api/events/:eventId', requireAuth, requirePermission('canViewEvents'),
 });
 
 // CREATE event
-app.post('/dashboard/events/create', requireAuth, requirePermission('canCreateEvents'), async (req, res) => {
+app.post('/dashboard/events/create', requireAuth, requirePermission('canCreateEvents'), parseJson, async (req, res) => {
   try {
     const {
       name,
@@ -6983,7 +6983,7 @@ app.post('/dashboard/events/create', requireAuth, requirePermission('canCreateEv
 });
 
 // UPDATE event
-app.post('/dashboard/events/update/:id', requireAuth, requirePermission('canCreateEvents'), async (req, res) => {
+app.post('/dashboard/events/update/:id', requireAuth, requirePermission('canCreateEvents'), parseJson, async (req, res) => {
   try {
     const eventId = req.params.id;
     const {
@@ -7603,8 +7603,9 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
 
     await event.save();
 
-    // Send invitation email to school using centralized service
+    // Send invitation email to school contact using centralized service
     try {
+      const School = require('./models/School');
       const school = await School.findById(schoolId);
       if (school && school.contactPerson?.email) {
         const protocol = req.protocol;
@@ -7612,9 +7613,10 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
         const rsvpLink = `${protocol}://${host}/events/${eventId}/rsvp?school=${schoolId}&token=${encodeURIComponent(btoa(schoolId + ':' + eventId))}`;
 
         const emailHtml = `
-          <h2>Invitation to ${event.name}</h2>
+          <h2>You are Invited to ${event.name}</h2>
           <p>Dear ${school.contactPerson.name || 'School Representative'},</p>
-          <p>You are invited to participate in:</p>
+          <p>You are invited to participate in this event:
+
           <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
             <h3>${event.name}</h3>
             <p><strong>Type:</strong> ${event.eventType.replace('_', ' ')}</p>
@@ -7624,8 +7626,9 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
           </div>
           <p>Please confirm your participation by clicking the link below:</p>
           <p><a href="${rsvpLink}" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;">RSVP Now</a></p>
-          ${customMessage ? `<p>${customMessage}</p>` : ''}
-          <p>RSVP Deadline: ${rsvpDeadline ? new Date(rsvpDeadline).toLocaleDateString() : (event.defaultInvitationDeadline ? new Date(event.defaultInvitationDeadline).toLocaleDateString() : 'TBD')}</p>
+          ${customMessage ? `<p><em>${customMessage}</em></p>` : ''}
+          <p><strong>RSVP Deadline:</strong> ${rsvpDeadline ? new Date(rsvpDeadline).toLocaleDateString() : (event.defaultInvitationDeadline ? new Date(event.defaultInvitationDeadline).toLocaleDateString() : 'TBD')}</p>
+          <p>When responding, please indicate the total number of students from your school who will be attending.</p>
         `;
 
         await emailService.sendEmail({
@@ -7652,6 +7655,62 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
       }
     } catch (emailErr) {
       console.error('Error sending invitation email:', emailErr);
+    }
+
+    // Send in-app notification to school staff (assigned staff)
+    try {
+      const Staff = require('./models/Staff');
+      const schoolStaff = await Staff.find({
+        _id: { $in: (school.assignedStaff || []).map(a => a.staffId) },
+        status: 'Active'
+      }).lean();
+
+      const inviterName = req.session.user?.name || 'Admin';
+
+      await Promise.all(schoolStaff.map(staff =>
+        Notification.create({
+          recipientId: staff._id,
+          type: 'event_invitation',
+          title: `You are invited to ${event.name}`,
+          message: `${inviterName} has invited ${school.name} to participate in the event "${event.name}" on ${new Date(event.startDate).toLocaleDateString()}. Please RSVP by ${rsvpDeadline ? new Date(rsvpDeadline).toLocaleDateString() : 'the deadline'} and confirm the total number of students attending.`,
+          icon: 'calendar',
+          color: 'blue',
+          actionUrl: `/events/${eventId}/rsvp?school=${schoolId}`,
+          actionLabel: 'RSVP & Confirm Attendance',
+          entityType: 'event',
+          entityId: eventId,
+          priority: 'high',
+          expiresAt: rsvpDeadline ? new Date(rsvpDeadline) : undefined,
+          metadata: {
+            relatedNames: [event.name, school.name],
+            extra: { schoolId: schoolId.toString(), eventId: eventId.toString(), rsvpDeadline: rsvpDeadline || null }
+          }
+        })
+      ));
+    } catch (notifErr) {
+      console.error('Error sending school invitation notifications:', notifErr);
+    }
+
+    // Notify the admin who created the event (if different from inviter) that a new school was invited
+    try {
+      if (event.createdBy && event.createdBy.toString() !== req.session.user.id.toString()) {
+        const invitedSchool = await School.findById(schoolId);
+        await Notification.create({
+          recipientId: event.createdBy,
+          type: 'event_reminder',
+          title: 'New School Invited to Event',
+          message: `${req.session.user.name} has invited ${invitedSchool?.name || schoolId} to "${event.name}".`,
+          icon: 'calendar',
+          color: 'blue',
+          actionUrl: `/dashboard/events/${eventId}`,
+          actionLabel: 'View Event',
+          entityType: 'event',
+          entityId: eventId,
+          priority: 'normal'
+        });
+      }
+    } catch (notifErr2) {
+      console.error('Error notifying event creator:', notifErr2);
     }
 
     const populatedEvent = await Event.findById(eventId)
@@ -7716,6 +7775,7 @@ app.post('/api/events/rsvp', async (req, res) => {
           <p>Dear ${school.contactPerson.name || 'School Representative'},</p>
           <p>Your RSVP for <strong>${event.name}</strong> has been recorded as: <strong>${status.replace('_', ' ')}</strong>.</p>
           <p>${confirmationMsg}</p>
+          ${participantCount && status === 'confirmed' ? `<p><strong>Students attending:</strong> ${participantCount}</p>` : ''}
         `;
 
         await emailService.sendEmail({
@@ -7728,7 +7788,8 @@ app.post('/api/events/rsvp', async (req, res) => {
             eventName: event.name,
             rsvpStatus: status,
             eventDate: `${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}`,
-            location: event.location?.name
+            location: event.location?.name,
+            participantCount: participantCount || undefined
           },
           triggeredBy: req.session.user.id,
           entityType: 'event',
@@ -7737,19 +7798,36 @@ app.post('/api/events/rsvp', async (req, res) => {
           priority: 'normal'
         });
 
-        // Notify event creator about RSVP update (if not the same user)
-        if (event.createdBy && event.createdBy.toString() !== req.session.user.id.toString()) {
+        // Notify admin of attendance count update when a school confirms their participation
+        if (status === 'confirmed' && event.createdBy && participantCount) {
           await Notification.create({
             recipientId: event.createdBy,
             type: 'event_reminder',
-            title: 'RSVP Update',
-            message: `${school.name} has ${status} the invitation to ${event.name}`,
-            actionUrl: '/dashboard/events/' + eventId,
+            title: 'Attendance Confirmed',
+            message: `${school.name} has confirmed their attendance at "${event.name}" with ${participantCount} student${participantCount !== 1 ? 's' : ''}.`,
+            icon: 'users',
+            color: 'green',
+            actionUrl: `/dashboard/events/${eventId}`,
+            actionLabel: 'View Event',
             entityType: 'event',
             entityId: eventId,
             priority: 'normal'
           });
         }
+      }
+
+      // Notify event creator about RSVP update (if not the same user)
+      if (event.createdBy && event.createdBy.toString() !== req.session.user.id.toString()) {
+        await Notification.create({
+          recipientId: event.createdBy,
+          type: 'event_reminder',
+          title: 'RSVP Update',
+          message: `${school.name} has ${status} the invitation to ${event.name}`,
+          actionUrl: '/dashboard/events/' + eventId,
+          entityType: 'event',
+          entityId: eventId,
+          priority: 'normal'
+        });
       }
     } catch (emailErr) {
       console.error('Error sending RSVP confirmation:', emailErr);

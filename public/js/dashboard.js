@@ -2996,19 +2996,6 @@ async function openOnboardingModal(schoolId = null) {
     document.getElementById('onboardingModal').style.display = 'flex';
     showOnboardingStep(0);
     updateOnboardingUI();
-
-    // Attach event listener to next button (ensure it's attached after modal is in DOM)
-    const nextBtn = document.getElementById('nextStepBtn');
-    if (nextBtn) {
-        nextBtn.onclick = function(e) {
-            if (currentOnboardingStep === 3) {
-                e.preventDefault();
-                submitOnboarding();
-            } else {
-                changeOnboardingStep(1);
-            }
-        };
-    }
 }
 
 function closeOnboardingModal() {
@@ -3204,15 +3191,27 @@ async function submitOnboarding() {
         const result = await response.json();
 
         if (result.success) {
-            messageEl.textContent = successMessage;
-            messageEl.style.backgroundColor = '#d4edda';
-            messageEl.style.color = '#155724';
-            messageEl.style.borderLeft = '4px solid #28a745';
-            messageEl.style.display = 'block';
+            if (result.duplicate && result.schoolId) {
+                // School already exists — skip redirect, show a clear warning
+                messageEl.textContent = `⚠ School "${result.schoolName}" already exists. Opening existing record...`;
+                messageEl.style.backgroundColor = '#fff3cd';
+                messageEl.style.color = '#856404';
+                messageEl.style.borderLeft = '4px solid #ffc107';
+                messageEl.style.display = 'block';
+                setTimeout(() => {
+                    window.location.href = `/dashboard/schools/${result.schoolId}`;
+                }, 1500);
+            } else {
+                messageEl.textContent = successMessage;
+                messageEl.style.backgroundColor = '#d4edda';
+                messageEl.style.color = '#155724';
+                messageEl.style.borderLeft = '4px solid #28a745';
+                messageEl.style.display = 'block';
 
-            setTimeout(() => {
-                window.location.href = redirectUrl;
-            }, 1500);
+                setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 1500);
+            }
         } else {
             messageEl.textContent = '✗ ' + (result.error || 'Failed to save school');
             messageEl.style.backgroundColor = '#f8d7da';

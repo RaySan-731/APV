@@ -4878,6 +4878,18 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
       schoolData.programsEnrolled = [];
     }
 
+    // Deduplication: check for an existing school with the same name (case-insensitive)
+    const existingSchool = await School.findOne({ name: { $regex: `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+    if (existingSchool) {
+      return res.status(200).json({
+        success: true,
+        duplicate: true,
+        schoolId: existingSchool._id,
+        schoolName: existingSchool.name,
+        message: `School "${existingSchool.name}" already exists in the system.`
+      });
+    }
+
     const school = new School(schoolData);
     await school.save();
 

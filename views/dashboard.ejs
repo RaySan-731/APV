@@ -3662,6 +3662,7 @@ async function saveSchoolAllocation() {
               onboardingModal.style.display = 'none';
               editingSchoolId = null;
               isEditingMode = false;
+              window._onboardingSubmitBusy = false;
               messageEl.style.display = 'none';
             }
            window.closeOnboardingModal = closeOnboardingModal;
@@ -3725,9 +3726,11 @@ async function saveSchoolAllocation() {
              document.getElementById('selectedProgramPrice').textContent = `Rate: KES ${price}`;
            });
 
-           // Form submission
-           async function submitOnboardingForm() {
-             const formData = {
+            // Form submission
+            async function submitOnboardingForm() {
+              if (window._onboardingSubmitBusy) return;
+              window._onboardingSubmitBusy = true;
+              const formData = {
                name: document.querySelector('[name="name"]').value.trim(),
                street: document.querySelector('[name="street"]').value.trim(),
                city: document.querySelector('[name="city"]').value.trim(),
@@ -3762,21 +3765,27 @@ async function saveSchoolAllocation() {
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify(data)
                });
-               const result = await res.json();
-               const success = result.success || result.school;
-               if (success) {
-                 showMessage(editingSchoolId ? 'School updated successfully!' : 'School onboarded successfully!');
-                 setTimeout(() => {
-                   closeOnboardingModal();
-                   window.location.reload();
-                 }, 1000);
+                const result = await res.json();
+                if (result.duplicate && result.schoolId) {
+                  showMessage(`⚠ School "${result.schoolName}" already exists. Redirecting to existing record...`, false);
+                  setTimeout(() => {
+                    window.location.href = `/dashboard/schools/${result.schoolId}`;
+                  }, 1500);
+                } else if (result.success || result.school) {
+                  showMessage(editingSchoolId ? 'School updated successfully!' : 'School onboarded successfully!');
+                  setTimeout(() => {
+                    closeOnboardingModal();
+                    window.location.reload();
+                  }, 1000);
                 } else {
                   showMessage(result.error || 'Operation failed', true);
+                  window._onboardingSubmitBusy = false;
                 }
               } catch (err) {
                 console.error('Error saving school:', err);
                 editingSchoolId = null;
                 isEditingMode = false;
+                window._onboardingSubmitBusy = false;
                 showMessage('Network error', true);
               }
             }

@@ -120,7 +120,7 @@
                                     <% invoices.forEach(inv => { %>
                                         <tr class="<%= inv.status === 'overdue' ? 'table-danger' : inv.status === 'paid' ? 'table-success' : '' %>">
                                             <td><%= inv.invoiceNumber %></td>
-                                            <td><a href="/schools/<%= inv.schoolId._id %>"><%= inv.schoolId.name %></a></td>
+                                            <td><% if (inv.schoolId) { %><a href="/schools/<%= inv.schoolId._id %>"><%= inv.schoolId.name %></a><% } else { %><span class="text-muted">School deleted</span><% } %></td>
                                             <td><%= new Date(inv.issueDate).toLocaleDateString() %></td>
                                             <td><%= new Date(inv.dueDate).toLocaleDateString() %></td>
                                             <td>KES <%= inv.totalAmount.toLocaleString() %></td>

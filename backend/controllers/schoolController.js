@@ -677,10 +677,84 @@ exports.removeProgram = async (req, res) => {
    res.status(501).json({ success: false, error: 'Not implemented' });
  };
 
- // Update event attendance (placeholder)
- exports.updateEventAttendance = async (req, res) => {
-   res.status(501).json({ success: false, error: 'Not implemented' });
- };
+  // Update event attendance — school admin records/updates their RSVP for an invited event
+  exports.updateEventAttendance = async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      const { rsvpStatus, attendingCount } = req.body;
+      const schoolId = req.schoolId;
+
+      if (!mongoose.Types.ObjectId.isValid(eventId)) {
+        return res.status(400).json({ success: false, error: 'Invalid event ID' });
+      }
+
+      const event = await Event.findById(eventId);
+      if (!event) {
+        return res.status(404).json({ success: false, error: 'Event not found' });
+      }
+
+      // Find this school's invitation record
+      const schoolIndex = event.targetSchools.findIndex(
+        ts => ts.schoolId.toString() === schoolId.toString()
+      );
+
+      if (schoolIndex === -1) {
+        return res.status(404).json({ success: false, error: 'Your school has not been invited to this event' });
+      }
+
+      const schoolTarget = event.targetSchools[schoolIndex];
+
+      // Update RSVP status
+      if (rsvpStatus) {
+        const validStatuses = ['invited', 'confirmed', 'declined', 'pending', 'no_response'];
+        if (!validStatuses.includes(rsvpStatus)) {
+          return res.status(400).json({ success: false, error: 'Invalid RSVP status' });
+        }
+        schoolTarget.rsvpStatus = rsvpStatus;
+        schoolTarget.rsvpResponseDate = new Date();
+        schoolTarget.rsvpResponseBy = req.staff._id;
+      }
+
+      // Update attendance / participation count
+      if (attendingCount !== undefined) {
+        const count = parseInt(attendingCount, 10);
+        if (isNaN(count) || count < 0) {
+          return res.status(400).json({ success: false, error: 'Invalid attendance count' });
+        }
+        schoolTarget.attendance = schoolTarget.attendance || {};
+        schoolTarget.attendance.registered = count;
+        schoolTarget.attendance.recordedAt = new Date();
+        schoolTarget.attendance.recordedBy = req.staff._id;
+      }
+
+      await event.save();
+
+      await logAudit(
+        'attendance_updated',
+        'event',
+        eventId,
+        event.name,
+        {
+          schoolId,
+          rsvpStatus: schoolTarget.rsvpStatus,
+          attendingCount: attendingCount !== undefined ? attendingCount : schoolTarget.attendance?.registered
+        },
+        {
+          userId: req.staff._id,
+          userName: req.staff.name,
+          userEmail: req.staff.email,
+          userRole: req.staff.role,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        }
+      );
+
+      res.json({ success: true, event });
+    } catch (err) {
+      console.error('Error updating attendance:', err);
+      res.status(500).json({ success: false, error: 'Failed to update attendance' });
+    }
+  };
 
  // Get invoices for school (JSON API)
  exports.getInvoices = async (req, res) => {

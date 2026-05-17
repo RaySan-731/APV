@@ -5061,6 +5061,63 @@ app.get('/dashboard/schools/:schoolId/edit', requireAuth, requirePermission('can
    }
  });
 
+// GET schools list for dropdowns  -- MUST be before /api/schools/:schoolId so Express matches first
+app.get('/api/schools/list', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
+  try {
+    const schools = await School.find({ status: { $ne: 'inactive' } })
+      .select('name address city contactPerson')
+      .sort({ name: 1 })
+      .lean();
+
+    res.json({ success: true, schools });
+  } catch (err) {
+    console.error('Error fetching schools list:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch schools' });
+  }
+});
+
+// Get all active schools with full details (for reports, modals)
+app.get('/api/schools/active', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
+  console.log('[/api/schools/active] req.user:', req.session.user?.role, '| canViewSchools permission check...');
+  try {
+    const schools = await School.find({ $or: [{ serviceStatus: 'active' }, { serviceStatus: { $exists: false }, status: 'active' }] })
+      .populate('programsEnrolled', 'name category price duration')
+      .select('name address city zone region contactPerson studentCount serviceStatus servicePackage programsEnrolled participationMetrics createdAt')
+      .sort({ name: 1 })
+      .lean();
+
+    // Enrich with participation metrics
+    const schoolIds = schools.map(s => s._id);
+    const eventAggregates = await Event.aggregate([
+      { $match: { 'targetSchools.schoolId': { $in: schoolIds } } },
+      {
+        $group: {
+          _id: '$targetSchools.schoolId',
+          eventCount: { $sum: 1 },
+          avgAttendance: { $avg: '$participationMetrics.averageAttendanceRate' }
+        }
+      }
+    ]);
+    const eventMap = new Map(eventAggregates.map(a => [a._id.toString(), a]));
+
+    const enrichedSchools = schools.map(school => ({
+      ...school,
+      participationMetrics: {
+        ...(school.participationMetrics || {}),
+        totalEventsAttended: eventMap.get(school._id.toString())?.eventCount || 0,
+        averageAttendanceRate: Math.round(eventMap.get(school._id.toString())?.avgAttendance || 0),
+        engagementScore: Math.min(100, Math.round(((eventMap.get(school._id.toString())?.eventCount || 0) * 10) + (eventMap.get(school._id.toString())?.avgAttendance || 0)))
+      }
+    }));
+
+    res.json({ success: true, schools: enrichedSchools });
+  } catch (err) {
+    console.error('Error fetching active schools:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch active schools' });
+  }
+});
+
+
 // GET: Fetch single school details
 app.get('/api/schools/:schoolId', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
   try {
@@ -7562,7 +7619,7 @@ app.post('/api/events/:eventId/remove-trainer', requireAuth, requirePermission('
 });
 
 // Invite school to event
-app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('canAssignTrainers'), parseJson, async (req, res) => {
   try {
     const eventId = req.params.eventId;
     const { schoolId, rsvpDeadline, customMessage } = req.body;
@@ -8365,62 +8422,6 @@ app.get('/api/trainers/list', requireAuth, requirePermission('canViewStaff'), as
   } catch (err) {
     console.error('Error fetching trainers list:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch trainers' });
-  }
-});
-
-// GET schools list for dropdowns
-app.get('/api/schools/list', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
-  try {
-    const schools = await School.find({ status: { $ne: 'inactive' } })
-      .select('name address city contactPerson')
-      .sort({ name: 1 })
-      .lean();
-
-    res.json({ success: true, schools });
-  } catch (err) {
-    console.error('Error fetching schools list:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch schools' });
-  }
-});
-
-// Get all active schools with full details (for reports, modals)
-app.get('/api/schools/active', requireAuth, requirePermission('canViewSchools'), async (req, res) => {
-  console.log('[/api/schools/active] req.user:', req.session.user?.role, '| canViewSchools permission check...');
-  try {
-    const schools = await School.find({ $or: [{ serviceStatus: 'active' }, { serviceStatus: { $exists: false }, status: 'active' }] })
-      .populate('programsEnrolled', 'name category price duration')
-      .select('name address city zone region contactPerson studentCount serviceStatus servicePackage programsEnrolled participationMetrics createdAt')
-      .sort({ name: 1 })
-      .lean();
-
-    // Enrich with participation metrics
-    const schoolIds = schools.map(s => s._id);
-    const eventAggregates = await Event.aggregate([
-      { $match: { 'targetSchools.schoolId': { $in: schoolIds } } },
-      {
-        $group: {
-          _id: '$targetSchools.schoolId',
-          eventCount: { $sum: 1 },
-          avgAttendance: { $avg: '$participationMetrics.averageAttendanceRate' }
-        }
-      }
-    ]);
-    const eventMap = new Map(eventAggregates.map(a => [a._id.toString(), a]));
-
-    const enrichedSchools = schools.map(school => ({
-      ...school,
-      participationMetrics: {
-        ...(school.participationMetrics || {}),
-        totalEventsAttended: eventMap.get(school._id.toString())?.eventCount || 0,
-        averageAttendanceRate: Math.round(eventMap.get(school._id.toString())?.avgAttendance || 0),
-        engagementScore: Math.min(100, Math.round(((eventMap.get(school._id.toString())?.eventCount || 0) * 10) + (eventMap.get(school._id.toString())?.avgAttendance || 0)))
-      }
-    }));
-
-    res.json({ success: true, schools: enrichedSchools });
-  } catch (err) {
-    console.error('Error fetching active schools:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch active schools' });
   }
 });
 

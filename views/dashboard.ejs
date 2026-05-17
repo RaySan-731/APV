@@ -2025,11 +2025,29 @@ async function saveProgramAllocation() {
                                         <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 0.5rem;">
                                             <p style="font-size: 0.85rem; color: var(--muted-foreground); margin-bottom: 0.75rem;">Invite a new school to this event. They will receive a notification with an RSVP deadline and a link to confirm their participation and student attendance count.</p>
                                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
-                                                <select id="schoolSelect" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); min-width: 200px;">
-                                                    <option value="">Select a school...</option>
-                                                </select>
+                                                <div id="schoolPickerWrapper" style="position: relative; min-width: 300px;">
+                                                    <input type="text" id="schoolSearchInput" placeholder="Search schools by name or city..."
+                                                           style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); width: 100%;"
+                                                           autocomplete="off" aria-autocomplete="list" aria-expanded="false"
+                                                           role="combobox" aria-label="Search and select a school">
+                                                    <button type="button" id="schoolPickerToggle"
+                                                            aria-label="Toggle school list"
+                                                            style="position:absolute;right:4px;top:50%;transform:translateY(-50%);
+                                                                   background:none;border:none;padding:4px;cursor:pointer;color:var(--muted-foreground);display:flex;align-items:center;justify-content:center;">
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                                        </svg>
+                                                    </button>
+                                                    <div id="schoolSearchPopup" role="listbox"
+                                                         style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1000;
+                                                                background: var(--background); border: 1px solid var(--border); border-radius: var(--radius);
+                                                                margin-top: 4px; max-height: 260px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.12);">
+                                                        <div id="schoolSearchList"></div>
+                                                    </div>
+                                                    <input type="hidden" id="schoolSelect" value="">
+                                                </div>
                                                 <label style="display: flex; align-items: center; gap: 0.5rem;">RSVP Deadline<input type="date" id="inviteRsvpDeadline"></label>
-                                                <button class="btn btn-primary" onclick="inviteSchool()">Send Invitation</button>
+                                                <button class="btn btn-primary" onclick="inviteSchool()" id="inviteSchoolBtn" disabled>Send Invitation</button>
                                             </div>
                                         </div>
                                     </div>

@@ -2185,26 +2185,162 @@ async function assignTrainer() {
     }
 }
 
-// Populate school dropdown
+// Populate school dropdown / search picker
+let _allSchools = [];
+let _schoolPickerReady = false;
+
 async function populateSchoolDropdown() {
     try {
         const response = await fetch('/api/schools/list');
         const data = await response.json();
 
-        if (data.success) {
-            const select = document.getElementById('schoolSelect');
-            select.innerHTML = '<option value="">Select a school...</option>';
-            data.schools.forEach(school => {
-                const option = document.createElement('option');
-                option.value = school._id;
-                option.textContent = `${school.name} - ${school.address?.city || 'No city'}`;
-                select.appendChild(option);
-            });
+        if (!response.ok || !data.success) {
+            showToast(data.error || 'Failed to load schools', 'error');
+            _closeSchoolPopup();
+            return;
+        }
+
+        _allSchools = data.schools || [];
+        _schoolPickerReady = true;
+        _renderSchoolSearchResults(_allSchools);
+
+        // Show the full list in the popup so user sees schools immediately
+        const popup = document.getElementById('schoolSearchPopup');
+        const input = document.getElementById('schoolSearchInput');
+        if (popup && input) {
+            popup.style.display = 'block';
+            popup.setAttribute('aria-hidden', 'false');
+            input.setAttribute('aria-expanded', 'true');
         }
     } catch (error) {
         console.error('Error fetching schools:', error);
+        showToast('Failed to load schools list', 'error');
+        _closeSchoolPopup();
     }
 }
+
+function _renderSchoolSearchResults(schools) {
+    const list = document.getElementById('schoolSearchList');
+    if (!list) return;
+
+    if (!schools.length) {
+        list.innerHTML = '<div style="padding:0.5rem 0.75rem;color:var(--muted-foreground);font-size:0.85rem;">No schools found</div>';
+        return;
+    }
+
+    list.innerHTML = schools.map((school, i) => {
+        const name = escapeHtml(school.name || 'Unnamed School');
+        const city = school.address?.city ? `<span style="color:var(--muted-foreground);font-size:0.8rem;"> · ${escapeHtml(school.address.city)}</span>` : '';
+        const contact = school.contactPerson?.email
+            ? `<br><small style="color:var(--muted-foreground);font-size:0.75rem;">${escapeHtml(school.contactPerson.email)}</small>`
+            : '';
+        return `<div role="option" data-index="${i}" data-id="${school._id}" data-name="${name}"
+                      style="padding:0.5rem 0.75rem;cursor:pointer;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px;"
+                      onmouseenter="this.style.background='var(--muted)'" onmouseleave="this.style.background=''"
+                      onclick="_onSchoolPick(this)">
+                    <span>${name}${city}</span>${contact}
+                </div>`;
+    }).join('');
+}
+
+function _filterSchools(query) {
+    const q = query.toLowerCase().trim();
+    if (!q) return _allSchools;
+    return _allSchools.filter(s =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.address?.city || '').toLowerCase().includes(q)
+    );
+}
+
+function _onSchoolPick(el) {
+    if (!el) return;
+    const input = document.getElementById('schoolSearchInput');
+    const select = document.getElementById('schoolSelect');
+    const btn = document.getElementById('inviteSchoolBtn');
+    if (input) {
+        input.value = el.dataset.name || '';
+        input.setAttribute('aria-expanded', 'false');
+    }
+    if (select) select.value = el.dataset.id || '';
+    if (btn) btn.disabled = !el.dataset.id;
+    _closeSchoolPopup();
+}
+
+function _closeSchoolPopup() {
+    const popup = document.getElementById('schoolSearchPopup');
+    const input = document.getElementById('schoolSearchInput');
+    if (popup) {
+        popup.style.display = 'none';
+        popup.setAttribute('aria-hidden', 'true');
+    }
+    if (input) input.setAttribute('aria-expanded', 'false');
+}
+
+function _onSchoolSearchInput() {
+    const input = document.getElementById('schoolSearchInput');
+    const popup = document.getElementById('schoolSearchPopup');
+    if (!input || !popup) return;
+
+    const matches = _filterSchools(input.value);
+    _renderSchoolSearchResults(matches);
+    if (matches.length > 0) {
+        popup.style.display = 'block';
+        popup.setAttribute('aria-hidden', 'false');
+        input.setAttribute('aria-expanded', 'true');
+    } else {
+        popup.style.display = 'none';
+        input.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function _onSchoolSearchKeydown(e) {
+    const popup = document.getElementById('schoolSearchPopup');
+    if (e.key === 'Escape') { _closeSchoolPopup(); e.stopPropagation(); }
+    if (e.key === 'Enter' && popup && popup.style.display !== 'none') {
+        const first = popup.querySelector('[role="option"]');
+        if (first) { first.click(); e.preventDefault(); }
+    }
+    if (e.key === 'ArrowDown') {
+        if (popup && popup.style.display === 'block') {
+            const first = popup.querySelector('[role="option"]');
+            if (first) { first.focus(); e.preventDefault(); }
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Wire up school search picker
+    const si = document.getElementById('schoolSearchInput');
+    const toggleBtn = document.getElementById('schoolPickerToggle');
+    if (si) {
+        si.addEventListener('input', _onSchoolSearchInput);
+        si.addEventListener('keydown', _onSchoolSearchKeydown);
+        si.parentElement.addEventListener('click', function (e) {
+            if (e.target === si || e.target.id === 'schoolPickerWrapper') si.focus();
+        });
+        // Also open/close on arrow button click
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                si.focus();
+                if (!_schoolPickerReady || _allSchools.length === 0) return;
+                const popup = document.getElementById('schoolSearchPopup');
+                const willShow = popup.style.display === 'none' || popup.getAttribute('aria-hidden') === 'true';
+                if (willShow) {
+                    _renderSchoolSearchResults(_allSchools);
+                    popup.style.display = 'block';
+                    popup.setAttribute('aria-hidden', 'false');
+                    si.setAttribute('aria-expanded', 'true');
+                } else {
+                    _closeSchoolPopup();
+                }
+            });
+        }
+        document.addEventListener('click', function (e) {
+            if (!si.closest('#schoolPickerWrapper')) _closeSchoolPopup();
+        });
+    }
+});
 
 // Invite school to event
 async function inviteSchool() {

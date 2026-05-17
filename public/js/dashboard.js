@@ -3149,11 +3149,33 @@ function updateOnboardingSummary() {
 }
 
 async function submitOnboarding() {
+    const messageEl = document.getElementById('onboardingMessage');
     const form = document.getElementById('onboardingForm');
+    // Pre-submit validation: guard against empty required fields
+    if (form) {
+        const programSelect = form.querySelector('#programSelect');
+        const nameInput = form.querySelector('[name="name"]');
+        const contactNameInput = form.querySelector('[name="contactName"]');
+        const contactEmailInput = form.querySelector('[name="contactEmail"]');
+        const contactPhoneInput = form.querySelector('[name="contactPhone"]');
+        const missing = [];
+        if (nameInput && !nameInput.value.trim()) missing.push('School Name');
+        if (contactNameInput && !contactNameInput.value.trim()) missing.push('Contact Name');
+        if (contactEmailInput && !contactEmailInput.value.trim()) missing.push('Contact Email');
+        if (contactPhoneInput && !contactPhoneInput.value.trim()) missing.push('Contact Phone');
+        if (programSelect && !programSelect.value) missing.push('Program');
+        if (missing.length) {
+            messageEl.textContent = '✗ Please complete all required fields: ' + missing.join(', ');
+            messageEl.style.backgroundColor = '#f8d7da';
+            messageEl.style.color = '#721c24';
+            messageEl.style.borderLeft = '4px solid #f5c6cb';
+            messageEl.style.display = 'block';
+            return;
+        }
+    }
+
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
-
-    const messageEl = document.getElementById('onboardingMessage');
 
     try {
         let endpoint, method;

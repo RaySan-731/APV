@@ -25,9 +25,9 @@ exports.getExpenses = async (req, res) => {
     } = req.query;
 
     const query = {};
-    if (eventId) query.eventId = mongoose.Types.ObjectId(eventId);
-    if (schoolId) query.schoolId = mongoose.Types.ObjectId(schoolId);
-    if (staffId) query.staffId = mongoose.Types.ObjectId(staffId);
+    if (eventId) query.eventId = new mongoose.Types.ObjectId(eventId);
+    if (schoolId) query.schoolId = new mongoose.Types.ObjectId(schoolId);
+    if (staffId) query.staffId = new mongoose.Types.ObjectId(staffId);
     if (category) query.category = category;
     if (status) query.status = status;
     if (startDate || endDate) {
@@ -146,7 +146,7 @@ exports.createExpense = async (req, res) => {
       status: status || 'pending',
       notes,
       rejectionReason,
-      createdBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null
+      createdBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null
     });
 
     await expense.save();
@@ -183,7 +183,7 @@ exports.uploadReceipt = async (req, res) => {
 
     expense.receiptUrl = `/uploads/receipts/${req.file.filename}`;
     expense.receiptFileName = req.file.originalname;
-    expense.uploadedBy = req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null;
+    expense.uploadedBy = req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null;
     expense.uploadedAt = new Date();
     await expense.save();
 
@@ -206,7 +206,7 @@ exports.updateExpenseStatus = async (req, res) => {
 
     expense.status = status;
     if (status === 'approved') {
-      expense.approvedBy = req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null;
+      expense.approvedBy = req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null;
       expense.approvedAt = new Date();
       expense.approvedAmount = parseFloat(approvedAmount) || expense.netAmount;
     } else if (status === 'rejected') {

@@ -187,7 +187,7 @@ exports.getRevenueVsExpenses = async (req, res) => {
       dateFilter.$lte = new Date();
     }
 
-    const schoolFilter = schoolId ? { schoolId: mongoose.Types.ObjectId(schoolId) } : {};
+    const schoolFilter = schoolId ? { schoolId: new mongoose.Types.ObjectId(schoolId) } : {};
 
     // Get monthly revenue and expenses
     const monthlyData = [];

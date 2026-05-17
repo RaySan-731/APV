@@ -29,7 +29,7 @@ class FinancialReportingService {
         dateFilter.$lte = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       }
 
-      const schoolFilter = schoolId ? { schoolId: mongoose.Types.ObjectId(schoolId) } : {};
+      const schoolFilter = schoolId ? { schoolId: new mongoose.Types.ObjectId(schoolId) } : {};
 
       // Revenue calculations
       const revenueData = await Invoice.aggregate([
@@ -272,7 +272,7 @@ class FinancialReportingService {
         dateFilter.$lte = new Date();
       }
 
-      const trainerFilter = trainerId ? { trainerId: mongoose.Types.ObjectId(trainerId) } : {};
+      const trainerFilter = trainerId ? { trainerId: new mongoose.Types.ObjectId(trainerId) } : {};
 
       // Get payroll data
       const payrollData = await Payroll.aggregate([
@@ -455,7 +455,7 @@ class FinancialReportingService {
         const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
 
-        const schoolFilter = schoolId ? { schoolId: mongoose.Types.ObjectId(schoolId) } : {};
+        const schoolFilter = schoolId ? { schoolId: new mongoose.Types.ObjectId(schoolId) } : {};
 
         const [revenue, expenses, payroll] = await Promise.all([
           Invoice.aggregate([

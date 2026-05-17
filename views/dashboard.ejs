@@ -2611,8 +2611,6 @@ async function saveSchoolAllocation() {
                             <label>Rate per Student (KES) <input type="number" name="ratePerStudent" id="ratePerStudent" min="0" step="0.01" placeholder="Auto-filled from program" readonly style="background: var(--muted);"></label>
                             <p style="font-size: 0.85rem; color: var(--muted-foreground);">Rate is automatically set based on the selected program and cannot be changed.</p>
                         </div>
-                            <label>Rate per Student (optional) <input type="number" name="ratePerStudent" min="0" step="0.01" placeholder="0.00"></label>
-                        </div>
 
                         <!-- Step 4: Trainer Assignment -->
                         <div id="step-3" class="onboarding-step" style="display: none;">
@@ -3795,7 +3793,7 @@ async function saveSchoolAllocation() {
        </script>
 
       <% if (page === 'analytics') { %>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+         <script src="/js/chart.umd.min.js"></script>
         <script src="/js/analytics_dashboard.js"></script>
       <% } %>
       <script src="/js/dashboard.js"></script>

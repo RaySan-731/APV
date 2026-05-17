@@ -71,7 +71,7 @@ exports.getFinancialDashboard = async (req, res) => {
            error: 'Invalid school identifier' 
          });
        }
-       schoolFilter = { schoolId: mongoose.Types.ObjectId(schoolId) };
+        schoolFilter = { schoolId: new mongoose.Types.ObjectId(schoolId) };
      }
 
      // Key metrics
@@ -252,7 +252,7 @@ exports.getFinancialDashboard = async (req, res) => {
       }).populate('eventId', 'name').limit(10).lean(),
       // Payment methods summary
       Payment.aggregate([
-        { $match: { status: 'completed', ...(schoolId && { schoolId: mongoose.Types.ObjectId(schoolId) }) } },
+        { $match: { status: 'completed', ...(schoolId && { schoolId: new mongoose.Types.ObjectId(schoolId) }) } },
         {
           $group: {
             _id: '$method',
@@ -346,7 +346,7 @@ exports.getMonthlyTrends = async (dateFilter, schoolId) => {
           $match: {
             issueDate: { $gte: monthStart, $lte: monthEnd },
             status: { $in: ['issued', 'sent', 'partial', 'paid'] },
-            ...(schoolId && { schoolId: mongoose.Types.ObjectId(schoolId) })
+            ...(schoolId && { schoolId: new mongoose.Types.ObjectId(schoolId) })
           }
         },
         {
@@ -362,7 +362,7 @@ exports.getMonthlyTrends = async (dateFilter, schoolId) => {
           $match: {
             paidDate: { $gte: monthStart, $lte: monthEnd },
             status: 'approved',
-            ...(schoolId && { schoolId: mongoose.Types.ObjectId(schoolId) })
+            ...(schoolId && { schoolId: new mongoose.Types.ObjectId(schoolId) })
           }
         },
         {

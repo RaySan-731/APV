@@ -16,7 +16,7 @@ exports.getBudgets = async (req, res) => {
     if (type) query.type = type;
     if (period) query.period = period;
     if (status) query.status = status;
-    if (eventId) query.eventId = mongoose.Types.ObjectId(eventId);
+    if (eventId) query.eventId = new mongoose.Types.ObjectId(eventId);
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -127,10 +127,10 @@ exports.createBudget = async (req, res) => {
       totalSpent: 0,
       totalRemaining: totalAllocated,
       status: status || 'draft',
-      approvedBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null,
+      approvedBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null,
       approvedAt: status === 'active' ? new Date() : null,
       notes,
-      createdBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null
+      createdBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null
     });
 
     await budget.save();
@@ -200,7 +200,7 @@ exports.updateBudgetStatus = async (req, res) => {
 
     budget.status = status;
     if (status === 'active' && !budget.approvedBy) {
-      budget.approvedBy = req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null;
+      budget.approvedBy = req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null;
       budget.approvedAt = new Date();
     }
     await budget.save();

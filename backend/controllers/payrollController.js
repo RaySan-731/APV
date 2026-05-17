@@ -24,7 +24,7 @@ exports.getPayrollDashboard = async (req, res) => {
     const { trainerId, period, status, page = 1, limit = 20 } = req.query;
 
     const query = {};
-    if (trainerId) query.trainerId = mongoose.Types.ObjectId(trainerId);
+    if (trainerId) query.trainerId = new mongoose.Types.ObjectId(trainerId);
     if (period) {
       const [year, month] = period.split('-').map(Number);
       const start = new Date(year, month - 1, 1);
@@ -209,7 +209,7 @@ exports.createPayroll = async (req, res) => {
       taxAmount: parseFloat(taxAmount) || 0,
       notes,
       status: 'draft',
-      createdBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null
+      createdBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null
     });
 
     await payroll.save(); // pre-save hook calculates gross and net
@@ -235,7 +235,7 @@ exports.approvePayroll = async (req, res) => {
     }
 
     payroll.status = 'approved';
-    payroll.approvedBy = req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null;
+    payroll.approvedBy = req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null;
     payroll.approvedAt = new Date();
     await payroll.save();
 
@@ -265,7 +265,7 @@ exports.markAsPaid = async (req, res) => {
     payroll.paidAt = new Date();
     payroll.paymentReference = paymentReference;
     payroll.paymentMethod = paymentMethod || payroll.trainerId?.paymentMethod || 'mpesa';
-    payroll.paidBy = req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null;
+    payroll.paidBy = req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null;
     await payroll.save();
 
     // Create Payment record for outflow
@@ -280,7 +280,7 @@ exports.markAsPaid = async (req, res) => {
       reference: paymentReference,
       status: 'completed',
       notes: `Payroll payment for period ${payroll.periodStart.toLocaleDateString()} - ${payroll.periodEnd.toLocaleDateString()}`,
-      recordedBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null
+      recordedBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null
     });
     await payment.save();
 

@@ -45,7 +45,7 @@ exports.syncTrainerToSchoolPrograms = async (trainerId, schoolId, action = 'add'
       return results;
     }
 
-    const trainerObjectId = mongoose.Types.ObjectId(trainerId);
+    const trainerObjectId = new mongoose.Types.ObjectId(trainerId);
 
     for (const program of programs) {
       if (action === 'add') {
@@ -246,7 +246,7 @@ exports.syncSchoolToPrograms = async (schoolId) => {
         if (!existingTrainerIds.has(active.trainerId.toString())) {
           program.assignedTrainers.push({
             trainerId: active.trainerId,
-            schoolId: mongoose.Types.ObjectId(schoolId),
+            schoolId: new mongoose.Types.ObjectId(schoolId),
             assignmentType: active.assignmentType,
             assignedDate: new Date(),
             status: 'active'

@@ -17,7 +17,8 @@ const auditLogSchema = new mongoose.Schema({
       'permission_changed', 'role_changed', 'status_changed',
       'password_reset', 'account_activated', 'account_deactivated',
       'leave_approved', 'leave_rejected', 'assignment_changed',
-      'feedback_submitted', 'visit_logged'
+      'feedback_submitted', 'visit_logged',
+      'attendance_updated'
     ]
   },
   entityType: {

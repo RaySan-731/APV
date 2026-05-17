@@ -6,7 +6,7 @@
     <title>Financial Dashboard - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/js/chart.umd.min.js"></script>
     <style nonce="<%= cspNonce %>">
       .finance-card { border-left: 4px solid #007bff; }
       .finance-card.bg-primary { background-color: #007bff; color: white; }
@@ -36,6 +36,7 @@
                 </button>
                 <h1 class="page-title">Financial Dashboard</h1>
                 <div class="btn-toolbar">
+                    <a href="/finance/invoices" class="btn btn-outline-secondary btn-sm">View Invoices</a>
                     <a href="/finance/reports" class="btn btn-outline-primary btn-sm">Reports</a>
                     <a href="/finance/invoices/create" class="btn btn-primary btn-sm ms-2">New Invoice</a>
                 </div>

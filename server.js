@@ -214,6 +214,7 @@ const EmailLog = require('./models/EmailLog');
 
 // Finance models
 const Invoice = require('./models/Invoice');
+const invoiceService = require('./backend/services/invoiceService');
 const Expense = require('./models/Expense');
 const Budget = require('./models/Budget');
 const Payroll = require('./models/Payroll');
@@ -4793,7 +4794,7 @@ app.get('/dashboard/schools', requireAuth, requirePermission('canViewSchools'), 
 });
 
 // School onboarding wizard submission
-app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreateSchools'), async (req, res) => {
+app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreateSchools'), parseJson, async (req, res) => {
   try {
     const {
       name, street, city, state, zipCode, country, zone, region,
@@ -5140,7 +5141,7 @@ app.get('/api/schools/:schoolId', requireAuth, requirePermission('canViewSchools
 });
 
 // POST: Update school details (full edit for admins/founders) - supports onboarding-style data
-app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { schoolId } = req.params;
 
@@ -7482,7 +7483,61 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
        status: 'assigned'
      });
 
-     await event.save();
+    await event.save();
+
+    // If school confirmed attendance, create a draft invoice now so it is stored in the DB
+    // and visible in the invoices list immediately. The RFC-legal participant count (numberOfParticipants)
+    // drives the invoice quantity. A founder can update / finalise the invoice at any time.
+    if (status === 'confirmed' && schoolId) {
+      try {
+        const participantCount = schoolRsvpEntry?.numberOfParticipants || 0;
+        const ratePerStudent = (await School.findById(schoolId))?.paymentTerms?.ratePerStudent || 0;
+        const eventRate = event.costPerParticipant || 0;
+        const unitRate = eventRate > 0 ? eventRate : ratePerStudent;
+
+        if (unitRate > 0) {
+          const rsvpCount = participantCount > 0
+            ? participantCount
+            : (event.review?.actualAttendeeCount || event.estimatedScoutCount || 0 || 1);
+
+          const draftInvoice = new Invoice({
+            schoolId: new mongoose.Types.ObjectId(schoolId),
+            invoiceNumber:
+              invoiceService.generateInvoiceNumber('INV'),
+            invoiceType: 'event',
+            relatedEvents: [new mongoose.Types.ObjectId(eventId)],
+            status: 'draft',
+            issueDate: new Date(),
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            currency: 'KES',
+            items: [{
+              description: `Event: ${event.name} - ${rsvpCount} participants @ KES ${unitRate.toFixed(2)}/student`,
+              quantity: rsvpCount,
+              unitPrice: unitRate,
+              total: rsvpCount * unitRate,
+              eventId: event._id
+            }],
+            subtotal: rsvpCount * unitRate,
+            totalAmount: rsvpCount * unitRate,
+            balance: rsvpCount * unitRate,
+            bankDetails: {
+              bankName: process.env.BANK_NAME || 'APV Ventures Ltd',
+              accountName: process.env.BANK_ACCOUNT_NAME || 'Arrow-Park Ventures',
+              accountNumber: process.env.BANK_ACCOUNT_NUMBER || '1234567890',
+              branch: process.env.BANK_BRANCH || 'Nairobi',
+              swiftCode: process.env.BANK_SWIFT || 'AFRIKENXXX',
+              mpesaTillNumber: process.env.MPESA_TILL || '123456'
+            }
+          });
+
+          await draftInvoice.save();
+          req.eventDraftInvoiceId = draftInvoice._id;
+        }
+      } catch (invoiceErr) {
+        console.error('Error creating draft invoice on RSVP confirm:', invoiceErr.message);
+        // Do not fail the RSVP if invoice creation fails
+      }
+    }
 
      // Get the assigned trainer object for the response
      const assignedTrainer = event.trainers.find(t => t.trainerId.toString() === trainerId);
@@ -7660,10 +7715,12 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
 
     await event.save();
 
+    // Fetch school for both email and in-app notifications
+    const School = require('./models/School');
+    const school = await School.findById(schoolId);
+
     // Send invitation email to school contact using centralized service
     try {
-      const School = require('./models/School');
-      const school = await School.findById(schoolId);
       if (school && school.contactPerson?.email) {
         const protocol = req.protocol;
         const host = req.get('host');

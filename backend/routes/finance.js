@@ -78,19 +78,11 @@ router.get('/dashboard', requireFinanceAccess, financeController.getFinancialDas
 router.get('/invoices', requireFinanceAccess, invoiceController.getInvoices);
 router.get('/invoices/create', requireFinanceAccess, async (req, res) => {
   try {
-    const [schools, events, packages] = await Promise.all([
-      School.find({}).select('_id name studentCount').lean(),
-      Event.find({ status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed'] } })
-        .select('_id name startDate status costPerParticipant estimatedScoutCount targetSchools')
-        .lean(),
-      ServicePackage.find({ isActive: true }).select('_id name displayName pricingModel').lean()
-    ]);
+    const schools = await School.find({}).select('_id name studentCount').lean();
     res.render('finance/invoices/create', {
       user: req.session.user,
       page: 'finance/invoices',
-      schools,
-      events,
-      packages
+      schools
     });
   } catch (err) {
     console.error('Error loading invoice create form:', err);
@@ -98,42 +90,23 @@ router.get('/invoices/create', requireFinanceAccess, async (req, res) => {
   }
 });
 router.post('/invoices/create', requireFinanceAccess, invoiceController.createInvoice);
+
+// Specific invoice routes — must come BEFORE /invoices/:id to avoid route shadowing
+router.post('/invoices/generate/event', requireFinanceAccess, invoiceController.generateEventInvoices);
+router.post('/invoices/generate/program', requireFinanceAccess, invoiceController.generateProgramInvoices);
+router.get('/invoices/overdue', requireFinanceAccess, invoiceController.getOverdueAccounts);
+router.get('/invoices/suggest', requireFinanceAccess, invoiceController.getInvoiceSuggestion);
+router.get('/invoices/uninvoiced-items', requireFinanceAccess, invoiceController.getUninvoicedItems);
+
+// Generic /invoices/:id routes — placed AFTER all specific /invoices/* paths
 router.get('/invoices/:id', requireFinanceAccess, invoiceController.getInvoice);
 router.post('/invoices/:id/cancel', requireFinanceAccess, invoiceController.cancelInvoice);
 router.post('/invoices/:id/send-reminder', requireFinanceAccess, invoiceController.sendReminder);
 router.get('/invoices/:id/download', requireFinanceAccess, invoiceController.downloadInvoicePDF);
-
-// Auto-generate invoice routes
-router.post('/invoices/generate/event', requireFinanceAccess, invoiceController.generateEventInvoices);
-router.post('/invoices/generate/program', requireFinanceAccess, invoiceController.generateProgramInvoices);
-router.get('/invoices/overdue', requireFinanceAccess, invoiceController.getOverdueAccounts);
-
-// ========== PAYMENTS ==========
-router.get('/payments', requireFinanceAccess, paymentController.getPayments);
-router.get('/payments/create', requireFinanceAccess, paymentController.getCreatePayment);
-router.post('/payments/create', requireFinanceAccess, receiptUpload.single('receipt'), paymentController.createPayment);
-router.get('/payments/:id', requireFinanceAccess, paymentController.getPayment);
-router.post('/payments/:id/cancel', requireFinanceAccess, paymentController.cancelPayment);
-router.get('/payments/overdue', requireFinanceAccess, paymentController.getOverduePayments);
-router.post('/payments/:id/send-reminder', requireFinanceAccess, paymentController.sendPaymentReminder);
-router.get('/api/payments/methods-summary', requireFinanceAccess, paymentController.getPaymentMethodsSummary);
-
-// ========== FINANCIAL REPORTS ==========
-router.get('/reports', requireFinanceAccess, financialReportsController.getFinancialReports);
-router.get('/reports/pl-summary', requireFinanceAccess, financialReportsController.getPLReport);
-router.get('/reports/school-revenue', requireFinanceAccess, financialReportsController.getSchoolRevenueReport);
-router.get('/reports/trainer-costs', requireFinanceAccess, financialReportsController.getTrainerCostReport);
-router.get('/reports/trends', requireFinanceAccess, financialReportsController.getFinancialTrends);
-router.get('/api/reports/revenue-expenses', requireFinanceAccess, financialReportsController.getRevenueVsExpenses);
-
-// Record payment against invoice
 router.post('/invoices/:id/payments', requireFinanceAccess, receiptUpload.single('receipt'), (req, res) => {
   req.body.invoiceId = req.params.id;
   invoiceController.recordPayment(req, res);
 });
-
-// Auto-suggest invoice
-router.get('/invoices/suggest', requireFinanceAccess, invoiceController.getInvoiceSuggestion);
 
 // ========== EXPENSES ==========
 router.get('/expenses', requireFinanceAccess, expenseController.getExpenses);

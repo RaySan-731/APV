@@ -10,6 +10,7 @@ const ServicePackage = require('../../models/ServicePackage');
 const Payment = require('../../models/Payment');
 const PaymentService = require('../services/paymentService');
 const InvoicePDFService = require('../services/invoicePDFService');
+const InvoiceService = require('../services/invoiceService');
 const fs = require('fs');
 const path = require('path');
 
@@ -37,7 +38,7 @@ exports.getInvoices = async (req, res) => {
 
     const query = {};
 
-    if (schoolId) query.schoolId = mongoose.Types.ObjectId(schoolId);
+    if (schoolId) query.schoolId = new mongoose.Types.ObjectId(schoolId);
     if (status) query.status = status;
     if (invoiceType) query.invoiceType = invoiceType;
     if (startDate || endDate) {
@@ -97,6 +98,9 @@ exports.getInvoices = async (req, res) => {
 // GET: Single invoice detail
 exports.getInvoice = async (req, res) => {
   try {
+    if (!req.params.id || !/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Invoice not found' });
+    }
     const invoice = await Invoice.findById(req.params.id)
       .populate('schoolId', 'name email contactPerson billingAddress paymentTerms')
       .populate('issuedBy', 'name email')
@@ -148,6 +152,10 @@ exports.createInvoice = async (req, res) => {
       currency = 'KES'
     } = req.body;
 
+    if (!schoolId || schoolId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Valid schoolId is required' });
+    }
+
     const school = await School.findById(schoolId);
     if (!school) {
       return res.status(404).json({ success: false, error: 'School not found' });
@@ -157,12 +165,22 @@ exports.createInvoice = async (req, res) => {
     let subtotal = 0;
     let skippedReasons = [];
 
-    if (invoiceType === 'event' && relatedEvents) {
-      // Auto-generate invoice from events
+    const eventIds = (Array.isArray(relatedEvents)
+      ? relatedEvents
+      : relatedEvents ? [relatedEvents] : [])
+      .filter(id => id && id.toString().trim());
+
+    if (invoiceType === 'event' && eventIds.length > 0) {
+      // Auto-generate invoice from confirmed events for this school
       const events = await Event.find({
-        _id: { $in: relatedEvents },
-        'targetSchools.schoolId': schoolId,
-        status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed'] }
+        _id: { $in: eventIds },
+        targetSchools: {
+          $elemMatch: {
+            schoolId: new mongoose.Types.ObjectId(schoolId),
+            rsvpStatus: 'confirmed'
+          }
+        },
+        status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed', 'reviewed'] }
       });
 
       const ratePerStudent = school.paymentTerms?.ratePerStudent || 0;
@@ -170,10 +188,18 @@ exports.createInvoice = async (req, res) => {
       skippedReasons = [];
 
       for (const event of events) {
-        // Use event-specific attendee count when available; fall back to estimatedScoutCount then school.studentCount.
-        // final fallback to school.studentCount satisfies: “cost per participant × number of students in the selected school”
+        // Primary: use RSVP participant count from the confirmed school entry in targetSchools.
+        // Fall back to attendance.registered, actualAttendeeCount, estimatedScoutCount, then school.studentCount.
+        const schoolRsvpEntry = (event.targetSchools || []).find(
+          ts => ts.schoolId.toString() === schoolId.toString()
+        );
+        const rsvpCount = schoolRsvpEntry?.numberOfParticipants
+          || schoolRsvpEntry?.attendance?.registered
+          || 0;
+
         const eventQuantity =
-          event.review?.actualAttendeeCount
+          (rsvpCount > 0 ? rsvpCount :
+            event.review?.actualAttendeeCount)
           || event.estimatedScoutCount
           || school.studentCount
           || 0;
@@ -276,7 +302,7 @@ exports.createInvoice = async (req, res) => {
       relatedEvents: relatedEvents || [],
       servicePackageId: servicePackageId || null,
       status: 'issued',
-      issuedBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null,
+      issuedBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null,
       bankDetails: {
         bankName: process.env.BANK_NAME || 'APV Ventures Ltd',
         accountName: process.env.BANK_ACCOUNT_NAME || 'Arrow-Park Ventures',
@@ -297,7 +323,7 @@ exports.createInvoice = async (req, res) => {
 
     await invoice.save();
 
-    res.json({ success: true, invoice });
+    res.redirect('/finance/invoices');
   } catch (err) {
     console.error('Error creating invoice:', err);
     res.status(500).json({ success: false, error: 'Failed to create invoice' });
@@ -340,7 +366,7 @@ exports.recordPayment = async (req, res) => {
       reference,
       notes,
       receiptFile: receiptFile || (req.file ? req.file : null),
-      recordedBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null
+      recordedBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null
     });
 
     res.json({ success: true, payment, invoiceBalance: invoice.balance - paymentAmount });
@@ -583,6 +609,68 @@ exports.getOverdueAccounts = async (req, res) => {
   } catch (err) {
     console.error('Error fetching overdue accounts:', err);
     res.status(500).render('404', { user: req.session.user, error: 'Failed to load overdue accounts' });
+  }
+};
+
+// GET: Get events and service packages never invoiced for a given school
+exports.getUninvoicedItems = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, error: 'schoolId is required' });
+    }
+
+    // Guard against malformed ObjectIds before any DB call
+    if (!/^[0-9a-fA-F]{24}$/.test(schoolId)) {
+      return res.status(400).json({ success: false, error: 'Invalid schoolId format: must be a 24-character hex string' });
+    }
+
+    // Collect all event IDs and service package IDs that have appeared in non-cancelled invoices for this school
+    const billedInvoices = await Invoice.find({
+      schoolId: new mongoose.Types.ObjectId(schoolId),
+      status: { $ne: 'cancelled' }
+    }).select('relatedEvents servicePackageId').lean();
+
+    const invoicedEventIds = [];
+    for (const inv of billedInvoices) {
+      const events = Array.isArray(inv.relatedEvents) ? inv.relatedEvents : [];
+      for (const ev of events) {
+        if (ev && typeof ev.toString === 'function') invoicedEventIds.push(ev.toString());
+      }
+    }
+
+    const invoicedPackageIds = [];
+    for (const inv of billedInvoices) {
+      const pkgId = inv.servicePackageId;
+      if (pkgId && typeof pkgId.toString === 'function') invoicedPackageIds.push(pkgId.toString());
+    }
+
+    const uninvoicedEvents = await Event.find({
+      ...(invoicedEventIds.length > 0 ? { _id: { $nin: invoicedEventIds } } : {}),
+      targetSchools: {
+        $elemMatch: {
+          schoolId: new mongoose.Types.ObjectId(schoolId),
+          rsvpStatus: 'confirmed'
+        }
+      },
+      status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed', 'reviewed'] }
+    })
+      .select('_id name startDate status costPerParticipant estimatedScoutCount targetSchools')
+      .lean();
+
+    const uninvoicedPackages = invoicedPackageIds.length > 0
+      ? await ServicePackage.find({
+          _id: { $nin: invoicedPackageIds },
+          isActive: true
+        }).select('_id displayName pricingModel').lean()
+      : await ServicePackage.find({ isActive: true }).select('_id displayName pricingModel').lean();
+
+    res.json({ success: true, events: uninvoicedEvents, packages: uninvoicedPackages });
+  } catch (err) {
+    console.error('Error fetching uninvoiced items:', err.message || err);
+    console.error(err.stack);
+    res.status(500).json({ success: false, error: 'Failed to load uninvoiced items', details: err.message });
   }
 };
 

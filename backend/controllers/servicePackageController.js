@@ -102,7 +102,7 @@ exports.savePackage = async (req, res) => {
       pkg = new ServicePackage({
         name,
         ...pkgData,
-        createdBy: req.session.user?.id ? mongoose.Types.ObjectId(req.session.user.id) : null
+        createdBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null
       });
       await pkg.save();
     }

@@ -27,6 +27,7 @@
             <div class="container-fluid mt-4">
                 <div class="card">
                     <div class="card-body">
+                        <div id="uninvoiceError" style="color:var(--danger);margin:0.5rem 0;font-size:0.875rem;"></div>
                         <form action="/finance/invoices/create" method="POST">
                             <div class="mb-3">
                                 <label class="form-label">School *</label>
@@ -50,13 +51,8 @@
                             <div id="eventFields" style="display:none;">
                                 <div class="mb-3">
                                     <label class="form-label">Select Events (completed or in progress)</label>
-                                    <select name="relatedEvents" class="form-select" multiple size="5">
-                                        <% events.forEach(ev => { %>
-                                            <option
-                                                value="<%= ev._id %>"
-                                                data-target-school-ids=<%- JSON.stringify((ev.targetSchools || []).map(ts => ts.schoolId?.toString() || '')) %>
-                                            ><%= ev.name %> - <%= ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date' %></option>
-                                        <% }); %>
+                                    <select name="relatedEvents[]" class="form-select" multiple size="5">
+                                        <option value="">Load uninvoiced events</option>
                                     </select>
                                     <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
                                 </div>
@@ -66,10 +62,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">Service Package</label>
                                     <select name="servicePackageId" class="form-select">
-                                        <option value="">Select package</option>
-                                        <% packages.forEach(p => { %>
-                                            <option value="<%= p._id %>"><%= p.displayName %> (<%= p.pricingModel %>)</option>
-                                        <% }); %>
+                                        <option value="">Load uninvoiced packages</option>
                                     </select>
                                 </div>
                             </div>
@@ -78,13 +71,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">Select Events to build Custom Line Items</label>
                                     <select id="customEventSelect" class="form-select" multiple size="5">
-                                        <% events.forEach(ev => { %>
-                                            <option
-                                                value="<%= ev._id %>"
-                                                data-cost-per-participant="<%= ev.costPerParticipant || 0 %>"
-                                                data-target-school-ids=<%- JSON.stringify((ev.targetSchools || []).map(ts => ts.schoolId?.toString() || '')) %>
-                                            ><%= ev.name %> - <%= ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date' %></option>
-                                        <% }); %>
+                                        <option value="">Load uninvoiced events</option>
                                     </select>
                                     <small class="text-muted">Hold Ctrl/Cmd to select multiple events. Custom JSON will be generated automatically.</small>
                                 </div>
@@ -150,16 +137,24 @@
         return schoolSelect ? schoolSelect.value : null;
     }
 
-    /** Filter a multi-select so that only events whose data-target-school-ids includes the
-     *  currently selected school are visible; hide and deselect all others.
-     *  An option with no data-target-school-ids attribute is treated as "unlinked" and always hidden. */
+    /** Rebuild a multi-select element's option list so that only events whose
+     *  data-target-school-ids includes the currently selected school are visible;
+     *  hide and deselect all others. Options sorted newest-first by start date. */
     function filterEventsSelect(selectEl) {
         if (!selectEl) return;
         const schoolId = getSelectedSchoolId();
+
+        // Reorder: recently dated events last (so Hebrew text reads left-to-right at bottom)
+        Array.from(selectEl.options).sort((a, b) => {
+            const aDate = new Date((b.dataset?.eventDate || 0));
+            const bDate = new Date((b.dataset?.eventDate || 0));
+            return aDate - bDate;
+        });
+
         Array.from(selectEl.options).forEach(opt => {
+            if (opt.value === '') return; // keep the empty placeholder option alone
             const targetIds = JSON.parse(opt.getAttribute('data-target-school-ids') || '[]');
             if (schoolId && targetIds.length === 0) {
-                // Unlinked event – always invisible
                 opt.hidden = true;
                 opt.selected = false;
             } else if (!schoolId) {
@@ -168,7 +163,6 @@
             } else if (targetIds.includes(schoolId)) {
                 opt.hidden = false;
             } else {
-                // Linked but to a different school – hide and deselect
                 opt.hidden = true;
                 opt.selected = false;
             }
@@ -182,49 +176,134 @@
 
     function buildCustomItemsFromSelectedEvents() {
         const schoolStudentCount = getSelectedStudentCount();
-
         const selectEl = document.getElementById('customEventSelect');
         if (!selectEl) return [];
 
         const selectedOptions = Array.from(selectEl.selectedOptions || []);
         const quantity = schoolStudentCount > 0 ? schoolStudentCount : 1;
 
-        const items = selectedOptions.map(opt => {
+        return selectedOptions.map(opt => {
             const name = opt.textContent.trim();
             const costPerParticipant = parseFloat(opt.dataset.costPerParticipant || '0') || 0;
-
             return {
                 description: `Event: ${name}`,
                 quantity,
                 unitPrice: costPerParticipant
             };
         });
-
-        return items;
     }
 
     function updateCustomItemsTextarea() {
         const type = document.getElementById('invoiceType').value;
         const textarea = document.getElementById('customItemsTextarea');
-        if (!textarea) return;
+        if (!textarea || type !== 'custom') return;
 
-        if (type !== 'custom') return;
-
-        const items = buildCustomItemsFromSelectedEvents();
-        textarea.value = JSON.stringify(items);
+        textarea.value = JSON.stringify(buildCustomItemsFromSelectedEvents(), null, 2);
     }
 
-    // Initialize
+    /** Fetch uninvoiced events and packages for the currently selected school
+     *  and rebuild the select elements. Falls back gracefully if the request fails. */
+    async function loadUninvoicedItems() {
+        const schoolId = getSelectedSchoolId();
+        if (!schoolId) {
+            // No school selected — clear the event/package selects and textarea
+            clearAllItems();
+            return;
+        }
+
+        try {
+            const resp = await fetch(`/finance/invoices/uninvoiced-items?schoolId=${encodeURIComponent(schoolId)}`);
+            let errBody = null;
+            if (!resp.ok) {
+              try { errBody = await resp.json(); } catch (e) { /* ignore */ }
+              const msg = (errBody && errBody.error) || 'Failed to load uninvoiced items';
+              const el = document.getElementById('uninvoiceError');
+              if (el) el.textContent = msg;
+              clearAllItems();
+              return;
+            }
+
+            const data = await resp.json();
+
+            // ── Rebuild the Events multi-selects ──────────────────────────
+            ['relatedEvents', 'customEventSelect'].forEach(selId => {
+                const sel = selId === 'relatedEvents'
+                    ? document.querySelector('select[name="relatedEvents"]')
+                    : document.getElementById(selId);
+                if (!sel) return;
+
+                const schoolIdForFilter = schoolId; // capture for closure
+                const firstOpt = sel.options[0] ? sel.options[0].outerHTML : '';
+                sel.innerHTML = '';
+                if (firstOpt) sel.appendChild(new DOMParser().parseFromString(firstOpt, 'text/html').body.firstChild);
+
+                (data.events || []).forEach(ev => {
+                    const opt = document.createElement('option');
+                    opt.value = ev._id;
+                    opt.textContent = `${ev.name} — ${ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date'}`;
+                    opt.setAttribute('data-cost-per-participant', ev.costPerParticipant || 0);
+                    opt.setAttribute('data-target-school-ids', JSON.stringify(
+                        (ev.targetSchools || []).map(ts => ts.schoolId?.toString() || '')
+                    ));
+                    opt.setAttribute('data-event-date', ev.startDate || '');
+                    sel.appendChild(opt);
+                });
+
+                sel.value = '';
+                if (selId === 'relatedEvents') filterEventsSelect(sel);
+            });
+
+            // ── Rebuild the Service Package select ─────────────────────────
+            const pkgSel = document.querySelector('select[name="servicePackageId"]');
+            if (pkgSel) {
+                const firstPkgOpt = pkgSel.options[0] ? pkgSel.options[0].outerHTML : '';
+                pkgSel.innerHTML = '';
+                if (firstPkgOpt) pkgSel.appendChild(new DOMParser().parseFromString(firstPkgOpt, 'text/html').body.firstChild);
+
+                (data.packages || []).forEach(pkg => {
+                    const opt = document.createElement('option');
+                    opt.value = pkg._id;
+                    opt.textContent = `${pkg.displayName} (${pkg.pricingModel})`;
+                    pkgSel.appendChild(opt);
+                });
+            }
+
+            updateCustomItemsTextarea();
+        } catch (err) {
+            console.error('Error loading uninvoiced items:', err);
+            clearAllItems();
+            const el = document.getElementById('uninvoiceError');
+            if (el) el.textContent = err.message || 'An unexpected error occurred.';
+        }
+    }
+
+    function clearAllItems() {
+        ['relatedEvents', 'customEventSelect'].forEach(selId => {
+            const sel = selId === 'relatedEvents'
+                ? document.querySelector('select[name="relatedEvents"]')
+                : document.getElementById(selId);
+            if (sel) { sel.innerHTML = '<option value="">Load uninvoiced events</option>'; }
+        });
+        const pkgSel = document.querySelector('select[name="servicePackageId"]');
+        if (pkgSel) pkgSel.innerHTML = '<option value="">Select package</option>';
+        updateCustomItemsTextarea();
+    }
+
+    // Initialise on page load
     toggleFields();
     filterAllEventDropDowns();
     updateCustomItemsTextarea();
 
-    // Wiring: filter events when school is selected; regenerate JSON for custom type
+    // Fetch uninvoiced items whenever the school changes
     document.querySelector('select[name="schoolId"]').addEventListener('change', () => {
-        filterAllEventDropDowns();
-        updateCustomItemsTextarea();
+        loadUninvoicedItems();
     });
+
+    // Update custom JSON whenever the custom-event selection changes
     document.getElementById('customEventSelect').addEventListener('change', () => updateCustomItemsTextarea());
+
+    // Load uninvoiced items on initial render if a school is pre-selected
+    if (getSelectedSchoolId()) loadUninvoicedItems();
     </script>
 
     <script src="/js/main.js"></script>

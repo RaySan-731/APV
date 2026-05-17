@@ -27,8 +27,8 @@ exports.getPayments = async (req, res) => {
 
     const query = {};
 
-    if (schoolId) query.schoolId = mongoose.Types.ObjectId(schoolId);
-    if (invoiceId) query.invoiceId = mongoose.Types.ObjectId(invoiceId);
+    if (schoolId) query.schoolId = new mongoose.Types.ObjectId(schoolId);
+    if (invoiceId) query.invoiceId = new mongoose.Types.ObjectId(invoiceId);
     if (status) query.status = status;
     if (method) query.method = method;
     if (startDate || endDate) {

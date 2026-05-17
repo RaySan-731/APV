@@ -80,8 +80,8 @@ router.get('/invoices/create', requireFinanceAccess, async (req, res) => {
   try {
     const [schools, events, packages] = await Promise.all([
       School.find({}).select('_id name studentCount').lean(),
-      Event.find({ status: { $in: ['completed', 'in_progress'] } })
-        .select('_id name startDate status costPerParticipant')
+      Event.find({ status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed'] } })
+        .select('_id name startDate status costPerParticipant estimatedScoutCount targetSchools')
         .lean(),
       ServicePackage.find({ isActive: true }).select('_id name displayName pricingModel').lean()
     ]);

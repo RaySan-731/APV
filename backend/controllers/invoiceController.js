@@ -155,36 +155,46 @@ exports.createInvoice = async (req, res) => {
 
     let items = [];
     let subtotal = 0;
+    let skippedReasons = [];
 
     if (invoiceType === 'event' && relatedEvents) {
       // Auto-generate invoice from events
       const events = await Event.find({
         _id: { $in: relatedEvents },
         'targetSchools.schoolId': schoolId,
-        status: { $in: ['completed', 'in_progress'] }
+        status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed'] }
       });
 
       const ratePerStudent = school.paymentTerms?.ratePerStudent || 0;
 
+      skippedReasons = [];
+
       for (const event of events) {
-        // Prefer event-specific attendee count when available; fall back to school.studentCount.
+        // Use event-specific attendee count when available; fall back to estimatedScoutCount then school.studentCount.
+        // final fallback to school.studentCount satisfies: “cost per participant × number of students in the selected school”
         const eventQuantity =
-          event.review?.actualAttendeeCount ||
-          event.review?.actualParticipantCount ||
-          event.review?.actualScoutCount ||
-          event.estimatedScoutCount ||
-          school.studentCount ||
-          0;
+          event.review?.actualAttendeeCount
+          || event.estimatedScoutCount
+          || school.studentCount
+          || 0;
 
-        if (eventQuantity <= 0) continue;
+        if (eventQuantity <= 0) {
+          skippedReasons.push(`${event.name}: no participant count found (review count, estimatedScoutCount, and school.studentCount are all 0)`);
+          continue;
+        }
 
-        const rate = ratePerStudent || event.costPerParticipant || 0;
-        if (rate <= 0) continue;
+        // Use the event's own costPerParticipant as the primary rate; fall back to school paymentTerms rate only
+        // when the event has not set a rate of its own.
+        const rate = (event.costPerParticipant > 0 ? event.costPerParticipant : (ratePerStudent > 0 ? ratePerStudent : 0));
+        if (rate <= 0) {
+          skippedReasons.push(`${event.name}: no rate found (event costPerParticipant=${event.costPerParticipant ?? 'missing'}, school ratePerStudent=${ratePerStudent || 'missing'})`);
+          continue;
+        }
 
         const total = rate * eventQuantity;
 
         items.push({
-          description: `Event: ${event.name} (${event.startDate ? event.startDate.toLocaleDateString() : 'No date'}) - ${eventQuantity} participants`,
+          description: `Event: ${event.name} (${event.startDate ? event.startDate.toLocaleDateString() : 'No date'}) - ${eventQuantity} participants @ KES ${rate.toFixed(2)}/student`,
           quantity: eventQuantity,
           unitPrice: rate,
           total,
@@ -192,6 +202,10 @@ exports.createInvoice = async (req, res) => {
         });
 
         subtotal += total;
+      }
+
+      if (skippedReasons.length > 0) {
+        console.warn('Invoice generation – events skipped for school "' + school.name + '":', skippedReasons);
       }
     } else if (invoiceType === 'service_package' && servicePackageId) {
       // Invoice based on service package
@@ -235,7 +249,10 @@ exports.createInvoice = async (req, res) => {
     }
 
     if (items.length === 0) {
-      return res.status(400).json({ success: false, error: 'No billable items found for invoice' });
+      const detail = skippedReasons.length > 0
+        ? ' Reasons: ' + skippedReasons.join('; ')
+        : ' Ensure events have a cost per participant (event.costPerParticipant or paymentTerms.ratePerStudent) and a participant count (review counts or estimatedScoutCount).';
+      return res.status(400).json({ success: false, error: 'No billable items found for invoice.' + detail });
     }
 
     // Calculate totals
@@ -373,7 +390,7 @@ exports.getInvoiceSuggestion = async (req, res) => {
 
       let total = 0;
       suggestion.items = events.map(event => {
-        const qty = event.review?.actualAttendeeCount || event.estimatedScoutCount || 0;
+        const qty = event.review?.actualAttendeeCount || event.estimatedScoutCount || school.studentCount || 0;
         const rate = school.paymentTerms.ratePerStudent;
         const itemTotal = qty * rate;
         total += itemTotal;

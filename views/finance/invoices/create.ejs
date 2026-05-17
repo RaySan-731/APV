@@ -52,7 +52,10 @@
                                     <label class="form-label">Select Events (completed or in progress)</label>
                                     <select name="relatedEvents" class="form-select" multiple size="5">
                                         <% events.forEach(ev => { %>
-                                            <option value="<%= ev._id %>"><%= ev.name %> - <%= ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date' %></option>
+                                            <option
+                                                value="<%= ev._id %>"
+                                                data-target-school-ids=<%- JSON.stringify((ev.targetSchools || []).map(ts => ts.schoolId?.toString() || '')) %>
+                                            ><%= ev.name %> - <%= ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date' %></option>
                                         <% }); %>
                                     </select>
                                     <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
@@ -79,6 +82,7 @@
                                             <option
                                                 value="<%= ev._id %>"
                                                 data-cost-per-participant="<%= ev.costPerParticipant || 0 %>"
+                                                data-target-school-ids=<%- JSON.stringify((ev.targetSchools || []).map(ts => ts.schoolId?.toString() || '')) %>
                                             ><%= ev.name %> - <%= ev.startDate ? new Date(ev.startDate).toLocaleDateString() : 'No date' %></option>
                                         <% }); %>
                                     </select>
@@ -141,6 +145,41 @@
         return selected && selected.dataset ? (parseFloat(selected.dataset.studentCount || '0') || 0) : 0;
     }
 
+    function getSelectedSchoolId() {
+        const schoolSelect = document.querySelector('select[name="schoolId"]');
+        return schoolSelect ? schoolSelect.value : null;
+    }
+
+    /** Filter a multi-select so that only events whose data-target-school-ids includes the
+     *  currently selected school are visible; hide and deselect all others.
+     *  An option with no data-target-school-ids attribute is treated as "unlinked" and always hidden. */
+    function filterEventsSelect(selectEl) {
+        if (!selectEl) return;
+        const schoolId = getSelectedSchoolId();
+        Array.from(selectEl.options).forEach(opt => {
+            const targetIds = JSON.parse(opt.getAttribute('data-target-school-ids') || '[]');
+            if (schoolId && targetIds.length === 0) {
+                // Unlinked event – always invisible
+                opt.hidden = true;
+                opt.selected = false;
+            } else if (!schoolId) {
+                opt.hidden = true;
+                opt.selected = false;
+            } else if (targetIds.includes(schoolId)) {
+                opt.hidden = false;
+            } else {
+                // Linked but to a different school – hide and deselect
+                opt.hidden = true;
+                opt.selected = false;
+            }
+        });
+    }
+
+    function filterAllEventDropDowns() {
+        filterEventsSelect(document.querySelector('select[name="relatedEvents"]'));
+        filterEventsSelect(document.getElementById('customEventSelect'));
+    }
+
     function buildCustomItemsFromSelectedEvents() {
         const schoolStudentCount = getSelectedStudentCount();
 
@@ -177,10 +216,14 @@
 
     // Initialize
     toggleFields();
+    filterAllEventDropDowns();
     updateCustomItemsTextarea();
 
-    // Wiring: regenerate JSON whenever school or event selection changes
-    document.querySelector('select[name="schoolId"]').addEventListener('change', () => updateCustomItemsTextarea());
+    // Wiring: filter events when school is selected; regenerate JSON for custom type
+    document.querySelector('select[name="schoolId"]').addEventListener('change', () => {
+        filterAllEventDropDowns();
+        updateCustomItemsTextarea();
+    });
     document.getElementById('customEventSelect').addEventListener('change', () => updateCustomItemsTextarea());
     </script>
 

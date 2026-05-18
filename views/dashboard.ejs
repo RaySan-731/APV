@@ -678,7 +678,7 @@
                                         <!-- Step 1: Basic Information -->
                                         <div id="staff-step-0" class="onboarding-step" style="display: grid;">
                                             <h4>Basic Information</h4>
-                                            <label>ID Number (Optional)<input type="text" name="idNumber" placeholder="Staff ID"></label>
+                                            <label>ID Number (Optional)<input type="text" id="addStaffIdNumber" name="idNumber" placeholder="Staff ID"></label>
                                             <label>Full Name *<input type="text" name="name" required placeholder="John Doe"></label>
                                             <label>Email Address *<input type="email" name="email" required placeholder="john@example.com"></label>
                                             <label>Phone Number<input type="tel" name="phone" placeholder="+254700000000"></label>
@@ -708,7 +708,7 @@
                                             <h4>Address Information</h4>
                                             <label>Street Address<input type="text" name="street" placeholder="123 Main St"></label>
                                             <label>City<input type="text" name="city" placeholder="Nairobi"></label>
-                                            <label>State/County<input type="text" name="state" placeholder="Nairobi County"></label>
+                                            <label>Subcounty<input type="text" name="state" placeholder="e.g., Dagoretti North"></label>
                                             <label>Zip/Postal Code<input type="text" name="zipCode" placeholder="00100"></label>
                                             <label>Country<input type="text" name="country" value="Kenya"></label>
                                         </div>
@@ -783,7 +783,7 @@
                                         <!-- Address Information -->
                                         <label>Street Address<input type="text" id="editStreet" name="street" maxlength="200" pattern="[A-Za-z0-9\s\-,'#\.]+" title="Address must contain only letters, numbers, spaces, hyphens, apostrophes, commas, hash or periods."></label>
                                         <label>City<input type="text" id="editCity" name="city" maxlength="50" pattern="[A-Za-z\s\-]+" title="City must contain only letters, spaces and hyphens."></label>
-                                        <label>State<input type="text" id="editState" name="state" maxlength="50" pattern="[A-Za-z\s\-]+" title="State must contain only letters, spaces and hyphens."></label>
+                                        <label>Subcounty<input type="text" id="editSubcounty" name="state" maxlength="50" pattern="[A-Za-z\s\-]+" title="Subcounty must contain only letters, spaces and hyphens."></label>
                                         <label>Zip Code<input type="text" id="editZipCode" name="zipCode" maxlength="15" pattern="[A-Za-z0-9\s\-]+" title="Zip Code must contain only letters, numbers, spaces and hyphens."></label>
                                         <label>Country<input type="text" id="editCountry" name="country" maxlength="50" pattern="[A-Za-z\s\-]+" title="Country must contain only letters, spaces and hyphens."></label>
 
@@ -860,7 +860,7 @@
                                         <div class="profile-grid">
                                             <div class="profile-field"><strong>Street:</strong> <span id="profileStreet">—</span></div>
                                             <div class="profile-field"><strong>City:</strong> <span id="profileCity">—</span></div>
-                                            <div class="profile-field"><strong>State:</strong> <span id="profileState">—</span></div>
+                                            <div class="profile-field"><strong>Subcounty:</strong> <span id="profileState">—</span></div>
                                             <div class="profile-field"><strong>Zip Code:</strong> <span id="profileZipCode">—</span></div>
                                             <div class="profile-field"><strong>Country:</strong> <span id="profileCountry">—</span></div>
                                         </div>

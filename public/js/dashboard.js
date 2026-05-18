@@ -497,7 +497,7 @@ async function editStaff(staffId) {
         // Address fields
         document.getElementById('editStreet').value = staff.address?.street || '';
         document.getElementById('editCity').value = staff.address?.city || '';
-        document.getElementById('editState').value = staff.address?.state || '';
+        document.getElementById('editSubcounty').value = staff.address?.state || '';
         document.getElementById('editZipCode').value = staff.address?.zipCode || '';
         document.getElementById('editCountry').value = staff.address?.country || 'Kenya';
 
@@ -567,7 +567,7 @@ async function saveEditStaff() {
     // Address fields
     const street = document.getElementById('editStreet').value;
     const city = document.getElementById('editCity').value;
-    const state = document.getElementById('editState').value;
+    const state = document.getElementById('editSubcounty').value;
     const zipCode = document.getElementById('editZipCode').value;
     const country = document.getElementById('editCountry').value;
 
@@ -588,137 +588,169 @@ async function saveEditStaff() {
 
     const messageEl = document.getElementById('editMessage');
 
-    // Inline validation helpers
+    // -- validation helpers ---------------------------------------------------
     function setInputError(el, msg) {
         el.classList.add('input-error');
-        el.dataset.errMsg = msg;
-        el.addEventListener('input', el._clearHint, { once: true });
-        el.addEventListener('blur', el._showHint, { once: true });
+        // remove any stale hint then add one fresh
+        const old = el.parentElement.querySelector('.input-hint');
+        if (old) old.remove();
+        const hint = document.createElement('div');
+        hint.className = 'input-hint';
+        hint.textContent = msg;
+        el.parentElement.appendChild(hint);
     }
 
     function setInputOk(el) {
         el.classList.remove('input-error');
-        delete el.dataset.errMsg;
+        const hint = el.parentElement.querySelector('.input-hint');
+        if (hint) hint.remove();
     }
 
-    function showHint(el) {
-        if (!el.dataset.errMsg) return;
-        let hint = el.parentElement.querySelector('.input-hint');
-        if (!hint) {
-            hint = document.createElement('div');
-            hint.className = 'input-hint';
-            hint.style.cssText = 'color:#dc3545;font-size:.75rem;margin-top:.2rem;';
-            el.parentElement.appendChild(hint);
-        }
-        hint.textContent = el.dataset.errMsg;
+    function clearFormErrors(form) {
+        form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+        form.querySelectorAll('.input-hint').forEach(el => el.remove());
     }
 
-    // Collect input edge-values
+    // -- before we touch the DOM / network, remove any stale errors -----------
     const form = document.getElementById('editStaffForm');
-    const submitBtn = form.querySelector('[onclick="saveEditStaff()"]');
+    clearFormErrors(form);
 
-    // Contextual validation
-    let isValid = true;
+    // -- helpers to DRY up repeated pattern checks ---------------------------
+    const idNumberEl  = document.getElementById('editIdNumber');
+    const nameEl      = document.getElementById('editName');
+    const phoneEl     = document.getElementById('editPhone');
+    const deptEl      = document.getElementById('editDepartment');
+    const streetEl    = document.getElementById('editStreet');
+    const cityEl      = document.getElementById('editCity');
+    const subEl       = document.getElementById('editSubcounty');
+    const zipEl       = document.getElementById('editZipCode');
+    const countryEl   = document.getElementById('editCountry');
+    const emNameEl    = document.getElementById('editEmergencyContactName');
+    const emRelEl     = document.getElementById('editEmergencyContactRelationship');
+    const emPhoneEl   = document.getElementById('editEmergencyContactPhone');
+    const avgAttEl    = document.getElementById('editAverageAttendanceRate');
+    const avgFbEl     = document.getElementById('editAverageFeedbackRating');
+    const submitBtn   = form.querySelector('[onclick*="saveEditStaff"]') ||
+                        form.querySelector('button[type="button"]');
 
-    // Run HTML5 built-in validators first
-    if (!form.checkValidity()) {
-        form.reportValidity();
-        isValid = false;
+    let firstErrorEl = null;
+
+    function mark(errEl, msg) {
+        setInputError(errEl, msg);
+        if (!firstErrorEl) firstErrorEl = errEl;
     }
 
-    // Required-field guard for role select
-    if (!role) {
-        const roleEl = document.getElementById('editRole');
-        setInputError(roleEl, 'Please select a role.');
-        showHint(roleEl);
-        roleEl.focus();
-        isValid = false;
-    }
-
-    // Name pattern
-    const nameEl = document.getElementById('editName');
-    const namePattern = /^[A-Za-z][A-Za-z\s\-'\.]{1,98}$/;
-    if (name && !namePattern.test(name.trim())) {
-        setInputError(nameEl, 'Name must contain only letters, spaces, hyphens, apostrophes or periods (2–100 chars).');
-        showHint(nameEl);
-        if (isValid) { nameEl.focus(); isValid = false; }
+    // ---- Name: must be letters / spaces / hyphens / apostrophes / dots --------
+    // Name must start with a letter
+    const nameRegex = /^[A-Za-z][A-Za-z\s\-'\.]{1,99}$/;
+    if (!nameRegex.test(name.trim())) {
+        mark(nameEl, 'Name must be 2–100 letters, spaces, hyphens, apostrophes or periods and must begin with a letter.');
     } else {
         setInputOk(nameEl);
     }
 
-    // Department pattern
-    const deptPattern = /^[A-Za-z0-9\s\-&,]{1,50}$/;
-    if (department && !deptPattern.test(department.trim())) {
-        setInputError(document.getElementById('editDepartment'), 'Department contains invalid characters.');
-        if (isValid) { document.getElementById('editDepartment').focus(); isValid = false; }
+    // ---- Role is mandatory (we use novalidate so we must guard it) ----------
+    if (!role) {
+        mark(document.getElementById('editRole'), 'Please select a role.');
     }
 
-    // Phone pattern — must be digits (optionally with +, spaces, hyphens, parentheses, periods)
-    const phonePattern = /^[\+]?[\d\s\-\.\(\)]{7,20}$/;
-    if (phone && !phonePattern.test(phone.trim())) {
-        setInputError(document.getElementById('editPhone'), 'Enter a valid phone number (digits, +, spaces, hyphens parenthes., max 20 chars).');
-        if (isValid) { document.getElementById('editPhone').focus(); isValid = false; }
+    // ---- Email: native type="email" already在这儿; required + maxlength -----
+    // (no extra JS regex needed; form.checkValidity() handles it)
+
+    // ---- ID Number: A-Z 0-9 - _ / only --------------------------------------
+    if (idNumber && !/^[A-Za-z0-9\-_/]+$/.test(idNumber.trim())) {
+        mark(idNumberEl, 'ID Number must contain only letters, numbers, hyphens, underscores or slashes.');
+    } else {
+        setInputOk(idNumberEl);
     }
 
-    // Emergency contact phone
-    if (emergencyContactPhone && !phonePattern.test(emergencyContactPhone.trim())) {
-        setInputError(document.getElementById('editEmergencyContactPhone'), 'Enter a valid phone number.');
-        if (isValid) { document.getElementById('editEmergencyContactPhone').focus(); isValid = false; }
+    // ---- Department: A-Z a-z 0-9 spaces - & , only --------------------------
+    if (department && !/^[A-Za-z0-9\s\-&,]+$/.test(department.trim())) {
+        mark(deptEl, 'Department contains invalid characters.');
+    } else {
+        setInputOk(deptEl);
     }
 
-    // Zip code pattern
-    if (zipCode && !/^[A-Za-z0-9\s\-]{1,15}$/.test(zipCode.trim())) {
-        setInputError(document.getElementById('editZipCode'), 'Zip code contains invalid characters.');
-        if (isValid) { document.getElementById('editZipCode').focus(); isValid = false; }
+    // ---- Phone: optional; if given must be digits + optional + space -(). -- 
+    const phoneRx = /^[\+]?[\d\s\-\.\(\)]{7,20}$/;
+    if (phone && !phoneRx.test(phone.trim())) {
+        mark(phoneEl, 'Enter a valid phone number (7–20 digits, optionally prefixed with +).');
+    } else {
+        setInputOk(phoneEl);
+    }
+    if (emergencyContactPhone && !phoneRx.test(emergencyContactPhone.trim())) {
+        mark(emPhoneEl, 'Enter a valid emergency contact phone number.');
+    } else {
+        setInputOk(emPhoneEl);
     }
 
-    // City / State / Country alphabetic
-    const textOnly = /^[A-Za-z\s\-]+$/;
-    if (city && !textOnly.test(city.trim())) {
-        setInputError(document.getElementById('editCity'), 'City must contain only letters, spaces and hyphens.');
-        if (isValid) { document.getElementById('editCity').focus(); isValid = false; }
-    }
-    if (state && !textOnly.test(state.trim())) {
-        setInputError(document.getElementById('editState'), 'State must contain only letters, spaces and hyphens.');
-        if (isValid) { document.getElementById('editState').focus(); isValid = false; }
-    }
-    if (country && !textOnly.test(country.trim())) {
-        setInputError(document.getElementById('editCountry'), 'Country must contain only letters, spaces and hyphens.');
-        if (isValid) { document.getElementById('editCountry').focus(); isValid = false; }
+    // ---- Street: letters numbers spaces , ' - # . only -----------------------
+    const streetRx = /^[A-Za-z0-9\s\-,'#\.]+$/;
+    if (street && !streetRx.test(street.trim())) {
+        mark(streetEl, 'Street address contains invalid characters.');
+    } else {
+        setInputOk(streetEl);
     }
 
-    // Performance-metrics number guards (clamp to sensible default if out of range)
-    const eventsCompleted = document.getElementById('editEventsCompleted');
-    const reportsSubmitted = document.getElementById('editReportsSubmitted');
-    const schoolsVisited = document.getElementById('editSchoolsVisited');
-    const avgAttendance = document.getElementById('editAverageAttendanceRate');
-    const avgFeedback = document.getElementById('editAverageFeedbackRating');
-
-    [eventsCompleted, reportsSubmitted, schoolsVisited].forEach(el => {
-        if (el.value === '' || isNaN(el.value) || Number(el.value) < 0) el.value = 0;
-    });
-    if (avgAttendance.value === '' || isNaN(avgAttendance.value) || Number(avgAttendance.value) < 0 || Number(avgAttendance.value) > 100) {
-        avgAttendance.value = '';
-        setInputError(avgAttendance, 'Attendance must be between 0 and 100.');
-        if (isValid) { avgAttendance.focus(); isValid = false; }
+    // ---- City / Subcounty / Country: letters spaces hyphens only -------------
+    const alphabeticRx = /^[A-Za-z][A-Za-z\s\-]*$/;
+    if (city && !alphabeticRx.test(city.trim())) {
+        mark(cityEl, 'City must contain only letters, spaces and hyphens.');
+    } else {
+        setInputOk(cityEl);
     }
-    if (avgFeedback.value === '' || isNaN(avgFeedback.value) || Number(avgFeedback.value) < 0 || Number(avgFeedback.value) > 5) {
-        avgFeedback.value = '';
-        setInputError(avgFeedback, 'Rating must be between 0 and 5.');
-        if (isValid) { avgFeedback.focus(); isValid = false; }
+    if (subEl && subEl.value && !alphabeticRx.test(subEl.value.trim())) {
+        mark(subEl, 'Subcounty must contain only letters, spaces and hyphens.');
+    } else {
+        setInputOk(subEl);
+    }
+    if (countryEl && countryEl.value && !alphabeticRx.test(countryEl.value.trim())) {
+        mark(countryEl, 'Country must contain only letters, spaces and hyphens.');
+    } else {
+        setInputOk(countryEl);
     }
 
-    if (!isValid) {
+    // ---- Zip / Postal Code --------------------------------------------------
+    const zipRx = /^[A-Za-z0-9\s\-]+$/;
+    if (zipCode && !zipRx.test(zipCode.trim())) {
+        mark(zipEl, 'ZIP / Postal code contains invalid characters.');
+    } else {
+        setInputOk(zipEl);
+    }
+
+    // ---- Emergency contact fields -------------------------------------------
+    if (emNameEl && emNameEl.value && !nameRegex.test(emNameEl.value.trim())) {
+        mark(emNameEl, 'Emergency contact name must contain only letters, spaces, hyphens, apostrophes or periods.');
+    } else {
+        setInputOk(emNameEl);
+    }
+    if (emRelEl && emRelEl.value && !/^[A-Za-z\s\-]+$/.test(emRelEl.value.trim())) {
+        mark(emRelEl, 'Relationship must contain only letters, spaces and hyphens.');
+    } else {
+        setInputOk(emRelEl);
+    }
+
+    // ---- Performance metrics number guards ----------------------------------
+    if (avgAttEl && (avgAttEl.value === '' || isNaN(avgAttEl.value) || Number(avgAttEl.value) < 0 || Number(avgAttEl.value) > 100)) {
+        avgAttEl.value = '';
+        mark(avgAttEl, 'Attendance % must be between 0 and 100.');
+    }
+    if (avgFbEl && (avgFbEl.value === '' || isNaN(avgFbEl.value) || Number(avgFbEl.value) < 0 || Number(avgFbEl.value) > 5)) {
+        avgFbEl.value = '';
+        mark(avgFbEl, 'Feedback rating must be between 0 and 5.');
+    }
+
+    // -- abort on first error --------------------------------------------------
+    if (firstErrorEl) {
+        firstErrorEl.focus();
         if (submitBtn) submitBtn.disabled = false;
         return;
     }
 
-    if (!name || !email || !role) {
-        messageEl.textContent = '✗ Please fill in all required fields';
-        messageEl.style.backgroundColor = '#f8d7da';
-        messageEl.style.color = '#721c24';
-        messageEl.style.borderLeft = '4px solid #f5c6cb';
-        messageEl.style.display = 'block';
+    // -- also run any HTML5 native validators that are not pattern-based --------
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        if (submitBtn) submitBtn.disabled = false;
         return;
     }
 
@@ -2744,10 +2776,21 @@ async function submitTrainerReport() {
 
   if (!report) {
     showToast('Please enter a report', 'error');
-    return;
-  }
+        return;
+    }
 
-  try {
+    // Final required-fields guard (belt-and-suspenders)
+    if (!name || !email || !role) {
+        messageEl.textContent = '✗ Please fill in all required fields';
+        messageEl.style.backgroundColor = '#f8d7da';
+        messageEl.style.color = '#721c24';
+        messageEl.style.borderLeft = '4px solid #f5c6cb';
+        messageEl.style.display = 'block';
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+    }
+
+    try {
     const res = await fetch(`/api/events/${eventId}/submit-report`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3453,7 +3496,7 @@ document.addEventListener('click', function(event) {
 let currentStaffOnboardingStep = 0;
 let staffFormCache = {};
 
-function openAddStaffModal() {
+async function openAddStaffModal() {
     currentStaffOnboardingStep = 0;
     staffFormCache = {};
 
@@ -3466,6 +3509,16 @@ function openAddStaffModal() {
     }
     const form = document.getElementById('addStaffForm');
     if (form) form.reset();
+
+    // Pre-fill with next available monatomic TRN idNumber so the user never has to guess or reuse one
+    try {
+        const idRes = await fetch('/api/staff/next-id', { method: 'GET' });
+        if (idRes.ok) {
+            const { idNumber } = await idRes.json();
+            const idInput = document.getElementById('addStaffIdNumber');
+            if (idInput) idInput.value = idNumber || '';
+        }
+    } catch (_) { /* ignore – backend will still auto-generate if left blank */ }
 
     // Show modal and first step
     document.getElementById('addStaffModal').style.display = 'flex';

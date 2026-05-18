@@ -192,6 +192,7 @@ const Booking = require('./models/Booking');
 const Program = require('./models/Program');
 const School = require('./models/School');
 const Staff = require('./models/Staff');
+const Counter = require('./models/Counter');
 const Event = require('./models/Event');
 const VisitLog = require('./models/VisitLog');
 const Feedback = require('./models/Feedback');
@@ -239,12 +240,28 @@ const notificationScheduler = require('./backend/services/notificationScheduler'
 if (process.env.MONGODB_URI) {
   // Connect without deprecated options; mongoose v6+ uses sensible defaults
   mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log('Connected to MongoDB');
     // Start schedulers
     reportScheduler.start();
     notificationScheduler.start();
-    // Initialize default system settings and holidays
+
+    // Bootstrap the TRN counter from any already-existing staff TRN numbers
+    let staffIdCounter = await Counter.findOne({ _id: 'staff-id-counter' });
+    if (!staffIdCounter) {
+      const highest = await Staff
+        .find({ idNumber: { $regex: /^TRN\d+$/ } })
+        .sort({ idNumber: -1 })
+        .limit(1)
+        .select('idNumber')
+        .lean();
+      const startFrom = highest.length > 0
+        ? parseInt(highest[0].idNumber.replace('TRN', ''), 10)
+        : 16; // next new number drives from 17
+      await Counter.create({ _id: 'staff-id-counter', seq: startFrom });
+      console.log(`[Counter] Seeded staff-id-counter at ${startFrom}`);
+    }
+
     initializeSystemSettings();
   })
   .catch(err => {
@@ -2008,8 +2025,23 @@ app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'
     const invitationToken = crypto.randomBytes(32).toString('hex');
     const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
+    // Auto-generate a unique TRN idNumber if none was supplied.
+    // Uses an atomic counter so every number is unique even under concurrent requests.
+    // A number once issued is NEVER reused (deleted staff retain their TRN in the counter monotonicity).
+    let generatedIdNumber = idNumber && idNumber.trim() ? idNumber.trim() : null;
+    if (!generatedIdNumber) {
+      const counter = await Counter.findOneAndUpdate(
+        { _id: 'staff-id-counter' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      const nextSeq = String(counter.seq).padStart(4, '0');
+      generatedIdNumber = `TRN${nextSeq}`;
+      console.log('[Counter] Generated staff idNumber:', generatedIdNumber);
+    }
+
     const staffData = {
-      idNumber: idNumber && idNumber.trim() ? idNumber.trim() : null,
+      idNumber: generatedIdNumber,
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: phone ? phone.trim() : null,
@@ -2393,10 +2425,26 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
    } catch (err) {
      console.error('Error fetching staff details:', err);
      res.status(500).json({ error: 'Failed to fetch staff details' });
-   }
- });
+    }
+  });
 
- // ============ LEAVE MANAGEMENT ROUTES ============
+  // Get next auto-generated staff TRN idNumber (atomic, never recycles deleted IDs)
+  app.get('/api/staff/next-id', requireAuth, requirePermission('canCreateStaff'), async (req, res) => {
+    try {
+      const result = await Counter.findOneAndUpdate(
+        { _id: 'staff-id-counter' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      const nextNum = String(result.seq).padStart(4, '0');
+      res.json({ idNumber: `TRN${nextNum}` });
+    } catch (err) {
+      console.error('Error generating next staff idNumber:', err);
+      res.status(500).json({ error: 'Failed to generate next staff ID' });
+    }
+  });
+
+  // ============ LEAVE MANAGEMENT ROUTES ============
 
  // Trainer submits leave request
   app.post('/api/trainer/leave/request', requireAuth, parseJson, async (req, res) => {

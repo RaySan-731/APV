@@ -52,6 +52,8 @@ const paymentSchema = new mongoose.Schema({
   reference: String, // Transaction reference from bank/mpesa
   receiptUrl: String,
   receiptFileName: String,
+  checkoutRequestId: String,
+  transactionMeta: mongoose.Schema.Types.Mixed,
 
   // For payroll payments
   payrollId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payroll' },

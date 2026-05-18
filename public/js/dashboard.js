@@ -2569,6 +2569,9 @@ async function openManageEventModal(eventId) {
         document.getElementById('eventStartDate').value = formatDT(event.startDate);
         document.getElementById('eventEndDate').value = formatDT(event.endDate);
 
+        // Populate trainer dropdown
+        await populateTrainerDropdown();
+
         // Render assigned trainers
         const trainersList = document.getElementById('assignedTrainersList');
         trainersList.innerHTML = '';

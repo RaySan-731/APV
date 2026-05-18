@@ -2686,6 +2686,12 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     schoolController.getInvoices(req, res);
   });
 
+  // API: Get invoices sent to the school (with founder/admin sender/issuer info)
+  app.get('/api/school/sent-invoices', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getSentInvoices(req, res);
+  });
+
   // API: Download invoice
   app.get('/api/school/invoices/:invoiceId/download', requireAuth, requireSchoolAdmin, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
@@ -2696,6 +2702,18 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
   app.post('/api/school/invoices/:invoiceId/query', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
     schoolController.raisePaymentQuery(req, res);
+  });
+
+  // API: Pay invoice via MPESA STK push
+  app.post('/api/school/invoices/:invoiceId/pay', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.payInvoice(req, res);
+  });
+
+  // API: MPESA STK callback endpoint
+  app.post('/api/mpesa/stk-callback', parseJson, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.mpesaStkCallback(req, res);
   });
 
   // API: Get documents
@@ -4172,7 +4190,7 @@ app.post('/api/trainer/students', requireAuth, parseJson, async (req, res) => {
 });
 
 // POST update student (using POST instead of PUT to avoid method override)
-app.post('/api/trainer/students/:studentId', requireAuth, async (req, res) => {
+app.post('/api/trainer/students/:studentId', requireAuth, parseJson, async (req, res) => {
   if (!req.session.user || req.session.user.role !== 'trainer') {
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
@@ -4274,7 +4292,7 @@ app.post('/api/trainer/students/:studentId', requireAuth, async (req, res) => {
 });
 
 // POST delete student
-app.post('/api/trainer/students/:studentId/delete', requireAuth, async (req, res) => {
+app.post('/api/trainer/students/:studentId/delete', requireAuth, parseJson, async (req, res) => {
   if (!req.session.user || req.session.user.role !== 'trainer') {
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
@@ -5402,7 +5420,7 @@ app.post('/api/schools/:schoolId/status', requireAuth, requirePermission('canEdi
 });
 
 // POST: Delete a school (admin/founder only)
-app.post('/api/schools/:schoolId/delete', requireAuth, requirePermission('canDeleteSchools'), async (req, res) => {
+app.post('/api/schools/:schoolId/delete', requireAuth, requirePermission('canDeleteSchools'), parseJson, async (req, res) => {
   try {
     const { schoolId } = req.params;
 
@@ -5442,7 +5460,7 @@ app.post('/api/schools/:schoolId/delete', requireAuth, requirePermission('canDel
 });
 
 // POST: Bulk update school program enrollments
-app.post('/api/schools/:schoolId/update-programs', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/schools/:schoolId/update-programs', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { schoolId } = req.params;
     const { programIds } = req.body; // array of program ObjectId strings
@@ -5558,7 +5576,7 @@ app.get('/api/schools/:schoolId/onboard-data', requireAuth, requirePermission('c
 });
 
 // API: Record school event participation
-app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents'), async (req, res) => {
+app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents'), parseJson, async (req, res) => {
   try {
     const { schoolId, eventId, participantsCount, primaryContact, assignedStaff, notes } = req.body;
 
@@ -5614,7 +5632,7 @@ app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents')
 });
 
 // API: Update school event attendance (replaces broken SchoolEvent reference)
-app.post('/api/events/:eventId/attendance', requireAuth, requirePermission('canEditEvents'), async (req, res) => {
+app.post('/api/events/:eventId/attendance', requireAuth, requirePermission('canEditEvents'), parseJson, async (req, res) => {
   try {
     const { eventId } = req.params;
     const { schoolId, attended } = req.body;
@@ -5733,7 +5751,7 @@ app.get('/api/schools/:schoolId/payments', requireAuth, async (req, res) => {
 });
 
 // API: Create/update payment record
-app.post('/api/payments', requireAuth, requirePermission('canViewFinancials'), async (req, res) => {
+app.post('/api/payments', requireAuth, requirePermission('canViewFinancials'), parseJson, async (req, res) => {
   try {
     const {
       schoolId, invoiceNumber, amount, currency, paymentDate, dueDate,
@@ -5832,7 +5850,7 @@ app.post('/api/payments', requireAuth, requirePermission('canViewFinancials'), a
 });
 
 // API: Upload document for school
-app.post('/api/documents', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/documents', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { schoolId, documentType, name, description, url, fileSize, mimeType, expiryDate } = req.body;
 
@@ -5967,7 +5985,7 @@ app.get('/api/schools/analytics', requireAuth, requirePermission('canViewAnalyti
 
 // Note: Old event creation route removed. Use POST /dashboard/events/create instead.
 
-app.post('/dashboard/programs/add', requireAuth, async (req, res) => {
+app.post('/dashboard/programs/add', requireAuth, parseJson, async (req, res) => {
   try {
     const { name, description, category, ageMin, ageMax, duration, maxParticipants, priceAmount, priceCurrency, status } = req.body;
     const program = new Program({
@@ -5989,7 +6007,7 @@ app.post('/dashboard/programs/add', requireAuth, async (req, res) => {
 });
 
 // API routes for trainer actions
-app.post('/api/visit-logs', requireAuth, async (req, res) => {
+app.post('/api/visit-logs', requireAuth, parseJson, async (req, res) => {
   if (req.session.user.role !== 'trainer') {
     return res.status(403).json({ error: 'Unauthorized' });
   }
@@ -6017,7 +6035,7 @@ app.post('/api/visit-logs', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/feedback', requireAuth, async (req, res) => {
+app.post('/api/feedback', requireAuth, parseJson, async (req, res) => {
   if (req.session.user.role !== 'trainer') {
     return res.status(403).json({ error: 'Unauthorized' });
   }
@@ -6380,7 +6398,7 @@ app.get('/api/analytics/programs', requireAuth, requirePermission('canViewAnalyt
   }
 });
 
-app.post('/api/analytics/programs/:programId/assign-trainer', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+app.post('/api/analytics/programs/:programId/assign-trainer', requireAuth, requirePermission('canAssignTrainers'), parseJson, async (req, res) => {
   try {
     const { programId } = req.params;
     const { trainerId } = req.body;
@@ -6418,7 +6436,7 @@ app.post('/api/analytics/programs/:programId/assign-trainer', requireAuth, requi
 // ============ SCHOOL-PROGRAM ALLOCATION ROUTES ============
 
 // Allocate a school to a program (adds program to school and school to program)
-app.post('/api/programs/:programId/allocate-school', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/programs/:programId/allocate-school', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { programId } = req.params;
     const { schoolId } = req.body;
@@ -6471,7 +6489,7 @@ app.post('/api/programs/:programId/allocate-school', requireAuth, requirePermiss
 });
 
 // Deallocate a school from a program
-app.post('/api/programs/:programId/deallocate-school', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/programs/:programId/deallocate-school', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { programId } = req.params;
     const { schoolId } = req.body;
@@ -6514,7 +6532,7 @@ app.post('/api/programs/:programId/deallocate-school', requireAuth, requirePermi
 });
 
 // Allocate a program to a school (alternative endpoint from school side)
-app.post('/api/schools/:schoolId/allocate-program', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/schools/:schoolId/allocate-program', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { schoolId } = req.params;
     const { programId } = req.body;
@@ -6566,7 +6584,7 @@ app.post('/api/schools/:schoolId/allocate-program', requireAuth, requirePermissi
 });
 
 // Deallocate a program from a school
-app.post('/api/schools/:schoolId/deallocate-program', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/schools/:schoolId/deallocate-program', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { schoolId } = req.params;
     const { programId } = req.body;
@@ -6609,7 +6627,7 @@ app.post('/api/schools/:schoolId/deallocate-program', requireAuth, requirePermis
 });
 
 // POST: Bulk update program school allocations
-app.post('/api/programs/:programId/update-schools', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/programs/:programId/update-schools', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { programId } = req.params;
     const { schoolIds } = req.body; // array of school ObjectId strings
@@ -7427,7 +7445,7 @@ app.post('/dashboard/events/update/:id', requireAuth, requirePermission('canCrea
 });
 
 // DELETE event
-app.post('/dashboard/events/delete/:id', requireAuth, requirePermission('canDeleteEvents'), async (req, res) => {
+app.post('/dashboard/events/delete/:id', requireAuth, requirePermission('canDeleteEvents'), parseJson, async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) {
@@ -7513,32 +7531,66 @@ app.get('/api/trainers/:trainerId/availability', requireAuth, async (req, res) =
   }
 });
 
+// Get list of all active trainers
+app.get('/api/trainers/list', requireAuth, async (req, res) => {
+  try {
+    const trainers = await Staff.find({
+      role: { $in: ['trainer', 'training_officer', 'senior trainer', 'supervisor', 'coordinator'] },
+      status: { $in: ['Active', 'On Leave'] }
+    })
+      .select('name email role idNumber status')
+      .sort({ name: 1 })
+      .lean();
+
+    res.json({
+      success: true,
+      trainers: trainers.map(t => ({
+        _id: t._id,
+        name: t.name,
+        role: t.role,
+        email: t.email,
+        idNumber: t.idNumber,
+        status: t.status
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching trainers list:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch trainers' });
+  }
+});
+
 // Assign trainer to event
-app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('canAssignTrainers'), parseJson, async (req, res) => {
   try {
     const eventId = req.params.eventId;
     const { trainerId, role } = req.body;
 
     if (!trainerId) {
+      console.error('[assign-trainer] No trainerId in req.body');
       return res.status(400).json({ success: false, error: 'trainerId is required' });
     }
 
     // Get current admin staff (the one performing the assignment)
     const currentAdmin = await getCurrentStaff(req);
     if (!currentAdmin) {
+      console.error('[assign-trainer] currentAdmin is null for event:', eventId);
       return res.status(403).json({ success: false, error: 'Admin staff record not found' });
     }
 
     const event = await Event.findById(eventId);
     if (!event) {
+      console.error('[assign-trainer] Event not found:', eventId);
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
     // Check if trainer is already assigned
     const existing = event.trainers.find(t => t.trainerId.toString() === trainerId);
     if (existing) {
+      console.error('[assign-trainer] Trainer already assigned:', trainerId);
       return res.status(400).json({ success: false, error: 'Trainer already assigned to this event' });
     }
+
+    console.log('[assign-trainer] trainerId:', trainerId, 'eventId:', eventId, 'eventName:', event.name);
 
     // Check for scheduling conflicts
     const conflictCheck = await Event.find({
@@ -7572,12 +7624,14 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
 
     await event.save();
 
-    // If school confirmed attendance, create a draft invoice now so it is stored in the DB
-    // and visible in the invoices list immediately. The RFC-legal participant count (numberOfParticipants)
-    // drives the invoice quantity. A founder can update / finalise the invoice at any time.
-    if (status === 'confirmed' && schoolId) {
-      try {
+    // Invoice block — derive schoolId / schoolRsvpEntry from event.targetSchools
+    const confirmedSchools = (event.targetSchools || []).filter(ts => ts.rsvpStatus === 'confirmed');
+    if (confirmedSchools.length > 0) {
+      for (const idx in confirmedSchools) {
+        const schoolId = confirmedSchools[idx].schoolId;
+        const schoolRsvpEntry = confirmedSchools[idx];
         const participantCount = schoolRsvpEntry?.numberOfParticipants || 0;
+        try {
         const ratePerStudent = (await School.findById(schoolId))?.paymentTerms?.ratePerStudent || 0;
         const eventRate = event.costPerParticipant || 0;
         const unitRate = eventRate > 0 ? eventRate : ratePerStudent;
@@ -7625,6 +7679,7 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
         // Do not fail the RSVP if invoice creation fails
       }
     }
+  }
 
      // Get the assigned trainer object for the response
      const assignedTrainer = event.trainers.find(t => t.trainerId.toString() === trainerId);
@@ -7653,7 +7708,7 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
           );
           const otherTrainersList = otherTrainers.filter(Boolean);
           const otherTrainersText = otherTrainersList.length > 0
-            ? `<br><strong>Other Trainers:</strong><br>${otherTrainersList.map(t => `• ${t}`).join('<br>')}`
+            ? '<br><strong>Other Trainers:</strong><br>' + otherTrainersList.map(t => '• ' + t).join('<br>')
             : '';
 
           // Accept/Decline action buttons (links to event page where they can take action)
@@ -7715,7 +7770,7 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
                    📅 ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}<br>
                    📍 ${event.location?.name || 'TBD'}<br>
                    🏷️ ${event.eventType.replace('_', ' ')}<br>
-                   ${otherTrainersList.length ? `<br><strong>Other Trainers:</strong><br>${otherTrainersList.map(t => `• ${t}`).join('<br>')}<br><br>` : ''}
+                   ${otherTrainersList.length ? '<br><strong>Other Trainers:</strong><br>' + otherTrainersList.map(t => '• ' + t).join('<br>') + '<br><br>' : ''}
                    <strong>Please respond to this assignment:</strong><br>
                    <a href="/trainer/events/${eventId}" style="background: #22c55e; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block; margin-right: 0.5rem;">✅ Accept Assignment</a>
                    <a href="/trainer/events/${eventId}?action=decline" style="background: #ef4444; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block;">❌ Decline Assignment</a>`,
@@ -7735,13 +7790,14 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
 
     res.json({ success: true, event: populatedEvent, message: 'Trainer assigned successfully' });
   } catch (err) {
-    console.error('Error assigning trainer:', err);
-    res.status(500).json({ success: false, error: 'Failed to assign trainer' });
+    console.error('[assign-trainer] Error:', err);
+    console.error('[assign-trainer] Stack:', err.stack);
+    res.status(500).json({ success: false, error: 'Failed to assign trainer: ' + (err.message || err.toString()) });
   }
 });
 
 // Remove trainer from event
-app.post('/api/events/:eventId/remove-trainer', requireAuth, requirePermission('canAssignTrainers'), async (req, res) => {
+app.post('/api/events/:eventId/remove-trainer', requireAuth, requirePermission('canAssignTrainers'), parseJson, async (req, res) => {
   try {
     const { trainerId } = req.body;
     const event = await Event.findById(req.params.eventId);
@@ -8727,7 +8783,7 @@ app.get('/api/notification-preferences', requireAuth, async (req, res) => {
 });
 
 // Update notification preferences
-app.post('/api/notification-preferences', requireAuth, async (req, res) => {
+app.post('/api/notification-preferences', requireAuth, parseJson, async (req, res) => {
   try {
     const currentStaff = await getCurrentStaff(req);
     if (!currentStaff) {
@@ -8764,7 +8820,7 @@ app.get('/api/staff/all', requireAuth, async (req, res) => {
 // --- Announcement Routes ---
 
 // Create announcement (admin only)
-app.post('/api/announcements', requireAuth, async (req, res) => {
+app.post('/api/announcements', requireAuth, parseJson, async (req, res) => {
   try {
     // Check permission - only admins/supervisors can create announcements
     if (!['admin', 'founder', 'commissioner', 'supervisor'].includes(req.session.user.role)) {
@@ -9047,7 +9103,7 @@ app.get('/api/announcements/:announcementId', requireAuth, async (req, res) => {
 // --- System Notification Triggers (internal) ---
 
 // Create notification (internal endpoint)
-app.post('/api/notifications/create', requireAuth, async (req, res) => {
+app.post('/api/notifications/create', requireAuth, parseJson, async (req, res) => {
   try {
     const { recipientId, type, title, message, actionUrl, entityType, entityId, priority = 'normal', channels = ['in-app'], metadata, isSticky = false } = req.body;
 

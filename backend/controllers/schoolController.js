@@ -19,6 +19,8 @@ const Notification = require('../../models/Notification');
 const VisitLog = require('../../models/VisitLog');
 const AuditLog = require('../../models/AuditLog');
 const Program = require('../../models/Program');
+const PaymentService = require('../services/paymentService');
+const MpesaService = require('../services/mpesaService');
 const logAudit = require('../../server').logAudit;
 
 // GET: School admin dashboard homepage data
@@ -756,17 +758,128 @@ exports.removeProgram = async (req, res) => {
     }
   };
 
- // Get invoices for school (JSON API)
- exports.getInvoices = async (req, res) => {
-   try {
-     const invoices = await Invoice.find({ schoolId: req.schoolId })
-       .sort({ issueDate: -1 })
-       .lean();
-     res.json({ success: true, invoices });
-   } catch (err) {
-     res.status(500).json({ success: false, error: err.message });
-   }
- };
+  // Get invoices for school (JSON API)
+  exports.getInvoices = async (req, res) => {
+    try {
+      const invoices = await Invoice.find({ schoolId: req.schoolId })
+        .sort({ issueDate: -1 })
+        .lean();
+      res.json({ success: true, invoices });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  };
+
+  // Get invoices sent to a school, populated with founder/admin sender info
+  exports.getSentInvoices = async (req, res) => {
+    try {
+      const invoices = await Invoice.find({ schoolId: req.schoolId })
+        .populate('issuedBy', 'name email role')
+        .populate('sentBy', 'name email role')
+        .sort({ issueDate: -1 })
+        .lean();
+      res.json({ success: true, invoices });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  };
+
+  exports.payInvoice = async (req, res) => {
+    try {
+      const invoiceId = req.params.invoiceId;
+      const { phoneNumber } = req.body;
+
+      if (!invoiceId || !/^[0-9a-fA-F]{24}$/.test(invoiceId)) {
+        return res.status(400).json({ success: false, error: 'Invalid invoice selected' });
+      }
+
+      if (!phoneNumber || !phoneNumber.toString().trim()) {
+        return res.status(400).json({ success: false, error: 'Phone number is required' });
+      }
+
+      const invoice = await Invoice.findOne({ _id: invoiceId, schoolId: req.schoolId });
+      if (!invoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+
+      const balance = Math.max(0, (invoice.totalAmount || 0) - (invoice.amountPaid || 0));
+      if (balance <= 0) {
+        return res.status(400).json({ success: false, error: 'Invoice is already paid' });
+      }
+
+      const accountReference = invoice.invoiceNumber || invoice._id.toString();
+      const description = `Invoice payment ${invoice.invoiceNumber || ''}`.trim();
+
+      const result = await MpesaService.initiateStkPush({
+        phoneNumber,
+        amount: balance,
+        accountReference,
+        transactionDesc: description
+      });
+
+      if (!result.success) {
+        return res.status(502).json({ success: false, error: result.error || 'Failed to initiate STK push' });
+      }
+
+      const payment = await PaymentService.recordPayment({
+        schoolId: req.schoolId,
+        invoiceId: invoice._id,
+        amount: balance,
+        method: 'mpesa',
+        reference: result.data.CheckoutRequestID || PaymentService.generatePaymentReference('mpesa'),
+        notes: 'MPESA STK push initiated',
+        recordedBy: req.staff._id,
+        status: 'pending',
+        checkoutRequestId: result.data.CheckoutRequestID,
+        transactionMeta: result.data
+      });
+
+      res.json({ success: true, message: 'STK push initiated. Enter your M-Pesa PIN when prompted.', paymentId: payment._id });
+    } catch (err) {
+      console.error('Error initiating invoice payment:', err);
+      res.status(500).json({ success: false, error: 'Failed to initiate payment' });
+    }
+  };
+
+  exports.mpesaStkCallback = async (req, res) => {
+    try {
+      const callbackSecret = process.env.MPESA_STK_CALLBACK_SECRET;
+      if (callbackSecret) {
+        const incomingSecret = req.headers['x-mpesa-callback-secret'];
+        if (!incomingSecret || incomingSecret !== callbackSecret) {
+          return res.status(401).json({ success: false, error: 'Unauthorized callback' });
+        }
+      }
+
+      const payload = req.body || {};
+      const callbackBody = payload.Body?.stkCallback;
+      if (!callbackBody) {
+        return res.status(400).json({ success: false, error: 'Invalid callback payload' });
+      }
+
+      const checkoutRequestId = callbackBody.CheckoutRequestID;
+      const resultCode = Number(callbackBody.ResultCode || -1);
+      const resultDesc = callbackBody.ResultDesc || 'Unknown result';
+      const callbackMetadata = callbackBody.CallbackMetadata || {};
+
+      const amountItem = (callbackMetadata.Item || []).find(item => item.Name === 'Amount');
+      const receiptItem = (callbackMetadata.Item || []).find(item => item.Name === 'MpesaReceiptNumber');
+
+      await PaymentService.completePendingPayment({
+        checkoutRequestId,
+        mpesaReceiptNumber: receiptItem?.Value,
+        resultCode,
+        resultDesc,
+        amount: amountItem?.Value,
+        transactionMeta: callbackBody
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('MPESA callback error:', err);
+      res.status(500).json({ success: false, error: 'Failed to process callback' });
+    }
+  };
 
  // Download invoice (placeholder - could forward to finance controller)
  exports.downloadInvoice = async (req, res) => {

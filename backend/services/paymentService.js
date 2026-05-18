@@ -55,20 +55,25 @@ class PaymentService {
          reference: paymentReference,
          receiptUrl: receiptFile ? `/uploads/receipts/${receiptFile.filename}` : null,
          receiptFileName: receiptFile ? receiptFile.filename : null,
-         status: 'completed', // Assume completed when recorded
-         notes: notes,
-         recordedBy: recordedBy
-       });
+       checkoutRequestId: paymentData.checkoutRequestId || null,
+       transactionMeta: paymentData.transactionMeta || null,
+       status: paymentData.status || 'completed',
+       notes: notes,
+       recordedBy: recordedBy,
+       paidDate: paymentData.status === 'completed' ? new Date() : null
+     });
 
        await payment.save();
 
-       // Update invoice status if payment is for an invoice
-       if (invoice) {
+       // Update invoice status if payment is for an invoice and the payment is completed
+       if (invoice && payment.status === 'completed') {
          await this.updateInvoicePaymentStatus(invoice._id);
        }
 
-       // Send confirmation email
-       await this.sendPaymentConfirmation(payment, school);
+       // Send confirmation email only once the payment is complete
+       if (payment.status === 'completed') {
+         await this.sendPaymentConfirmation(payment, school);
+       }
 
        return payment;
      } catch (error) {
@@ -113,6 +118,36 @@ class PaymentService {
       return invoice;
     } catch (error) {
       console.error('Error updating invoice payment status:', error);
+      throw error;
+    }
+  }
+
+  static async completePendingPayment({ checkoutRequestId, mpesaReceiptNumber, resultCode, resultDesc, amount, transactionMeta }) {
+    try {
+      const payment = await Payment.findOne({ checkoutRequestId });
+      if (!payment) {
+        throw new Error('Pending payment not found');
+      }
+
+      payment.status = resultCode === 0 ? 'completed' : 'failed';
+      payment.reference = mpesaReceiptNumber || payment.reference || resultDesc || payment.reference;
+      payment.notes = [payment.notes, resultDesc].filter(Boolean).join(' | ');
+      payment.paidDate = new Date();
+      payment.paymentDate = new Date();
+      if (amount && amount > 0) {
+        payment.amount = amount;
+      }
+      payment.transactionMeta = transactionMeta || payment.transactionMeta;
+
+      await payment.save();
+
+      if (payment.status === 'completed' && payment.invoiceId) {
+        await this.updateInvoicePaymentStatus(payment.invoiceId);
+      }
+
+      return payment;
+    } catch (error) {
+      console.error('Error completing pending payment:', error);
       throw error;
     }
   }

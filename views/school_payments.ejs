@@ -21,6 +21,15 @@
         .filter-btn { padding:0.5rem 1rem; border:1px solid var(--border); background:var(--card); border-radius:var(--radius); cursor:pointer; }
         .filter-btn.active { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); }
         .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:2rem; }
+        .sent-toggle-btn { display:inline-flex; align-items:center; gap:0.4rem; padding:0.5rem 1rem; border:1px solid var(--border); background:var(--card); border-radius:var(--radius); cursor:pointer; font-size:0.875rem; font-weight:500; color:var(--foreground); margin-bottom:1.25rem; }
+        .sent-toggle-btn:hover { background:var(--surface); }
+        .sent-toggle-btn svg { width:16px; height:16px; }
+        .sent-toggle-btn.active { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); }
+        .sent-invoice-row { display:none; }
+        .sent-section table { width:100%; border-collapse:collapse; margin-top:0.75rem; font-size:0.9rem; }
+        .sent-section th, .sent-section td { padding:0.6rem 0.75rem; text-align:left; border-bottom:1px solid var(--border); }
+        .sent-section th { color:var(--muted-foreground); font-weight:600; font-size:0.75rem; text-transform:uppercase; }
+        .sent-section .send-note { display:block; margin:0.75rem 0 0; font-size:0.8rem; color:var(--muted-foreground); }
     </style>
 </head>
 <body>
@@ -68,6 +77,35 @@
                     <button class="filter-btn" data-filter="paid">Paid</button>
                 </div>
 
+                <!-- Toggle: Sent invoices by founder/admin -->
+                <button id="sentToggle" class="sent-toggle-btn" onclick="toggleSentInvoices()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                    Invoices Sent by Founder / Admin
+                </button>
+
+                <!-- Sent-Invoices Sub-View -->
+                <div id="sentSection" class="sent-section" style="display:none;margin-bottom:2rem;padding:1.25rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);">
+                    <p class="send-note">Showing every invoice issued or transmitted to this school by a founder or administrator. The <strong>Issued By</strong> column shows who created the invoice; the <strong>Sent By</strong> column shows who transmitted it.</p>
+                    <table id="sentInvoiceTable">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Date</th>
+                                <th>Due Date</th>
+                                <th>Type</th>
+                                <th>Total (KES)</th>
+                                <th>Status</th>
+                                <th>Issued By</th>
+                                <th>Sent By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sentInvoiceBody"><tr><td colspan="9" style="text-align:center;color:var(--muted-foreground);padding:2rem;">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+
                 <!-- Invoice List -->
                 <div class="invoice-list">
                     <% if (!invoices || invoices.length === 0) { %>
@@ -91,9 +129,10 @@
                                     <div style="margin:0.5rem 0;">
                                         <span class="status-badge status-<%= invoice.status || 'unknown' %>"><%= invoice.status || 'unknown' %></span>
                                     </div>
-                                    <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem;">
+                                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem;">
                                         <a href="/api/school/invoices/<%= invoice._id %>/download" class="btn btn-outline btn-sm" target="_blank">Download Receipt</a>
                                         <% if (invoice.status && ['issued','sent','partial','overdue'].includes(invoice.status)) { %>
+                                            <button class="btn btn-primary btn-sm pay-invoice-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>" data-invoice-balance="<%= ((invoice.totalAmount || 0) - (invoice.amountPaid || 0)).toFixed(2) %>">Pay with M-Pesa</button>
                                             <button class="btn btn-outline btn-sm raise-query-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>">Raise Query</button>
                                         <% } %>
                                     </div>
@@ -127,6 +166,29 @@
                 </div>
             </form>
         </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payModal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+      <div class="modal-content" style="background:var(--card);padding:2rem;border-radius:var(--radius);max-width:500px;width:90%;">
+        <h3>Pay Invoice</h3>
+        <p id="payInvoiceInfo" style="margin-bottom:1rem;color:var(--muted-foreground);"></p>
+        <form id="payForm">
+          <input type="hidden" id="payInvoiceId">
+          <div class="form-group">
+            <label for="payPhone">Phone Number</label>
+            <input type="text" id="payPhone" name="phoneNumber" class="form-input" required placeholder="07XXXXXXXX">
+          </div>
+          <div class="form-group">
+            <label for="payAmount">Amount (KES)</label>
+            <input type="text" id="payAmount" name="amount" class="form-input" readonly>
+          </div>
+          <div class="form-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+            <button type="button" class="btn btn-secondary" id="cancelPayBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary">Send STK Push</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <script nonce="<%= cspNonce %>">
@@ -189,7 +251,115 @@
                     alert('Error: ' + result.error);
                 }
             });
+
+            const payModal = document.getElementById('payModal');
+            const cancelPayBtn = document.getElementById('cancelPayBtn');
+            const payForm = document.getElementById('payForm');
+            const payInvoiceInfo = document.getElementById('payInvoiceInfo');
+            const payPhone = document.getElementById('payPhone');
+            const payAmount = document.getElementById('payAmount');
+
+            document.querySelectorAll('.pay-invoice-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const invoiceId = btn.dataset.invoiceId;
+                    const invoiceNum = btn.dataset.invoiceNum;
+                    const invoiceBalance = btn.dataset.invoiceBalance || '0.00';
+                    document.getElementById('payInvoiceId').value = invoiceId;
+                    payInvoiceInfo.textContent = `Invoice: ${invoiceNum} — Balance KES ${parseFloat(invoiceBalance).toLocaleString()}`;
+                    payAmount.value = invoiceBalance;
+                    payPhone.value = <%- JSON.stringify(school.contactPerson?.phone || '') %>;
+                    payModal.style.display = 'flex';
+                });
+            });
+
+            cancelPayBtn?.addEventListener('click', () => payModal.style.display = 'none');
+
+            payForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const invoiceId = document.getElementById('payInvoiceId').value;
+                const phone = payPhone.value.trim();
+
+                if (!phone) {
+                    alert('Please enter your phone number to receive the STK prompt.');
+                    return;
+                }
+
+                const res = await fetch(`/api/school/invoices/${invoiceId}/pay`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber: phone })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    alert(result.message || 'STK push sent. Please approve on your phone.');
+                    payModal.style.display = 'none';
+                    payForm.reset();
+                    window.location.reload();
+                } else {
+                    alert('Payment error: ' + (result.error || 'Unable to initiate payment.'));
+                }
+            });
+
+            // Sent invoices toggle state
+            window.sentInvoicesLoaded = false;
+            window.sentInvoicesVisible = false;
         });
+
+        // Toggle function (called inline via onclick in EJS)
+        async function toggleSentInvoices(btn) {
+            const section  = document.getElementById('sentSection');
+            const btnEl    = document.getElementById('sentToggle');
+            const body     = document.getElementById('sentInvoiceBody');
+
+            window.sentInvoicesVisible = !window.sentInvoicesVisible;
+
+            if (!window.sentInvoicesLoaded) {
+                body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted-foreground);padding:2rem;">Loading…</td></tr>';
+                section.style.display = 'block';
+
+                try {
+                    const res = await fetch('/api/school/sent-invoices');
+                    const data = await res.json();
+                    const invoices = data.invoices || [];
+
+                    if (invoices.length === 0) {
+                        body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted-foreground);padding:2rem;">No invoices found.</td></tr>';
+                    } else {
+                        body.innerHTML = invoices.map(inv => {
+                            const issuedName = inv.issuedBy?.name || '—';
+                            const sentName   = inv.sentBy?.name   || '—';
+                            return `
+                                <tr data-status="${inv.status || ''}">
+                                    <td><strong>Invoice ${inv.invoiceNumber || '—'}</strong></td>
+                                    <td>${inv.issueDate ? new Date(inv.issueDate).toLocaleDateString() : '—'}</td>
+                                    <td>${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—'}</td>
+                                    <td>${inv.invoiceType ? inv.invoiceType.replace('_',' ') : '—'}</td>
+                                    <td>KES ${inv.totalAmount ? inv.totalAmount.toLocaleString() : '0'}</td>
+                                    <td>${inv.status ? '<span class="status-badge status-' + inv.status + '">' + inv.status + '</span>' : '—'}</td>
+                                    <td>${issuedName}</td>
+                                    <td>${sentName}</td>
+                                    <td><a href="/api/school/invoices/${inv._id || ''}/download" class="btn btn-outline btn-sm" target="_blank">Download</a></td>
+                                </tr>`;
+                        }).join('');
+                    }
+
+                    window.sentInvoicesLoaded = true;
+                } catch (err) {
+                    body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--danger);padding:2rem;">Failed to load invoices.</td></tr>';
+                }
+            } else {
+                section.style.display = window.sentInvoicesVisible ? 'block' : 'none';
+            }
+
+            if (window.sentInvoicesVisible) {
+                btnEl.classList.add('active');
+                btnEl.querySelector('svg').setAttribute('style','transform:rotate(180deg)');
+            } else {
+                btnEl.classList.remove('active');
+                btnEl.querySelector('svg').removeAttribute('style');
+            }
+        }
     </script>
 </body>
 </html>

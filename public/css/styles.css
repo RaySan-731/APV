@@ -2255,6 +2255,18 @@ body {
     width: fit-content;
 }
 
+/* Form Validation */
+.form-grid .input-error {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    outline: none;
+}
+.form-grid .input-hint {
+    color: #dc3545;
+    font-size: 0.75rem;
+    margin-top: 0.2rem;
+}
+
 /* Modal Styles */
 .modal {
     position: fixed;

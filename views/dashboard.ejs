@@ -756,42 +756,42 @@
                                 <button type="button" class="close-btn" onclick="closeEditStaffModal()">×</button>
                             </div>
                             <div class="modal-body">
-                                <form id="editStaffForm" class="form-grid">
-                                    <input type="hidden" id="editStaffId" name="staffId">
+                                    <form id="editStaffForm" class="form-grid" novalidate>
+                                        <input type="hidden" id="editStaffId" name="staffId">
 
-                                    <!-- Basic Information -->
-                                    <label>ID Number<input type="text" id="editIdNumber" name="idNumber"></label>
-                                    <label>Name<input type="text" id="editName" name="name" required></label>
-                                    <label>Email<input type="email" id="editEmail" name="email" required></label>
-                                    <label>Phone<input type="tel" id="editPhone" name="phone"></label>
-                                    <label>Role<select id="editRole" name="role" required>
-                                        <option value="">Select Role</option>
-                                        <option value="trainer">Trainer</option>
-                                        <option value="senior trainer">Senior Trainer</option>
-                                        <option value="supervisor">Supervisor</option>
-                                        <option value="admin">Admin</option>
-                                        <option value="coordinator">Coordinator</option>
-                                    </select></label>
-                                    <label>Department<input type="text" id="editDepartment" name="department"></label>
-                                    <label>Status<select id="editStatus" name="status">
-                                        <option value="Active">Active</option>
-                                        <option value="On Leave">On Leave</option>
-                                        <option value="Inactive">Inactive</option>
-                                        <option value="Suspended">Suspended</option>
-                                    </select></label>
+                                        <!-- Basic Information -->
+                                        <label>ID Number<input type="text" id="editIdNumber" name="idNumber" maxlength="30" pattern="[A-Za-z0-9\-_/]+" title="ID Number must contain only letters, numbers, hyphens, underscores or slashes."></label>
+                                        <label>Name<input type="text" id="editName" name="name" required minlength="2" maxlength="100" pattern="[A-Za-z\s\-'\.]+" title="Name must contain 2–100 letters, spaces, hyphens, apostrophes or periods."></label>
+                                        <label>Email<input type="email" id="editEmail" name="email" required maxlength="100"></label>
+                                        <label>Phone<input type="tel" id="editPhone" name="phone" maxlength="20" pattern="[\+\d][\d\s\-\.\(\)]{6,20}" title="Enter a valid phone number (e.g. +91 98765 43210)."></label>
+                                        <label>Role<select id="editRole" name="role">
+                                            <option value="">Select Role</option>
+                                            <option value="trainer">Trainer</option>
+                                            <option value="senior trainer">Senior Trainer</option>
+                                            <option value="supervisor">Supervisor</option>
+                                            <option value="admin">Admin</option>
+                                            <option value="coordinator">Coordinator</option>
+                                        </select></label>
+                                        <label>Department<input type="text" id="editDepartment" name="department" maxlength="50" pattern="[A-Za-z0-9\s\-&,]+" title="Department must contain only letters, numbers, spaces, hyphens, ampersands or commas."></label>
+                                        <label>Status<select id="editStatus" name="status">
+                                            <option value="Active">Active</option>
+                                            <option value="On Leave">On Leave</option>
+                                            <option value="Inactive">Inactive</option>
+                                            <option value="Suspended">Suspended</option>
+                                        </select></label>
 
-                                    <!-- Address Information -->
-                                    <label>Street Address<input type="text" id="editStreet" name="street"></label>
-                                    <label>City<input type="text" id="editCity" name="city"></label>
-                                    <label>State<input type="text" id="editState" name="state"></label>
-                                    <label>Zip Code<input type="text" id="editZipCode" name="zipCode"></label>
-                                    <label>Country<input type="text" id="editCountry" name="country"></label>
+                                        <!-- Address Information -->
+                                        <label>Street Address<input type="text" id="editStreet" name="street" maxlength="200" pattern="[A-Za-z0-9\s\-,'#\.]+" title="Address must contain only letters, numbers, spaces, hyphens, apostrophes, commas, hash or periods."></label>
+                                        <label>City<input type="text" id="editCity" name="city" maxlength="50" pattern="[A-Za-z\s\-]+" title="City must contain only letters, spaces and hyphens."></label>
+                                        <label>State<input type="text" id="editState" name="state" maxlength="50" pattern="[A-Za-z\s\-]+" title="State must contain only letters, spaces and hyphens."></label>
+                                        <label>Zip Code<input type="text" id="editZipCode" name="zipCode" maxlength="15" pattern="[A-Za-z0-9\s\-]+" title="Zip Code must contain only letters, numbers, spaces and hyphens."></label>
+                                        <label>Country<input type="text" id="editCountry" name="country" maxlength="50" pattern="[A-Za-z\s\-]+" title="Country must contain only letters, spaces and hyphens."></label>
 
-                                    <!-- Emergency Contact -->
-                                    <label>Emergency Contact Name<input type="text" id="editEmergencyContactName" name="emergencyContactName"></label>
-                                    <label>Emergency Contact Relationship<input type="text" id="editEmergencyContactRelationship" name="emergencyContactRelationship"></label>
-                                    <label>Emergency Contact Phone<input type="tel" id="editEmergencyContactPhone" name="emergencyContactPhone"></label>
-                                    <label>Emergency Contact Email<input type="email" id="editEmergencyContactEmail" name="emergencyContactEmail"></label>
+                                        <!-- Emergency Contact -->
+                                        <label>Emergency Contact Name<input type="text" id="editEmergencyContactName" name="emergencyContactName" maxlength="100" pattern="[A-Za-z\s\-'\.]+" title="Name must contain 2–100 letters, spaces, hyphens, apostrophes or periods."></label>
+                                        <label>Emergency Contact Relationship<input type="text" id="editEmergencyContactRelationship" name="emergencyContactRelationship" maxlength="50" pattern="[A-Za-z\s\-]+" title="Relationship must contain only letters, spaces and hyphens."></label>
+                                        <label>Emergency Contact Phone<input type="tel" id="editEmergencyContactPhone" name="emergencyContactPhone" maxlength="20" pattern="[\+\d][\d\s\-\.\(\)]{6,20}" title="Enter a valid phone number (e.g. +91 98765 43210)."></label>
+                                        <label>Emergency Contact Email<input type="email" id="editEmergencyContactEmail" name="emergencyContactEmail" maxlength="100"></label>
 
                                     <!-- Permissions -->
                                     <div style="grid-column: 1 / -1; margin-top: 1rem;">

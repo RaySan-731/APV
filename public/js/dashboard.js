@@ -588,7 +588,131 @@ async function saveEditStaff() {
 
     const messageEl = document.getElementById('editMessage');
 
-    // Validate required fields
+    // Inline validation helpers
+    function setInputError(el, msg) {
+        el.classList.add('input-error');
+        el.dataset.errMsg = msg;
+        el.addEventListener('input', el._clearHint, { once: true });
+        el.addEventListener('blur', el._showHint, { once: true });
+    }
+
+    function setInputOk(el) {
+        el.classList.remove('input-error');
+        delete el.dataset.errMsg;
+    }
+
+    function showHint(el) {
+        if (!el.dataset.errMsg) return;
+        let hint = el.parentElement.querySelector('.input-hint');
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.className = 'input-hint';
+            hint.style.cssText = 'color:#dc3545;font-size:.75rem;margin-top:.2rem;';
+            el.parentElement.appendChild(hint);
+        }
+        hint.textContent = el.dataset.errMsg;
+    }
+
+    // Collect input edge-values
+    const form = document.getElementById('editStaffForm');
+    const submitBtn = form.querySelector('[onclick="saveEditStaff()"]');
+
+    // Contextual validation
+    let isValid = true;
+
+    // Run HTML5 built-in validators first
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        isValid = false;
+    }
+
+    // Required-field guard for role select
+    if (!role) {
+        const roleEl = document.getElementById('editRole');
+        setInputError(roleEl, 'Please select a role.');
+        showHint(roleEl);
+        roleEl.focus();
+        isValid = false;
+    }
+
+    // Name pattern
+    const nameEl = document.getElementById('editName');
+    const namePattern = /^[A-Za-z][A-Za-z\s\-'\.]{1,98}$/;
+    if (name && !namePattern.test(name.trim())) {
+        setInputError(nameEl, 'Name must contain only letters, spaces, hyphens, apostrophes or periods (2–100 chars).');
+        showHint(nameEl);
+        if (isValid) { nameEl.focus(); isValid = false; }
+    } else {
+        setInputOk(nameEl);
+    }
+
+    // Department pattern
+    const deptPattern = /^[A-Za-z0-9\s\-&,]{1,50}$/;
+    if (department && !deptPattern.test(department.trim())) {
+        setInputError(document.getElementById('editDepartment'), 'Department contains invalid characters.');
+        if (isValid) { document.getElementById('editDepartment').focus(); isValid = false; }
+    }
+
+    // Phone pattern — must be digits (optionally with +, spaces, hyphens, parentheses, periods)
+    const phonePattern = /^[\+]?[\d\s\-\.\(\)]{7,20}$/;
+    if (phone && !phonePattern.test(phone.trim())) {
+        setInputError(document.getElementById('editPhone'), 'Enter a valid phone number (digits, +, spaces, hyphens parenthes., max 20 chars).');
+        if (isValid) { document.getElementById('editPhone').focus(); isValid = false; }
+    }
+
+    // Emergency contact phone
+    if (emergencyContactPhone && !phonePattern.test(emergencyContactPhone.trim())) {
+        setInputError(document.getElementById('editEmergencyContactPhone'), 'Enter a valid phone number.');
+        if (isValid) { document.getElementById('editEmergencyContactPhone').focus(); isValid = false; }
+    }
+
+    // Zip code pattern
+    if (zipCode && !/^[A-Za-z0-9\s\-]{1,15}$/.test(zipCode.trim())) {
+        setInputError(document.getElementById('editZipCode'), 'Zip code contains invalid characters.');
+        if (isValid) { document.getElementById('editZipCode').focus(); isValid = false; }
+    }
+
+    // City / State / Country alphabetic
+    const textOnly = /^[A-Za-z\s\-]+$/;
+    if (city && !textOnly.test(city.trim())) {
+        setInputError(document.getElementById('editCity'), 'City must contain only letters, spaces and hyphens.');
+        if (isValid) { document.getElementById('editCity').focus(); isValid = false; }
+    }
+    if (state && !textOnly.test(state.trim())) {
+        setInputError(document.getElementById('editState'), 'State must contain only letters, spaces and hyphens.');
+        if (isValid) { document.getElementById('editState').focus(); isValid = false; }
+    }
+    if (country && !textOnly.test(country.trim())) {
+        setInputError(document.getElementById('editCountry'), 'Country must contain only letters, spaces and hyphens.');
+        if (isValid) { document.getElementById('editCountry').focus(); isValid = false; }
+    }
+
+    // Performance-metrics number guards (clamp to sensible default if out of range)
+    const eventsCompleted = document.getElementById('editEventsCompleted');
+    const reportsSubmitted = document.getElementById('editReportsSubmitted');
+    const schoolsVisited = document.getElementById('editSchoolsVisited');
+    const avgAttendance = document.getElementById('editAverageAttendanceRate');
+    const avgFeedback = document.getElementById('editAverageFeedbackRating');
+
+    [eventsCompleted, reportsSubmitted, schoolsVisited].forEach(el => {
+        if (el.value === '' || isNaN(el.value) || Number(el.value) < 0) el.value = 0;
+    });
+    if (avgAttendance.value === '' || isNaN(avgAttendance.value) || Number(avgAttendance.value) < 0 || Number(avgAttendance.value) > 100) {
+        avgAttendance.value = '';
+        setInputError(avgAttendance, 'Attendance must be between 0 and 100.');
+        if (isValid) { avgAttendance.focus(); isValid = false; }
+    }
+    if (avgFeedback.value === '' || isNaN(avgFeedback.value) || Number(avgFeedback.value) < 0 || Number(avgFeedback.value) > 5) {
+        avgFeedback.value = '';
+        setInputError(avgFeedback, 'Rating must be between 0 and 5.');
+        if (isValid) { avgFeedback.focus(); isValid = false; }
+    }
+
+    if (!isValid) {
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+    }
+
     if (!name || !email || !role) {
         messageEl.textContent = '✗ Please fill in all required fields';
         messageEl.style.backgroundColor = '#f8d7da';
@@ -599,6 +723,7 @@ async function saveEditStaff() {
     }
 
     try {
+        if (submitBtn) submitBtn.disabled = true;
         const response = await fetch('/dashboard/staff/update', {
             method: 'POST',
             headers: {
@@ -665,6 +790,8 @@ async function saveEditStaff() {
         messageEl.style.color = '#721c24';
         messageEl.style.borderLeft = '4px solid #f5c6cb';
         messageEl.style.display = 'block';
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 

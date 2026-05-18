@@ -105,22 +105,24 @@ const eventSchema = new mongoose.Schema({
     mandatory: { type: Boolean, default: true }
   }],
 
-  // Trainer Assignments
-  trainers: [{
-    trainerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', required: true },
-    role: {
-      type: String,
-      enum: ['lead_trainer', 'assistant_trainer', 'coordinator', 'volunteer'],
-      default: 'assistant_trainer'
-    },
-    assignedAt: { type: Date, default: Date.now },
-    status: {
-      type: String,
-      enum: ['assigned', 'confirmed', 'declined', 'removed'],
-      default: 'assigned'
-    },
-    notes: String
-  }],
+   // Trainer Assignments
+   trainers: [{
+     trainerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', required: true },
+     role: {
+       type: String,
+       enum: ['lead_trainer', 'assistant_trainer', 'coordinator', 'volunteer'],
+       default: 'assistant_trainer'
+     },
+     assignedAt: { type: Date, default: Date.now },
+     status: {
+       type: String,
+       enum: ['assigned', 'confirmed', 'declined', 'removed'],
+       default: 'assigned'
+     },
+     notes: String,
+     // Timestamp of the last overdue-report reminder sent to this trainer for this event
+     lastReminderAt: Date
+   }],
 
   // Capacity & Registration
   maxParticipants: {

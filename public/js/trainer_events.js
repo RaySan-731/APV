@@ -19,6 +19,12 @@ async function initializePage() {
     setupEventListeners();
     await loadEvents();
     updateStats();
+
+    // Switch to calendar view if ?view=calendar is in the URL (e.g. from the dashboard "View Schedule" quick action)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('view') === 'calendar') {
+      switchView('calendar');
+    }
 }
 
 function setupEventListeners() {

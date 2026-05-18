@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arrow-Park Ventures - Youth Development & Leadership Training</title>
+    <title>Arrow-Park Ventures | Youth Development &amp; Leadership Training</title>
     <meta name="description" content="Empowering young minds through leadership and adventure. Professional training, camps, leadership development, and programs for schools.">
     <meta name="author" content="Arrow-Park Ventures">
     <meta name="keywords" content="scouting, youth development, leadership training, camps, outdoor education, team building">
@@ -14,12 +14,13 @@
     <link rel="icon" href="/favicon.ico">
 </head>
 <body>
-     <!-- Navigation -->
-     <nav class="navbar">
+     <header class="site-header">
+         <!-- Navigation -->
+         <nav class="navbar" role="navigation" aria-label="Main navigation">
          <div class="nav-container">
-             <div class="nav-brand">
+             <a href="/" class="nav-brand" aria-label="Arrow-Park Ventures Home">
                  <div class="logo">
-                     <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor">
+                     <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                          <path d="M17 14V2"></path>
                          <path d="M9 18.12L10 14H4l1.88-4.12L9 18.12z"></path>
                          <path d="M13 22l3-8"></path>
@@ -27,107 +28,109 @@
                      </svg>
                      <span>Arrow-Park Ventures</span>
                  </div>
+             </a>
+             <div class="nav-menu" role="menubar">
+                 <a href="#programs" class="nav-link" role="menuitem">Programs</a>
+                 <a href="#about" class="nav-link" role="menuitem">About Us</a>
+                 <a href="#events" class="nav-link" role="menuitem">Events</a>
+                 <a href="#faq" class="nav-link" role="menuitem">FAQ</a>
+                 <a href="#contact" class="nav-link" role="menuitem">Contact</a>
+                 <a href="/login" class="btn btn-primary" role="menuitem">Member Login</a>
              </div>
-            <div class="nav-menu">
-                <a href="#programs" class="nav-link">Programs</a>
-                <a href="#about" class="nav-link">About Us</a>
-                <a href="#events" class="nav-link">Events</a>
-                <a href="#faq" class="nav-link">FAQ</a>
-                <a href="#contact" class="nav-link">Contact</a>
-                <a href="/login" class="btn btn-primary">Member Login</a>
-            </div>
-            <div class="nav-toggle">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        </div>
-    </nav>
+             <div class="nav-toggle" role="button" aria-label="Toggle navigation menu" aria-expanded="false" tabindex="0">
+                 <span></span>
+                 <span></span>
+                 <span></span>
+             </div>
+         </div>
+     </nav>
+     </header>
+     <main id="main-content">
 
      <!-- Hero Section -->
-     <section class="hero">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-            <div class="hero-logo">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17 14V2"></path>
-                    <path d="M9 18.12L10 14H4l1.88-4.12L9 18.12z"></path>
-                    <path d="M13 22l3-8"></path>
-                    <path d="M7 22l3-8"></path>
-                </svg>
-            </div>
-            <h1 class="hero-title">
-                Empowering Young <span class="hero-highlight">Leaders</span>
-            </h1>
-            <p class="hero-subtitle">
-                Building character, confidence, and leadership through adventure and strategic principles.
-                Professional development programs for organizations across the nation.
-            </p>
-            <div class="hero-buttons">
-                <a href="/book" class="btn btn-primary btn-arrow">
-                    Book a Program
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                    </svg>
-                </a>
-                <a href="#programs" class="btn btn-outline">Explore Programs</a>
-            </div>
+     <section class="hero" aria-label="Welcome">
+         <div class="hero-overlay" aria-hidden="true"></div>
+         <div class="hero-content">
+             <div class="hero-logo" aria-hidden="true">
+                 <svg viewBox="0 0 24 24" fill="currentColor">
+                     <path d="M17 14V2"></path>
+                     <path d="M9 18.12L10 14H4l1.88-4.12L9 18.12z"></path>
+                     <path d="M13 22l3-8"></path>
+                     <path d="M7 22l3-8"></path>
+                 </svg>
+             </div>
+             <h1 class="hero-title">
+                 Empowering Young <span class="hero-highlight">Leaders</span>
+             </h1>
+             <p class="hero-subtitle">
+                 Building character, confidence, and leadership through adventure and strategic principles.
+                 Professional development programs for organizations across the nation.
+             </p>
+             <div class="hero-buttons">
+                 <a href="/book" class="btn btn-primary btn-arrow">
+                     Book a Program
+                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                         <line x1="5" y1="12" x2="19" y2="12"></line>
+                         <polyline points="12 5 19 12 12 19"></polyline>
+                     </svg>
+                 </a>
+                 <a href="#programs" class="btn btn-outline">Explore Programs</a>
+             </div>
 
-             <!-- Stats -->
-             <div class="stats">
-                 <div class="stat-card reveal reveal-delay-1">
-                     <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor">
-                         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                         <circle cx="9" cy="7" r="4"></circle>
-                         <path d="M22 2l-4 4"></path>
-                         <path d="M18 2l4 4"></path>
-                     </svg>
-                     <div class="stat-number">500+</div>
-                      <div class="stat-label">Students Trained</div>
+              <!-- Stats -->
+              <div class="stats" aria-label="Key statistics">
+                  <div class="stat-card reveal reveal-delay-1">
+                      <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="9" cy="7" r="4"></circle>
+                          <path d="M22 2l-4 4"></path>
+                          <path d="M18 2l4 4"></path>
+                      </svg>
+                      <div class="stat-number">500+</div>
+                       <div class="stat-label">Students Trained</div>
+                   </div>
+                   <div class="stat-card reveal reveal-delay-2">
+                      <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
+                          <path d="M2 12h20"></path>
+                          <path d="M6 12v8"></path>
+                          <path d="M18 12v8"></path>
+                      </svg>
+                      <div class="stat-number">25+</div>
+                      <div class="stat-label">Partner Schools</div>
+                   </div>
+                   <div class="stat-card reveal reveal-delay-2">
+                      <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-4"></path>
+                          <path d="M9 11V9a3 3 0 0 1 6 0v2"></path>
+                          <path d="M9 11v8"></path>
+                          <path d="M15 11v8"></path>
+                      </svg>
+                      <div class="stat-number">100+</div>
+                       <div class="stat-label">Adventures Led</div>
+                   </div>
+                   <div class="stat-card reveal reveal-delay-4">
+                      <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                      </svg>
+                      <div class="stat-number">98%</div>
+                      <div class="stat-label">Satisfaction Rate</div>
                   </div>
-                  <div class="stat-card reveal reveal-delay-2">
-                     <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor">
-                         <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
-                         <path d="M2 12h20"></path>
-                         <path d="M6 12v8"></path>
-                         <path d="M18 12v8"></path>
-                     </svg>
-                     <div class="stat-number">25+</div>
-                     <div class="stat-label">Partner Schools</div>
-                 </div>
-                  <div class="stat-card reveal reveal-delay-2">
-                     <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor">
-                         <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-4"></path>
-                         <path d="M9 11V9a3 3 0 0 1 6 0v2"></path>
-                         <path d="M9 11v8"></path>
-                         <path d="M15 11v8"></path>
-                     </svg>
-                     <div class="stat-number">100+</div>
-                      <div class="stat-label">Adventures Led</div>
-                  </div>
-                  <div class="stat-card reveal reveal-delay-4">
-                     <svg class="stat-icon" viewBox="0 0 24 24" fill="currentColor">
-                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                     </svg>
-                     <div class="stat-number">98%</div>
-                     <div class="stat-label">Satisfaction Rate</div>
-                 </div>
-            </div>
-        </div>
-        <!-- Scroll Down Indicator -->
-        <a href="#programs" class="scroll-indicator" aria-label="Scroll down">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5v14M19 12l-7 7-7-7"/>
-            </svg>
-        </a>
-    </section>
+               </div>
+           </div>
+           <!-- Scroll Down Indicator -->
+           <a href="#programs" class="scroll-indicator" aria-label="Scroll to Programs section">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                   <path d="M12 5v14M19 12l-7 7-7-7"/>
+               </svg>
+           </a>
+       </section>
 
     <!-- Programs Section -->
-    <section id="programs" class="programs reveal">
+    <section id="programs" class="programs reveal" aria-labelledby="programs-heading">
         <div class="container">
             <div class="section-header">
-                <h2>Our Programs</h2>
+                <h2 id="programs-heading">Our Programs</h2>
                 <p>Comprehensive scouting programs designed for different age groups and skill levels</p>
             </div>
             <div class="programs-grid">
@@ -308,6 +311,7 @@
             </div>
         </div>
     </section>
+    </main>
 
      <!-- Footer -->
      <footer class="footer">
@@ -352,12 +356,19 @@
                     </div>
                 </div>
             </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 Arrow-Park Ventures. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
+             <div class="footer-bottom">
+                 <p>&copy; 2024 Arrow-Park Ventures. All rights reserved.</p>
+             </div>
+         </div>
+     </footer>
 
-    <script src="/js/main.js"></script>
+     <!-- Scroll to top button -->
+     <button class="scroll-top-btn" aria-label="Back to top">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             <polyline points="18 15 12 9 6 15"></polyline>
+         </svg>
+     </button>
+
+     <script src="/js/main.js"></script>
 </body>
 </html>

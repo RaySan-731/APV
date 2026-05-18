@@ -132,7 +132,8 @@ class NotificationScheduler {
           const trainer = trainerAssign.trainerId;
           if (!trainer || !trainer.email) continue;
 
-          const lastReminder = event.trainers.find(t => t.trainerId.toString() === trainer._id.toString())?.lastReminderAt;
+          // lastReminderAt lives on the trainers subdoc (built from Event.js schema)
+          const lastReminder = trainerAssign.lastReminderAt;
           if (lastReminder && (now - lastReminder) < 24 * 60 * 60 * 1000) {
             continue; // Skip if reminder sent within last 24h
           }
@@ -143,7 +144,7 @@ class NotificationScheduler {
 
       // Process in batches with concurrency control
       await this.processInBatches(tasks, this.maxConcurrency, async ({ trainer, event }) => {
-        await this.sendReportReminder(trainer, event);
+        await this.sendReportReminder(trainer, event._id, event.trainers);
       });
 
     } catch (error) {
@@ -151,17 +152,21 @@ class NotificationScheduler {
     }
   }
 
-  async sendReportReminder(trainer, event) {
+  async sendReportReminder(trainer, eventId, trainersArray) {
     try {
-      const prefs = await NotificationPreference.findOne({ staffId: trainer._id });
+      const trainerId = trainer._id || trainer;
+      const prefs = await NotificationPreference.findOne({ staffId: trainerId });
 
       if (prefs && prefs.types?.report_reminder?.enabled === false) {
         return;
       }
 
+      const event = await Event.findById(eventId);
+      if (!event) return;
+
       // Create in-app notification (fast DB write)
       await Notification.create({
-        recipientId: trainer._id,
+        recipientId: trainerId,
         type: 'report_reminder',
         title: 'Report Overdue',
         message: `Please submit your post-event report for "${event.name}" (ended ${new Date(event.endDate).toLocaleDateString()})`,
@@ -175,6 +180,18 @@ class NotificationScheduler {
           daysOverdue: Math.floor((Date.now() - event.endDate) / (24 * 60 * 60 * 1000))
         }
       });
+
+      // Persist lastReminderAt on the matching trainers subdoc so next scheduler
+      // run can skip this trainer for the same event (24 h dedup window).
+      event.trainers = event.trainers || [];
+      const match = event.trainers.find(
+        t => t && (t.trainerId || t).toString?.() === trainerId.toString?.()
+      );
+      if (match) {
+        match.lastReminderAt = new Date();
+      }
+      // Always save to touch the field even when the match loop ran fine.
+      await event.save();
 
       // Send email asynchronously without blocking main flow
       if (prefs && prefs.channels?.email?.enabled && prefs.types?.report_reminder?.email) {
@@ -236,7 +253,8 @@ class NotificationScheduler {
           const trainer = trainerAssign.trainerId;
           if (!trainer || !trainer.email) continue;
 
-          const lastReminder = event.trainers.find(t => t.trainerId.toString() === trainer._id.toString())?.lastReminderAt;
+          // lastReminderAt lives on the trainers subdoc (Event.js schema)
+          const lastReminder = trainerAssign.lastReminderAt;
           if (lastReminder && (now - lastReminder) < 24 * 60 * 60 * 1000) {
             continue;
           }
@@ -247,7 +265,7 @@ class NotificationScheduler {
 
       // Process in batches
       await this.processInBatches(tasks, this.maxConcurrency, async ({ trainer, event }) => {
-        await this.sendUpcomingEventReminder(trainer, event);
+        await this.sendUpcomingEventReminder(trainer, event, null);
       });
 
     } catch (error) {
@@ -255,26 +273,38 @@ class NotificationScheduler {
     }
   }
 
-  async sendUpcomingEventReminder(trainer, event) {
+  async sendUpcomingEventReminder(trainer, event, _trainersArray) {
     try {
-      const prefs = await NotificationPreference.findOne({ staffId: trainer._id });
+      const trainerId = trainer._id || trainer;
+      const prefs = await NotificationPreference.findOne({ staffId: trainerId });
 
       if (prefs && prefs.types?.upcoming_event?.enabled === false) {
         return;
       }
 
-      const hoursUntil = Math.floor((new Date(event.startDate) - new Date()) / (60 * 60 * 1000));
+      const populatedEvent = await Event.findById(event._id);
+      if (!populatedEvent) return;
+
+      const hoursUntil = Math.floor((new Date(populatedEvent.startDate) - new Date()) / (60 * 60 * 1000));
 
       await Notification.create({
-        recipientId: trainer._id,
+        recipientId: trainerId,
         type: 'upcoming_event',
         title: 'Event Starting Soon',
-        message: `"${event.name}" begins in approximately ${hoursUntil} hours. Location: ${event.location?.name || 'TBD'}`,
-        actionUrl: '/dashboard/events/' + event._id,
+        message: `"${populatedEvent.name}" begins in approximately ${hoursUntil} hours. Location: ${populatedEvent.location?.name || 'TBD'}`,
+        actionUrl: '/dashboard/events/' + populatedEvent._id,
         entityType: 'event',
-        entityId: event._id,
+        entityId: populatedEvent._id,
         priority: hoursUntil < 24 ? 'high' : 'normal'
       });
+
+      // Persist lastReminderAt on the trainer subdoc so next run can deduplicate
+      populatedEvent.trainers = populatedEvent.trainers || [];
+      const match = populatedEvent.trainers.find(
+        t => (t.trainerId || t).toString?.() === trainerId.toString?.()
+      );
+      if (match) match.lastReminderAt = new Date();
+      await populatedEvent.save();
 
       if (prefs && prefs.channels?.email?.enabled && prefs.types?.upcoming_event?.email) {
         // Non-blocking email send
@@ -283,16 +313,16 @@ class NotificationScheduler {
             await Promise.race([
               emailService.sendEmail({
                 to: trainer.email,
-                subject: `Upcoming Event: ${event.name}`,
+                subject: `Upcoming Event: ${populatedEvent.name}`,
                 html: `
                   <h2>Event Reminder</h2>
                   <p>Hello ${trainer.name},</p>
                   <p>This is a reminder that you have an upcoming event:</p>
                   <ul>
-                    <li><strong>Event:</strong> ${event.name}</li>
-                    <li><strong>Date:</strong> ${new Date(event.startDate).toLocaleDateString()}</li>
-                    <li><strong>Time:</strong> ${new Date(event.startDate).toLocaleTimeString()}</li>
-                    <li><strong>Location:</strong> ${event.location?.name || 'TBD'}</li>
+                    <li><strong>Event:</strong> ${populatedEvent.name}</li>
+                    <li><strong>Date:</strong> ${new Date(populatedEvent.startDate).toLocaleDateString()}</li>
+                    <li><strong>Time:</strong> ${new Date(populatedEvent.startDate).toLocaleTimeString()}</li>
+                    <li><strong>Location:</strong> ${populatedEvent.location?.name || 'TBD'}</li>
                   </ul>
                   <p>Please ensure you are prepared and have submitted any required documentation.</p>
                 `,
@@ -306,7 +336,7 @@ class NotificationScheduler {
         }, 0);
       }
 
-      console.log(`[Notification] Upcoming event reminder sent to ${trainer.name} for ${event.name}`);
+      console.log(`[Notification] Upcoming event reminder sent to ${trainer.name} for ${populatedEvent.name}`);
     } catch (error) {
       console.error('[Notification] Error in sendUpcomingEventReminder:', error);
     }

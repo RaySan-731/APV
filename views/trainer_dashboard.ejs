@@ -90,9 +90,7 @@
                                 <path d="M18 12v8"></path>
                             </svg>
                         </div>
-                        <div class="stat-number" id="eventsCompletedThisMonth">
-                            <span class="skeleton-loader"></span>
-                        </div>
+    <div id="eventsCompletedThisMonth"><span class="skeleton-loader"></span></div>
                         <div class="stat-label">Events Completed (This Month)</div>
                     </div>
 
@@ -105,9 +103,9 @@
                                 <circle cx="15.5" cy="7" r="4"></circle>
                             </svg>
                         </div>
-                        <div class="stat-number" id="totalScoutsReached">
-                            <span class="skeleton-loader"></span>
-                        </div>
+    <div class="stat-number" id="totalScoutsReached">
+                        <span class="skeleton-loader"></span>
+                    </div>
                         <div class="stat-label">Scouts Reached</div>
                     </div>
 
@@ -227,7 +225,7 @@
                             <div class="quick-action-desc">Register a new student</div>
                         </a>
 
-                        <a href="/trainer/events" class="quick-action-card">
+                        <a href="/trainer/events?view=calendar" class="quick-action-card">
                             <div class="quick-action-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -379,13 +377,17 @@
             const el = document.getElementById(elementId);
             el.classList.add('loaded');
             el.classList.remove('loading', 'error');
+            const skeleton = el.querySelector('.skeleton-loader');
+            if (skeleton) { skeleton.remove(); }
             el.textContent = isFloat ? parseFloat(value).toFixed(1) : value;
         }
 
-        function setStatError(elementId, errorMsg = 'Error') {
+        function setStatError(elementId, errorMsg = '—') {
             const el = document.getElementById(elementId);
             el.classList.add('error');
             el.classList.remove('loading', 'loaded');
+            const skeleton = el.querySelector('.skeleton-loader');
+            if (skeleton) { skeleton.remove(); }
             el.textContent = errorMsg;
         }
 
@@ -447,13 +449,12 @@
 
                 // Hide loading states and populate data
                 statIds.forEach(id => setStatLoading(id, false));
-                document.getElementById('eventsCompletedThisMonth').textContent = data.stats.eventsCompletedThisMonth;
                 setStatLoaded('eventsCompletedThisMonth', data.stats.eventsCompletedThisMonth);
                 setStatLoaded('totalScoutsReached', data.stats.totalScoutsReached);
                 setStatLoaded('reportsSubmitted', data.stats.reportsSubmitted);
                 setStatLoaded('schoolsVisited', data.stats.schoolsVisited);
                 setStatLoaded('studentsManaged', data.stats.studentsManaged);
-                setStatLoaded('performanceRating', data.stats.performanceRating, true);
+                setStatLoaded('performanceRating', data.stats.performanceRating, false);
 
                 renderTodaySchedule(data.todaySchedule);
                 renderUpcomingEvents(data.upcomingEvents);
@@ -483,7 +484,115 @@
             }
         }
 
-        async function loadAnnouncementsFeed(announcements) {
+        function renderTodaySchedule(events) {
+            const container = document.getElementById('todaySchedule');
+            if (events && events.length > 0) {
+                container.innerHTML = events.map(ev => {
+                    const startTime = ev.startDate ? new Date(ev.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD';
+                    const endTime = ev.endDate ? new Date(ev.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD';
+                    const statusTag = ev.status === 'in_progress' ? '<span class="badge badge-success">In Progress</span>' :
+                                      ev.status === 'confirmed'     ? '<span class="badge badge-primary">Confirmed</span>' :
+                                      `<span class="badge badge-warning">${ev.status}</span>`;
+                    const schoolNames = (ev.targetSchools || [])
+                        .map(ts => ts.schoolId && typeof ts.schoolId === 'object' ? ts.schoolId.name || 'Unknown' : 'School')
+                        .join(', ') || 'General';
+                    return `
+                        <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 1rem;">${ev.name}</div>
+                                <div style="color: var(--muted-foreground); font-size: 0.875rem; margin-top: 0.25rem;">
+                                    ${startTime} – ${endTime} &bull; ${ev.location?.name || 'TBD'}
+                                </div>
+                                <div style="color: var(--muted-foreground); font-size: 0.75rem; margin-top: 0.25rem;">
+                                    ${schoolNames}
+                                </div>
+                            </div>
+                            ${statusTag}
+                        </div>`;
+                }).join('');
+            } else {
+                container.innerHTML = '<p class="placeholder-text">No events scheduled for today.</p>';
+            }
+        }
+
+        function renderUpcomingEvents(events) {
+            const container = document.getElementById('upcomingEvents');
+            if (events && events.length > 0) {
+                container.innerHTML = events.map(ev => {
+                    const dateStr = ev.startDate ? new Date(ev.startDate).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : 'TBD';
+                    const timeStr = ev.startDate ? new Date(ev.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                    const eventType = ev.eventType ? ev.eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Event';
+                    const schoolNames = (ev.targetSchools || [])
+                        .map(ts => ts.schoolId && typeof ts.schoolId === 'object' ? ts.schoolId.name || 'Unknown' : 'School')
+                        .join(', ') || 'General';
+                    return `
+                        <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 1rem;">${ev.name}</div>
+                                <div style="color: var(--muted-foreground); font-size: 0.875rem; margin-top: 0.25rem;">
+                                    ${dateStr} @ ${timeStr} &bull; ${eventType}
+                                </div>
+                                <div style="color: var(--muted-foreground); font-size: 0.75rem; margin-top: 0.25rem;">
+                                    ${schoolNames}
+                                </div>
+                            </div>
+                            <span class="badge badge-primary">${ev.status || 'scheduled'}</span>
+                        </div>`;
+                }).join('');
+            } else {
+                container.innerHTML = '<p class="placeholder-text">No upcoming events in the next 7 days.</p>';
+            }
+        }
+
+        function renderPendingReports(events) {
+            const container = document.getElementById('pendingReports');
+            if (events && events.length > 0) {
+                const sorted = [...events].sort((a, b) => new Date(b.endDate) - new Date(a.endDate));
+                container.innerHTML = sorted.map(ev => {
+                    const dateStr = ev.endDate ? new Date(ev.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Unknown date';
+                    const schoolNames = (ev.targetSchools || [])
+                        .map(ts => ts.schoolId && typeof ts.schoolId === 'object' ? ts.schoolId.name || 'Unknown' : 'School')
+                        .join(', ') || 'General';
+                    return `
+                        <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 1rem;">${ev.name}</div>
+                                <div style="color: var(--muted-foreground); font-size: 0.75rem;">Ended: ${dateStr} &bull; ${schoolNames}</div>
+                            </div>
+                            <a href="/trainer/events?view=report&eventId=${ev._id}" class="btn btn-sm btn-primary">Submit Report</a>
+                        </div>`;
+                }).join('');
+            } else {
+                container.innerHTML = '<p class="placeholder-text" style="color: var(--success);">All reports submitted. Great work!</p>';
+            }
+        }
+
+        function renderAlerts(actions) {
+            const card = document.getElementById('pendingActionsCard');
+            const container = document.getElementById('pendingActionsList');
+            if (!card || !container) return;
+            if (!actions || actions.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            container.innerHTML = actions.map(action => {
+                const icon = action.type === 'report'   ? '📋' :
+                             action.type === 'message'  ? '✉️' : '🔔';
+                const badgeClass = action.type === 'report'   ? 'badge-warning' :
+                                   action.type === 'message'  ? 'badge-primary' : 'badge-danger';
+                return `
+                    <div class="card" style="padding: 1rem; border-left: 4px solid ${action.type === 'report' ? 'var(--accent)' : action.type === 'message' ? 'var(--primary)' : 'var(--destructive)'}; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-size: 1.25rem; margin-right: 0.5rem;">${icon}</span>
+                            <span style="font-weight: 500;">${action.message}</span>
+                        </div>
+                        <span class="badge ${badgeClass}">${action.count}</span>
+                    </div>`;
+            }).join('');
+        }
+
+        function renderAnnouncementsFeed(announcements) {
             const container = document.getElementById('announcementsFeed');
             if (announcements && announcements.length > 0) {
                 container.innerHTML = announcements.map(ann => `
@@ -501,105 +610,14 @@
             }
         }
 
-        // Calendar & Leave functionality
-        let currentDate = new Date();
-        let availabilityData = {};
-
-         document.addEventListener('DOMContentLoaded', function() {
-             // Load dashboard data (consolidated)
-             loadDashboardData();
-
-             // Calendar navigation
-             document.getElementById('prevMonth').addEventListener('click', () => {
-                 currentDate.setMonth(currentDate.getMonth() - 1);
-                 renderCalendar();
-             });
-             document.getElementById('nextMonth').addEventListener('click', () => {
-                 currentDate.setMonth(currentDate.getMonth() + 1);
-                 renderCalendar();
-             });
-             document.getElementById('leaveRequestForm').addEventListener('submit', submitLeaveRequest);
-         });
-
-
-        function renderTodaySchedule(events) {
-            const container = document.getElementById('todaySchedule');
-            if (!events || events.length === 0) {
-                container.innerHTML = '<p class="placeholder-text">No events scheduled for today.</p>';
-                return;
-            }
-            container.innerHTML = events.map(ev => `
-                <div class="card">
-                    <div class="card-content">
-                        <h4>${ev.name}</h4>
-                        <p><strong>Time:</strong> ${new Date(ev.startDate).toLocaleTimeString()} - ${new Date(ev.endDate).toLocaleTimeString()}</p>
-                        <p><strong>Location:</strong> ${ev.location?.name || 'TBA'}</p>
-                        <p><strong>Status:</strong> <span class="badge badge-info">${ev.status}</span></p>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderUpcomingEvents(events) {
-            const container = document.getElementById('upcomingEvents');
-            if (!events || events.length === 0) {
-                container.innerHTML = '<p class="placeholder-text">No upcoming events.</p>';
-                return;
-            }
-            container.innerHTML = events.map(ev => `
-                <div class="card">
-                    <div class="card-content">
-                        <h4>${ev.name}</h4>
-                        <p><strong>Date:</strong> ${new Date(ev.startDate).toLocaleDateString()}</p>
-                        <p><strong>Location:</strong> ${ev.location?.name || 'TBA'}</p>
-                        <p><strong>Status:</strong> <span class="badge badge-info">${ev.status}</span></p>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderPendingReports(events) {
-            const container = document.getElementById('pendingReports');
-            if (!events || events.length === 0) {
-                container.innerHTML = '<p class="placeholder-text">No pending reports.</p>';
-                return;
-            }
-            container.innerHTML = events.map(ev => `
-                <div class="card">
-                    <div class="card-content">
-                        <h4>${ev.name}</h4>
-                        <p><strong>Event Date:</strong> ${new Date(ev.startDate).toLocaleDateString()}</p>
-                        <p><strong>Status:</strong> <span class="badge badge-warning">Report Required</span></p>
-                        <a href="/dashboard/events/${ev._id}" class="btn btn-outline btn-sm">View & Submit Report</a>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderAlerts(actions) {
-            const actionsCard = document.getElementById('pendingActionsCard');
-            const container = document.getElementById('pendingActionsList');
-            if (!actions || actions.length === 0) {
-                container.innerHTML = '<p class="placeholder-text">No active alerts.</p>';
-                actionsCard.style.display = 'none';
-                return;
-            }
-            actionsCard.style.display = 'block';
-            container.innerHTML = actions.map(action => {
-                let badgeClass = 'badge-info';
-                if (action.type === 'report') badgeClass = 'badge-warning';
-                else if (action.type === 'message') badgeClass = 'badge-danger';
-                else if (action.type === 'notification') badgeClass = 'badge-success';
-                return `
-                    <div class="card">
-                        <div class="card-content">
-                            <span class="badge ${badgeClass}">${action.type.toUpperCase()}</span>
-                            ${action.message}
-                        </div>
-                    </div>
-                `;
-            }            ).join('');
-        }
+        // Auto-refresh announcements every 60 seconds
+        let announceRefresh = setInterval(async () => {
+            try {
+                const r = await fetch('/api/trainer/dashboard');
+                const d = await r.json();
+                if (d.success) renderAnnouncementsFeed(d.announcements);
+            } catch (_) {}
+        }, 60000);
 
         // Availability & Leave (existing)
         async function loadAvailability() {

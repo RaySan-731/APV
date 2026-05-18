@@ -5556,7 +5556,9 @@ app.post('/api/school-events', requireAuth, requirePermission('canCreateEvents')
     }
 
     // Find or create school entry in targetSchools
-    let schoolTarget = event.targetSchools.find(s => s.schoolId.toString() === schoolId);
+    let schoolTarget = event.targetSchools.find(
+      s => s.schoolId && s.schoolId.toString && s.schoolId.toString() === schoolId
+    );
     if (schoolTarget) {
       // Update existing
       schoolTarget.participantsCount = participantsCount;
@@ -5606,7 +5608,9 @@ app.post('/api/events/:eventId/attendance', requireAuth, requirePermission('canE
     }
 
     // Find the school in targetSchools
-    const schoolIndex = event.targetSchools.findIndex(s => s.schoolId.toString() === schoolId);
+    const schoolIndex = event.targetSchools.findIndex(
+      s => s.schoolId && s.schoolId.toString && s.schoolId.toString() === schoolId
+    );
     if (schoolIndex === -1) {
       return res.status(404).json({ success: false, error: 'School not invited to this event' });
     }
@@ -7358,7 +7362,9 @@ app.post('/dashboard/events/update/:id', requireAuth, requirePermission('canCrea
     // Invite new schools
     if (schoolsToInvite && Array.isArray(schoolsToInvite)) {
       for (const schoolId of schoolsToInvite) {
-        const existing = event.targetSchools.find(s => s.schoolId.toString() === schoolId);
+        const existing = event.targetSchools.find(
+          s => s.schoolId && s.schoolId.toString && s.schoolId.toString() === schoolId
+        );
         if (!existing) {
           event.targetSchools.push({
             schoolId,
@@ -7749,7 +7755,9 @@ app.post('/api/events/:eventId/invite-school', requireAuth, requirePermission('c
     }
 
     // Check if already invited
-    const existing = event.targetSchools.find(s => s.schoolId.toString() === schoolId);
+    const existing = event.targetSchools.find(
+      s => s.schoolId && s.schoolId.toString && s.schoolId.toString() === schoolId
+    );
     if (existing) {
       return res.status(400).json({ success: false, error: 'School already invited' });
     }
@@ -7912,7 +7920,9 @@ app.post('/api/events/rsvp', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
-    const schoolIndex = event.targetSchools.findIndex(s => s.schoolId.toString() === schoolId);
+    const schoolIndex = event.targetSchools.findIndex(
+      s => s.schoolId && s.schoolId.toString && s.schoolId.toString() === schoolId
+    );
     if (schoolIndex === -1) {
       return res.status(404).json({ success: false, error: 'School not invited to this event' });
     }
@@ -8014,46 +8024,65 @@ app.post('/api/events/rsvp', async (req, res) => {
   }
 });
 
-// RSVP form page (public)
-app.get('/events/:eventId/rsvp', async (req, res) => {
-  try {
-    const { school } = req.query;
-    const eventId = req.params.eventId;
+  // RSVP form page (public)
+  app.get('/events/:eventId/rsvp', async (req, res) => {
+    try {
+      const { school } = req.query;
+      const eventId = req.params.eventId;
 
-    const event = await Event.findById(eventId)
-      .populate('targetSchools.schoolId', 'name')
-      .lean();
+      if (!school) {
+        return res.status(403).render('404', { user: req.session.user, error: 'School identifier is missing from the RSVP link. Please contact the event organizer.' });
+      }
 
-    if (!event) {
-      return res.status(404).send('Event not found');
+      const event = await Event.findById(eventId);
+
+      if (!event) {
+        return res.status(404).send('Event not found');
+      }
+
+      if (!Array.isArray(event.targetSchools)) {
+        console.error('RSVP route: event.targetSchools is not an array for event', event._id);
+        return res.status(500).send('Event configuration error. Please contact the event organizer.');
+      }
+
+      // Verify school is invited — must check BEFORE population so schoolId _id is intact
+      const invitation = event.targetSchools.find(
+        ts => ts.schoolId && ts.schoolId.toString && ts.schoolId.toString() === String(school)
+      );
+      if (!invitation) {
+        return res.status(403).send('School not invited to this event');
+      }
+
+      // Populate AFTER the verification check to get school name for display
+      const populatedEvent = await Event.findById(eventId)
+        .populate('targetSchools.schoolId', 'name')
+        .lean();
+
+      // Guard rsvpDeadline – must be a valid Date instance before passing to the template
+      const rsvpDeadline = invitation.rsvpDeadline instanceof Date && !isNaN(invitation.rsvpDeadline)
+        ? invitation.rsvpDeadline
+        : undefined;
+
+      res.render('event_rsvp', {
+        user: null,
+        event: {
+          _id: event._id,
+          name: event.name,
+          description: event.description,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location,
+          agenda: event.agenda
+        },
+        schoolId: String(school),
+        currentStatus: invitation.rsvpStatus,
+        rsvpDeadline
+      });
+    } catch (err) {
+      console.error('Error loading RSVP page for event', req.params.eventId, 'school', req.query.school, ':', err);
+      res.status(500).send('Error loading RSVP page');
     }
-
-    // Verify school is invited
-    const invitation = event.targetSchools.find(ts => ts.schoolId.toString() === school);
-    if (!invitation) {
-      return res.status(403).send('School not invited to this event');
-    }
-
-    res.render('event_rsvp', {
-      user: null,
-      event: {
-        _id: event._id,
-        name: event.name,
-        description: event.description,
-        startDate: event.startDate,
-        endDate: event.endDate,
-        location: event.location,
-        agenda: event.agenda
-      },
-      schoolId: school,
-      currentStatus: invitation.rsvpStatus,
-      rsvpDeadline: invitation.rsvpDeadline
-    });
-  } catch (err) {
-    console.error('Error loading RSVP page:', err);
-    res.status(500).send('Error loading RSVP page');
-  }
-});
+  });
 
 // ===== POST-EVENT REVIEW & SIGN-OFF =====
 

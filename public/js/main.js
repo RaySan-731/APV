@@ -2,7 +2,32 @@
 // Handles: mobile nav toggle, smooth scrolling, form validation, sidebar mobile toggle, resize events, scroll reveal.
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Mobile navigation toggle - toggles .open class for responsive nav visibility
+
+    // ── Navbar scroll state ────────────────────────────────────
+    const navbar = document.querySelector('.navbar');
+    if (navbar) {
+        function handleNavScroll() {
+            navbar.classList.toggle('scrolled', window.scrollY > 10);
+        }
+        handleNavScroll();
+        window.addEventListener('scroll', handleNavScroll, { passive: true });
+    }
+
+    // ── Scroll-to-top button ───────────────────────────────────
+    const scrollTopBtn = document.querySelector('.scroll-top-btn');
+    function handleScrollTopVisibility() {
+        if (!scrollTopBtn) return;
+        scrollTopBtn.classList.toggle('visible', window.scrollY > 400);
+    }
+    window.addEventListener('scroll', handleScrollTopVisibility, { passive: true });
+
+    if (scrollTopBtn) {
+        scrollTopBtn.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    // ── Mobile navigation toggle ─────────────────────────────
     const navToggle = document.querySelector('.nav-toggle');
     const navMenu = document.querySelector('.nav-menu');
 
@@ -10,9 +35,12 @@ document.addEventListener('DOMContentLoaded', function() {
         navToggle.addEventListener('click', function() {
             navMenu.classList.toggle('open');
             navToggle.classList.toggle('open');
+            const expanded = navMenu.classList.contains('open');
+            navToggle.setAttribute('aria-expanded', String(expanded));
         });
     }
 
+    // ── Previous existing code continues below ─────────────────
     // Smooth scrolling for anchor links
     const anchorLinks = document.querySelectorAll('a[href^="#"]');
     anchorLinks.forEach(link => {

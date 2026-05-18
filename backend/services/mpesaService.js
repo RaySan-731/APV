@@ -1,11 +1,11 @@
 const fetch = global.fetch || require('node-fetch');
 
 const MPESA_ENV = process.env.MPESA_ENV === 'production' ? 'production' : 'sandbox';
-const MPESA_CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY;
-const MPESA_CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET;
-const MPESA_SHORTCODE = process.env.MPESA_SHORTCODE || process.env.MPESA_TILL || '';
-const MPESA_PASSKEY = process.env.MPESA_PASSKEY;
-const CALLBACK_URL = process.env.MPESA_STK_CALLBACK_URL || `${process.env.APP_URL || 'http://localhost:3000'}/api/mpesa/stk-callback`;
+const MPESA_CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY?.trim();
+const MPESA_CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET?.trim();
+const MPESA_SHORTCODE = (process.env.MPESA_SHORTCODE || process.env.MPESA_TILL || '').trim();
+const MPESA_PASSKEY = process.env.MPESA_PASSKEY?.trim();
+const CALLBACK_URL = process.env.MPESA_STK_CALLBACK_URL?.trim() || null;
 
 const MPESA_BASE_URL = MPESA_ENV === 'production'
   ? 'https://api.safaricom.co.ke'
@@ -47,9 +47,26 @@ class MpesaService {
     return Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
   }
 
+  static isValidCallbackUrl(url) {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch (err) {
+      return false;
+    }
+  }
+
   static async initiateStkPush({ phoneNumber, amount, accountReference, transactionDesc }) {
     if (!MPESA_SHORTCODE || !MPESA_PASSKEY) {
       return { success: false, error: 'MPESA shortcode or passkey is not configured' };
+    }
+
+    if (!this.isValidCallbackUrl(CALLBACK_URL)) {
+      return {
+        success: false,
+        error: `Invalid MPESA_STK_CALLBACK_URL configuration. It must be a full URL including http:// or https://. Current value: ${CALLBACK_URL}`
+      };
     }
 
     const formattedPhone = this.formatPhoneNumber(phoneNumber);

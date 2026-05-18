@@ -166,6 +166,7 @@ app.set('views', path.join(__dirname, 'views'));
 // Generate CSP nonce for production (for inline scripts/styles)
 app.use((req, res, next) => {
   res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  res.locals.showDemo = process.env.NODE_ENV !== 'production';
   next();
 });
 
@@ -855,6 +856,39 @@ async function loginUserByCredentials(email, password) {
     }
   }
 
+  // Ensure Staff record exists for school_admin users and set school dashboard redirect.
+  if (user.role === 'school_admin') {
+    let staff = await Staff.findOne({ email: normalizedEmail, role: 'school_admin' });
+    if (!staff) {
+      const school = await School.findOne({
+        status: 'active',
+        'contactPerson.email': { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      if (school) {
+        staff = new Staff({
+          name: user.name || school.contactPerson?.name || school.name || 'School Admin',
+          email: normalizedEmail,
+          role: 'school_admin',
+          status: 'Active',
+          department: 'Administration',
+          phone: school.contactPerson?.phone || '',
+          schoolId: school._id,
+          permissions: {
+            canManageOwnSchool: true,
+            canManageScouts: true,
+            canViewEvents: true,
+            canOwnViewPayments: true,
+            canManageDocuments: true,
+            canSendMessages: true,
+            canViewMessages: true
+          }
+        });
+        await staff.save();
+        console.log(`[Login] Created Staff profile for school admin ${user.email}`);
+      }
+    }
+  }
+
   return {
     type: 'user',
     profile: user,
@@ -864,7 +898,11 @@ async function loginUserByCredentials(email, password) {
       role: user.role || 'rover',
       name: user.name || 'Member'
     },
-    redirect: (user.role === 'trainer' ? '/trainer/dashboard' : '/dashboard')
+    redirect: user.role === 'trainer'
+      ? '/trainer/dashboard'
+      : user.role === 'school_admin'
+        ? '/school/dashboard'
+        : '/dashboard'
   };
 }
 
@@ -1218,6 +1256,16 @@ app.get('/trainer/dashboard', requireAuth, (req, res) => {
  });
 
 // Trainer Notification Center Page
+// Public API: Organization Profile (used by frontend branding)
+app.get('/api/organization/profile', async (req, res) => {
+  try {
+    return await settingsController.getOrganizationProfile(req, res);
+  } catch (err) {
+    console.error('Error in /api/organization/profile route:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch organization profile' });
+  }
+});
+
 // API: Consolidated Trainer Dashboard (single call for all dashboard data)
 app.get('/api/trainer/dashboard', requireAuth, async (req, res) => {
   try {

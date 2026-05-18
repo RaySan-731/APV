@@ -364,17 +364,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-
-
-    // Initial pagination setup
-    if (paginationContainer) {
-        paginationContainer.dataset.currentPage = '1';
-        // Force full re-render to ensure pagination is calculated correctly
-        setTimeout(() => {
-            if (staffSearch) filterStaffTable();
-        }, 0);
-    }
 });
 
 async function loadDashboardData() {
@@ -387,6 +376,18 @@ async function loadDashboardData() {
 
         // Update recent activities
         updateActivities(data.recentActivities);
+
+        // Update notification bell badge with fresh counts
+        const total = (data.unreadMessagesCount || 0) + (data.unreadNotificationsCount || 0);
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            if (total > 0) {
+                badge.textContent = total > 99 ? '99+' : total;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
 
     } catch (error) {
         console.error('Error loading dashboard data:', error);
@@ -401,6 +402,8 @@ async function loadDashboardData() {
             revenueCollected: 150000,
             outstandingPayments: 25000,
             avgEngagementScore: 78,
+            unreadMessagesCount: 0,
+            unreadNotificationsCount: 0,
             recentActivities: [
                 {
                     title: 'New school onboarded',
@@ -2637,7 +2640,12 @@ async function openManageEventModal(eventId) {
                             ${inv.numberOfParticipants !== undefined && inv.numberOfParticipants !== null
                                 ? `<br><small><strong>Students confirmed:</strong> ${attendingCount}</small>`
                                 : `<br><small class="muted-text">No attendance count submitted yet</small>`
-                            }
+    }
+
+});
+
+
+
                             ${inv.attendance?.notes ? `<br><small style="color: var(--muted-foreground);"><em>Notes:</em> ${escapeHtml(String(inv.attendance.notes))}</small>` : ''}
                         </div>
                         ${event.costPerParticipant && attendingCount > 0

@@ -26,9 +26,36 @@ exports.getDashboardData = async (req, res) => {
       time: new Date(log.timestamp).toLocaleString()
     }));
 
+    // Get current staff for unread counts
+    const Staff = require('../../models/Staff');
+    const Notification = require('../../models/Notification');
+    const currentStaff = await Staff.findOne({ email: req.session.user.email.toLowerCase() }).select('_id');
+
+    let unreadMessagesCount = 0;
+    let unreadNotificationsCount = 0;
+
+    if (currentStaff) {
+      const [unreadMsgs, unreadNotifs] = await Promise.all([
+        require('../../models/Message').countDocuments({
+          'recipients.staffId': currentStaff._id,
+          'recipients.status': 'sent',
+          'recipients.deleted': { $ne: true }
+        }),
+        Notification.countDocuments({
+          recipientId: currentStaff._id,
+          isRead: false,
+          dismissed: false
+        })
+      ]);
+      unreadMessagesCount = unreadMsgs;
+      unreadNotificationsCount = unreadNotifs;
+    }
+
     res.json({
       ...kpis,
-      recentActivities
+      recentActivities,
+      unreadMessagesCount,
+      unreadNotificationsCount
     });
   } catch (error) {
     console.error('Error fetching dashboard data:', error);

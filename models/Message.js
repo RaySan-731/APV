@@ -103,6 +103,26 @@ const messageSchema = new mongoose.Schema({
     trim: true
   }],
 
+  // Context: links message to an event, region/zone, or school (for team chats / event chat)
+  context: {
+    type: {
+      type: String,
+      enum: ['event', 'region', 'school']
+    },
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Event'
+    },
+    zone: {
+      type: String,
+      trim: true
+    },
+    schoolId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'School'
+    }
+  },
+
   // Importance and tracking
   priority: {
     type: String,

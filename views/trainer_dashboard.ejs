@@ -79,6 +79,58 @@
                     </div>
                 </div>
 
+                <!-- Compose Message Modal -->
+                <div id="composeModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+                    <div class="modal-content" style="background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-card); width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; margin: 2rem;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);">
+                            <h3 style="margin: 0;">Compose Message</h3>
+                            <button class="btn btn-sm btn-outline" style="border: none; font-size: 1.5rem; line-height: 1; cursor: pointer;" onclick="closeComposeModal()">×</button>
+                        </div>
+                        <div class="modal-body" style="padding: 1.5rem;">
+                            <form id="composeForm">
+                                <div style="margin-bottom: 1rem;">
+                                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">To <span style="color: var(--destructive);">*</span></label>
+                                    <select id="composeRecipient" required style="width: 100%; padding: 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background);">
+                                        <option value="">Select a founder or admin...</option>
+                                    </select>
+                                    <small id="composeRecipientLoading" style="display: none; color: var(--muted-foreground);">Loading recipients...</small>
+                                </div>
+                                <div style="margin-bottom: 1rem;">
+                                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Subject</label>
+                                    <input type="text" id="composeSubject" placeholder="Enter subject (optional)" style="width: 100%; padding: 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background);">
+                                </div>
+                                <div style="margin-bottom: 1rem;">
+                                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Message <span style="color: var(--destructive);">*</span></label>
+                                    <textarea id="composeBody" rows="5" required placeholder="Type your message here..." style="width: 100%; padding: 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); resize: vertical;"></textarea>
+                                </div>
+                                <div style="margin-bottom: 1rem;">
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
+                                        <input type="checkbox" id="composeImportant" style="accent-color: var(--primary);">
+                                        Mark as Important
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-weight: 500;">
+                                        <select id="composePriority" style="padding: 0.375rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background);">
+                                            <option value="normal">Normal Priority</option>
+                                            <option value="high">High Priority</option>
+                                            <option value="urgent">Urgent</option>
+                                            <option value="low">Low Priority</option>
+                                        </select>
+                                        Priority
+                                    </label>
+                                </div>
+                                <div id="composeError" style="padding: 0.75rem; border-radius: var(--radius); background: rgba(239,68,68,0.1); color: var(--destructive); margin-bottom: 1rem; display: none;"></div>
+                            </form>
+                        </div>
+                        <div class="card-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+                            <button type="button" class="btn btn-outline" onclick="closeComposeModal()">Cancel</button>
+                            <button type="button" id="composeSendBtn" class="btn btn-primary" onclick="sendComposedMessage()">
+                                <span id="composeSendLabel">Send Message</span>
+                                <span id="composeSpinner" style="display: none;">⏳ Sending…</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Stats Grid -->
                 <div class="stats-grid" id="trainerStats">
                     <div class="stat-card">
@@ -737,9 +789,115 @@
             }
         }
 
-        // Quick action: Open message compose (placeholder)
+        // Compose message for trainer to founder/admins
+        function openComposeModal() {
+            document.getElementById('composeModal').style.display = 'flex';
+            document.getElementById('composeRecipient').value = '';
+            document.getElementById('composeSubject').value = '';
+            document.getElementById('composeBody').value = '';
+            document.getElementById('composeImportant').checked = false;
+            document.getElementById('composePriority').value = 'normal';
+            document.getElementById('composeError').style.display = 'none';
+            loadFounderRecipients();
+        }
+
+        function closeComposeModal() {
+            document.getElementById('composeModal').style.display = 'none';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.getElementById('composeModal') && (document.getElementById('composeModal').style.display = 'none');
+                document.getElementById('messageModal') && (document.getElementById('messageModal').style.display = 'none');
+            }
+        });
+
+        document.getElementById('composeModal')?.addEventListener('click', function(e) {
+            if (e.target === this) closeComposeModal();
+        });
+
+        async function loadFounderRecipients() {
+            const select = document.getElementById('composeRecipient');
+            const loading = document.getElementById('composeRecipientLoading');
+            select.innerHTML = '<option value="">Loading recipients...</option>';
+            select.disabled = true;
+            loading.style.display = 'inline';
+            try {
+                const res = await fetch('/api/trainer/founders');
+                const data = await res.json();
+                if (data.success && data.founders && data.founders.length > 0) {
+                    select.innerHTML = '<option value="">Select a founder or admin...</option>' +
+                        data.founders.map(f => `<option value="${f._id}">${escapeHtml(f.name)} — ${escapeHtml(f.role || 'Admin')}</option>`).join('');
+                } else {
+                    select.innerHTML = '<option value="">No founders or admins available</option>';
+                }
+            } catch (err) {
+                console.error('Error loading founders:', err);
+                select.innerHTML = '<option value="">Error loading recipients</option>';
+            } finally {
+                select.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        async function sendComposedMessage() {
+            const recipientId = document.getElementById('composeRecipient').value;
+            const subject = document.getElementById('composeSubject').value.trim();
+            const body = document.getElementById('composeBody').value.trim();
+            const isImportant = document.getElementById('composeImportant').checked;
+            const priority = document.getElementById('composePriority').value;
+            const errorEl = document.getElementById('composeError');
+            const sendBtn = document.getElementById('composeSendBtn');
+            const sendLabel = document.getElementById('composeSendLabel');
+            const spinner = document.getElementById('composeSpinner');
+
+            if (!recipientId || !body) {
+                errorEl.textContent = 'Please select a recipient and enter a message body.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            errorEl.style.display = 'none';
+            sendBtn.disabled = true;
+            sendLabel.style.display = 'none';
+            spinner.style.display = 'inline';
+
+            try {
+                const res = await fetch('/api/messages/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        recipientIds: [recipientId],
+                        subject: subject || 'Message from Trainer',
+                        body,
+                        priority,
+                        isImportant,
+                        messageType: 'direct'
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Message sent successfully', 'success');
+                    closeComposeModal();
+                    loadNotificationBadge();
+                    loadMessagesPanel();
+                } else {
+                    errorEl.textContent = 'Error: ' + (data.error || 'Failed to send message');
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                console.error('Error sending message:', err);
+                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.style.display = 'block';
+            } finally {
+                sendBtn.disabled = false;
+                sendLabel.style.display = 'inline';
+                spinner.style.display = 'none';
+            }
+        }
+
         function openMessageCompose() {
-            showToast('Message composer coming soon! For now, use the inbox.', 'info');
+            openComposeModal();
         }
 
     <script>

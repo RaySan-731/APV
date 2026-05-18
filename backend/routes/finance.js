@@ -98,6 +98,11 @@ router.get('/invoices/overdue', requireFinanceAccess, invoiceController.getOverd
 router.get('/invoices/suggest', requireFinanceAccess, invoiceController.getInvoiceSuggestion);
 router.get('/invoices/uninvoiced-items', requireFinanceAccess, invoiceController.getUninvoicedItems);
 
+// Redirect /invoices/:id/payments GET to invoice detail page (payments form lives there)
+router.get('/invoices/:id/payments', requireFinanceAccess, (req, res) => {
+  res.redirect(`/finance/invoices/${req.params.id}`);
+});
+
 // Generic /invoices/:id routes — placed AFTER all specific /invoices/* paths
 router.get('/invoices/:id', requireFinanceAccess, invoiceController.getInvoice);
 router.post('/invoices/:id/cancel', requireFinanceAccess, invoiceController.cancelInvoice);

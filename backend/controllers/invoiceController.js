@@ -333,17 +333,23 @@ exports.createInvoice = async (req, res) => {
 // POST: Record payment against invoice
 exports.recordPayment = async (req, res) => {
   try {
-    const { amount, paymentDate, method, reference, notes, receiptFile } = req.body;
+    console.log('[recordPayment] incoming body keys:', Object.keys(req.body), 'invoiceId_from_path:', req.params.id, 'method_from_body:', req.body.method);
+    const { amount, paymentDate, method, reference, notes, receiptFile, received_by } = req.body;
     const invoiceId = req.params.id || req.body.invoiceId;
 
     if (!invoiceId) {
+      console.log('[recordPayment] no invoice id');
       return res.status(400).json({ success: false, error: 'Invoice ID is required' });
     }
 
+    console.log('[recordPayment] invoiceId:', invoiceId, 'amount:', amount, 'paymentDate:', paymentDate, 'method:', method);
     const invoice = await Invoice.findById(invoiceId);
     if (!invoice) {
+      console.log('[recordPayment] invoice not found:', invoiceId);
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
+
+    console.log('[recordPayment] invoice balance before:', invoice.balance, 'paid:', invoice.amountPaid, 'status:', invoice.status);
 
     const paymentAmount = parseFloat(amount);
     if (isNaN(paymentAmount) || paymentAmount <= 0) {
@@ -351,9 +357,9 @@ exports.recordPayment = async (req, res) => {
     }
 
     if (paymentAmount > invoice.balance) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Payment amount (KES ${paymentAmount}) exceeds outstanding balance (KES ${invoice.balance})` 
+      return res.status(400).json({
+        success: false,
+        error: `Payment amount (KES ${paymentAmount}) exceeds outstanding balance (KES ${invoice.balance})`
       });
     }
 
@@ -364,12 +370,13 @@ exports.recordPayment = async (req, res) => {
       amount: paymentAmount,
       method: method || invoice.paymentMethod,
       reference,
-      notes,
+      notes: received_by ? `${notes || ''} (Received by: ${received_by})` : notes,
       receiptFile: receiptFile || (req.file ? req.file : null),
       recordedBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null,
       paymentDate: paymentDate ? new Date(paymentDate) : new Date()
     });
 
+    console.log('[recordPayment] payment saved._id:', payment._id, 'returning JSON');
     res.json({ success: true, payment, invoiceBalance: invoice.balance - paymentAmount });
   } catch (err) {
     console.error('Error recording payment:', err);

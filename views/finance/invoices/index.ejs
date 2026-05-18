@@ -200,8 +200,8 @@
                                                             <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
                                                             <button type="submit" class="btn btn-primary payment-submit-btn">Record Payment</button>
                                                         </div>
-                                                    </form>
-                                                </div>
+    </form>
+                </div>
                                             </div>
                                         </div>
                                     <% }); %>
@@ -229,7 +229,6 @@
 
     <script src="/js/main.js"></script>
     <script>
-    // Minimal toast helper used by the payment-form AJAX submit
     function showToast(message, type, duration) {
         duration = duration || 3000;
         type = type || 'info';
@@ -250,40 +249,28 @@
         }, duration);
     }
 
-    // Open/close payment modals without Bootstrap JS
     function openPaymentModal(invoiceId) {
         var el = document.getElementById('paymentModal' + invoiceId);
         if (el) { el.style.display = 'flex'; }
     }
-    function closePaymentModal(invoiceId) {
-        var el = document.getElementById('paymentModal' + invoiceId);
-        if (el) { el.style.display = 'none'; }
-    }
 
     document.addEventListener('DOMContentLoaded', function () {
+        console.log('[payment] DOMContentLoaded — starting payment form wiring');
 
-        // Wire up close buttons and overlay clicks for every payment modal
         document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
-            // Close when clicking on the overlay backdrop (not the dialog)
             overlay.addEventListener('click', function (e) {
                 if (e.target === overlay) overlay.style.display = 'none';
             });
-
-            // Close buttons inside the modal
             overlay.querySelectorAll('.close-modal-btn').forEach(function (btn) {
                 btn.addEventListener('click', function () { overlay.style.display = 'none'; });
             });
         });
 
-        // Toggle fields in the payment modal based on selected payment method
         function updatePaymentModal(form) {
-            var method   = form.querySelector('.payment-method');
-            var isCash   = method && method.value === 'cash';
-            var refRow   = form.querySelector('.reference-field');
-            var recRow   = form.querySelector('.received-by-field');
-            var refHint  = null;
-            form.querySelectorAll('.cash-hint').forEach(function (el) { refHint = el; });
-
+            var method  = form.querySelector('.payment-method');
+            var isCash  = method && method.value === 'cash';
+            var refRow  = form.querySelector('.reference-field');
+            var recRow  = form.querySelector('.received-by-field');
             if (refRow) {
                 refRow.style.display = isCash ? '' : 'none';
                 var refInput = refRow.querySelector('.payment-reference');
@@ -294,78 +281,57 @@
                 var recInput = recRow.querySelector('[name="received_by"]');
                 if (recInput) recInput.required = isCash;
             }
-            if (refHint) refHint.style.display = isCash ? 'inline' : 'none';
         }
 
-        // Hook into every payment modal form
+        function showMsg(form, type, html) {
+            var el = form.querySelector('.modal-payment-msg');
+            if (el) {
+                el.className = 'alert alert-' + (type === 'error' ? 'error' : 'success');
+                el.innerHTML  = html;
+                el.style.display = 'block';
+            }
+        }
+
+        function setSubmitState(btn, busy) {
+            if (!btn) return;
+            if (busy) { btn.dataset._orig = btn.textContent; btn.textContent = 'Recording\u2026'; btn.disabled = true; }
+            else       { btn.textContent = btn.dataset._orig || 'Record Payment'; btn.disabled = false; }
+        }
+
         document.querySelectorAll('.payment-form').forEach(function (form) {
-            // Set initial state
             updatePaymentModal(form);
+            form.querySelector('.payment-method').addEventListener('change', function () { updatePaymentModal(form); });
 
-            // Re-evaluate when the method changes
-            form.querySelector('.payment-method').addEventListener('change', function () {
-                updatePaymentModal(form);
-            });
+            form.addEventListener('submit', function (e) {
+                var balance = parseFloat(form.dataset.balance || '0');
+                var amount  = parseFloat(form.querySelector('.payment-amount').value || '0');
 
-            // Submit via AJAX → show toast → reload to show updated table state
-            form.addEventListener('submit', async function (e) {
+                if (isNaN(amount) || amount <= 0 || amount > balance) return; // let HTML5 field UI surface this
+
                 e.preventDefault();
+                console.log('[payment] submit intercepted, amount=', amount);
 
-                var submitBtn = form.querySelector('.payment-submit-btn');
-                var msgEl     = form.querySelector('.modal-payment-msg');
-                var amountEl  = form.querySelector('.payment-amount');
-                var balance   = parseFloat(form.dataset.balance || '0');
-                var amount    = parseFloat(amountEl.value || '0');
+                var btn  = form.querySelector('.payment-submit-btn');
+                var msg  = form.querySelector('.modal-payment-msg');
+                setSubmitState(btn, true);
 
-                if (isNaN(amount) || amount <= 0) {
-                    if (msgEl) {
-                        msgEl.className = 'alert alert-error';
-                        msgEl.textContent = 'Please enter a valid payment amount.';
-                        msgEl.style.display = 'block';
-                    }
-                    return;
-                }
-
-                if (amount > balance) {
-                    if (msgEl) {
-                        msgEl.className = 'alert alert-error';
-                        msgEl.textContent = 'Payment amount (KES ' + amount.toLocaleString() + ') exceeds the outstanding balance (KES ' + balance.toLocaleString() + ').';
-                        msgEl.style.display = 'block';
-                    }
-                    return;
-                }
-
-                if (msgEl) msgEl.style.display = 'none';
-                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Recording…'; }
-
-                try {
-                    var data  = new FormData(form);
-                    var resp  = await fetch(form.action, { method: 'POST', body: data });
-                    var result = await resp.json();
-
-                    if (result.success) {
-                        var invNum  = form.dataset.invoiceNumber || 'invoice';
-                        var newBal  = result.invoiceBalance !== undefined ? result.invoiceBalance : Math.max(0, balance - amount);
-                        showToast('Payment of KES ' + amount.toLocaleString() + ' recorded for ' + invNum + '. New balance: KES ' + newBal.toLocaleString(), 'success');
-                        // Reload after short delay so the user sees the toast
-                        setTimeout(function () { location.reload(); }, 1500);
+                fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' })
+                .then(function (resp) { console.log('[payment] response status:', resp.status); return resp.json(); })
+                .then(function (data) {
+                    console.log('[payment] response data:', data);
+                    if (data.success) {
+                        showToast('Payment recorded successfully! New balance: KES ' + parseFloat(data.invoiceBalance || balance - amount).toLocaleString(), 'success');
+                        setTimeout(function () { location.href = location.pathname; }, 1800);
                     } else {
-                        if (msgEl) {
-                            msgEl.className = 'alert alert-error';
-                            msgEl.textContent = result.error || 'Failed to record payment. Please try again.';
-                            msgEl.style.display = 'block';
-                        }
-                        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Record Payment'; }
+                        showMsg(form, 'error', data.error || 'Failed to record payment. Please try again.');
+                        setSubmitState(btn, false);
                     }
-                } catch (err) {
-                    console.error('Payment submission error:', err);
-                    if (msgEl) {
-                        msgEl.className = 'alert alert-error';
-                        msgEl.textContent = 'Network error. Please try again.';
-                        msgEl.style.display = 'block';
-                    }
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Record Payment'; }
-                }
+                })
+                .catch(function (err) {
+                    console.error('[payment] fetch error:', err);
+                    showMsg(form, 'error', 'Network error: ' + err.message + '. Please try again.');
+                    setSubmitState(btn, false);
+                });
             });
         });
     });

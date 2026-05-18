@@ -7,6 +7,8 @@ const mongoose = require('mongoose');
 const Event = require('../../models/Event');
 const School = require('../../models/School');
 const Staff = require('../../models/Staff');
+const Student = require('../../models/Student');
+const Invoice = require('../../models/Invoice');
 const Payment = require('../../models/Payment');
 const Feedback = require('../../models/Feedback');
 const VisitLog = require('../../models/VisitLog');
@@ -23,28 +25,59 @@ async function getKPIMetrics(dateRange = '30d') {
   // Total schools
   const totalSchools = await School.countDocuments();
 
-  // Active schools (status: active)
-  const activeSchools = await School.countDocuments({ status: 'active' });
+  // Active schools (serviceStatus = active; fallback to status for schools without serviceStatus)
+  const activeSchools = await School.countDocuments({ $or: [{ serviceStatus: 'active' }, { serviceStatus: { $exists: false }, status: 'active' }] });
 
   // New schools this month
   const newSchoolsThisMonth = await School.countDocuments({
     createdAt: { $gte: thisMonthStart }
   });
 
-  // Total students across all schools
-  const totalStudentsPipeline = await School.aggregate([
-    { $group: { _id: null, total: { $sum: '$studentCount' } } }
-  ]);
-  const totalStudents = totalStudentsPipeline[0]?.total || 0;
+  // Total active students
+  const totalStudents = await Student.countDocuments({ status: 'active' });
 
-  // Service status breakdown
+  // Service status breakdown (counts schools)
   const activeServiceSchools = await School.countDocuments({ serviceStatus: 'active' });
   const onHoldSchools = await School.countDocuments({ serviceStatus: 'on_hold' });
 
-  // Events this month (school-related events)
+  // Events this month
   const eventsThisMonth = await Event.countDocuments({
-    startDate: { $gte: thisMonthStart }
+    startDate: { $gte: thisMonthStart, $lte: new Date(now.getFullYear(), now.getMonth() + 1, 0) }
   });
+
+  // Revenue collected (sum of paid invoice totals, this year)
+  const revenuePipeline = await Invoice.aggregate([
+    {
+      $match: {
+        status: 'paid',
+        paidDate: { $gte: thisMonthStart }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$totalAmount' }
+      }
+    }
+  ]);
+  const revenueCollected = revenuePipeline[0]?.total || 0;
+
+  // Outstanding payments (issued, sent, partial, overdue — this year)
+  const outstandingPipeline = await Invoice.aggregate([
+    {
+      $match: {
+        status: { $in: ['issued', 'sent', 'partial', 'overdue'] },
+        issueDate: { $gte: thisMonthStart }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$balance' }
+      }
+    }
+  ]);
+  const outstandingPayments = outstandingPipeline[0]?.total || 0;
 
   // Average lead time from booking to event start (days)
   const leadTimePipeline = await Event.aggregate([
@@ -123,22 +156,9 @@ async function getKPIMetrics(dateRange = '30d') {
 
   const schoolParticipationPercent = totalSchools > 0 ? Math.round((activeSchools / totalSchools) * 100) : 0;
 
-  // Revenue collected (sum of amountPaid)
-  const revenuePipeline = await Payment.aggregate([
-    { $group: { _id: null, total: { $sum: '$amountPaid' } } }
-  ]);
-  const revenueCollected = revenuePipeline[0]?.total || 0;
-
-  // Outstanding payments (sum of balance for pending/partial payments)
-  const outstandingPipeline = await Payment.aggregate([
-    { $match: { status: { $in: ['pending', 'partial', 'overdue'] } } },
-    { $group: { _id: null, total: { $sum: '$balance' } } }
-  ]);
-  const outstandingPayments = outstandingPipeline[0]?.total || 0;
-
-  // Average school engagement score
+  // Average school engagement score (uses same active-schools definition)
   const avgEngagementPipeline = await School.aggregate([
-    { $match: { status: 'active' } },
+    { $match: { $or: [{ serviceStatus: 'active' }, { serviceStatus: { $exists: false }, status: 'active' }] } },
     { $group: { _id: null, avg: { $avg: '$participationMetrics.engagementScore' } } }
   ]);
   const avgEngagementScore = Math.round(avgEngagementPipeline[0]?.avg || 0);

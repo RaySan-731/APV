@@ -5347,7 +5347,7 @@ app.post('/api/schools/:schoolId/update', requireAuth, requirePermission('canEdi
 });
 
 // POST: Quick update school status (status + serviceStatus)
-app.post('/api/schools/:schoolId/status', requireAuth, requirePermission('canEditSchools'), async (req, res) => {
+app.post('/api/schools/:schoolId/status', requireAuth, requirePermission('canEditSchools'), parseJson, async (req, res) => {
   try {
     const { schoolId } = req.params;
     const { status, serviceStatus } = req.body;

@@ -366,7 +366,8 @@ exports.recordPayment = async (req, res) => {
       reference,
       notes,
       receiptFile: receiptFile || (req.file ? req.file : null),
-      recordedBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null
+      recordedBy: req.session.user?.id ? new mongoose.Types.ObjectId(req.session.user.id) : null,
+      paymentDate: paymentDate ? new Date(paymentDate) : new Date()
     });
 
     res.json({ success: true, payment, invoiceBalance: invoice.balance - paymentAmount });

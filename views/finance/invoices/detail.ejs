@@ -147,26 +147,45 @@
                 <% if (invoice.status !== 'paid' && invoice.status !== 'cancelled') { %>
                     <div class="card">
                         <div class="card-body">
-                            <form action="/finance/invoices/<%= invoice._id %>/payments" method="POST" class="row g-3">
-                                <div class="col-md-3">
-                                    <label class="form-label">Payment Amount</label>
-                                    <input type="number" name="amount" class="form-control" max="<%= invoice.balance %>" required>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Payment Date</label>
-                                    <input type="date" name="paymentDate" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>" required>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Payment Method</label>
-                                    <select name="method" class="form-select">
-                                        <option value="mpesa">M-Pesa</option>
-                                        <option value="bank_transfer">Bank Transfer</option>
-                                        <option value="cheque">Cheque</option>
-                                        <option value="cash">Cash</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-success w-100">Record Payment</button>
+                            <form action="/finance/invoices/<%= invoice._id %>/payments" method="POST" enctype="multipart/form-data" class="payment-form" data-invoice="<%= invoice._id %>" data-balance="<%= invoice.balance %>" data-invoice-number="<%= invoice.invoiceNumber %>">
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Payment Amount (KES)</label>
+                                        <input type="number" name="amount" class="form-control payment-amount" max="<%= invoice.balance %>" step="0.01" min="0.01" required>
+                                        <small class="text-muted">Outstanding: KES <%= invoice.balance.toLocaleString() %></small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Payment Date</label>
+                                        <input type="date" name="paymentDate" class="form-control payment-date" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Payment Method</label>
+                                        <select name="method" class="form-select payment-method" required>
+                                            <option value="mpesa">M-Pesa</option>
+                                            <option value="bank_transfer">Bank Transfer</option>
+                                            <option value="cheque">Cheque</option>
+                                            <option value="cash">Cash</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Reference <span class="text-muted cash-hint" style="display:none;">(optional — auto-generated for cash)</span></label>
+                                        <input type="text" name="reference" class="form-control payment-reference" placeholder="e.g. MPESA-XXXX or Receipt #">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Receipt / Proof of Payment <span class="text-muted cash-hint" style="display:none;">(not required for cash)</span></label>
+                                        <input type="file" name="receipt" class="form-control payment-receipt" accept="image/jpeg,image/png,image/gif,application/pdf,.doc,.docx,.xls,.xlsx">
+                                    </div>
+                                    <div class="col-md-3 received-by-field" style="display:none;">
+                                        <label class="form-label">Received By <span class="text-danger">*</span></label>
+                                        <input type="text" name="received_by" class="form-control" placeholder="Name of person who handed over the cash">
+                                        <small class="text-muted">Required for all cash payments.</small>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <div class="modal-payment-msg" style="display:none;"></div>
+                                    </div>
+                                    <div class="col-md-3 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-success w-100 payment-submit-btn">Record Payment</button>
+                                    </div>
                                 </div>
                             </form>
                         </div>
@@ -178,6 +197,107 @@
     </div>
 
     <script src="/js/main.js"></script>
+    <script>
+    // Minimal toast helper for payment-form feedback
+    function showToast(message, type, duration) {
+        duration = duration || 3000;
+        type = type || 'info';
+        var toast = document.createElement('div');
+        toast.className = 'toast toast-' + type;
+        toast.textContent = message;
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;padding:1rem 1.5rem;border-radius:6px;color:#fff;font-weight:500;z-index:10000;opacity:0;transform:translateY(-20px);transition:all 0.3s ease;';
+        if (type === 'success')  toast.style.backgroundColor = '#198754';
+        else if (type === 'error') toast.style.backgroundColor = '#dc3545';
+        else if (type === 'warning') toast.style.backgroundColor = '#ffc107';
+        else                          toast.style.backgroundColor = '#6c757d';
+        document.body.appendChild(toast);
+        setTimeout(function () { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; }, 10);
+        setTimeout(function () {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-20px)';
+            setTimeout(function () { toast.remove(); }, 300);
+        }, duration);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+        function updatePaymentModal(form) {
+            var method  = form.querySelector('.payment-method');
+            var isCash  = method && method.value === 'cash';
+            var refRow  = form.querySelector('.reference-field');
+            var recRow  = form.querySelector('.received-by-field');
+            var refHint = null;
+            form.querySelectorAll('.cash-hint').forEach(function (el) { refHint = el; });
+
+            if (refRow) { refRow.style.display = isCash ? '' : 'none'; }
+            if (recRow) { recRow.style.display = isCash ? '' : 'none'; }
+            if (refHint) refHint.style.display = isCash ? 'inline' : 'none';
+        }
+
+        document.querySelectorAll('.payment-form').forEach(function (form) {
+            updatePaymentModal(form);
+            form.querySelector('.payment-method').addEventListener('change', function () {
+                updatePaymentModal(form);
+            });
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                var submitBtn = form.querySelector('.payment-submit-btn');
+                var msgEl     = form.querySelector('.modal-payment-msg');
+                var amountEl  = form.querySelector('.payment-amount');
+                var balance   = parseFloat(form.dataset.balance || '0');
+                var amount    = parseFloat(amountEl.value || '0');
+
+                if (isNaN(amount) || amount <= 0) {
+                    if (msgEl) {
+                        msgEl.className = 'alert alert-error';
+                        msgEl.textContent = 'Please enter a valid payment amount.';
+                        msgEl.style.display = 'block';
+                    }
+                    return;
+                }
+                if (amount > balance) {
+                    if (msgEl) {
+                        msgEl.className = 'alert alert-error';
+                        msgEl.textContent = 'Payment amount (KES ' + amount.toLocaleString() + ') exceeds the outstanding balance (KES ' + balance.toLocaleString() + ').';
+                        msgEl.style.display = 'block';
+                    }
+                    return;
+                }
+
+                if (msgEl) msgEl.style.display = 'none';
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Recording…'; }
+
+                try {
+                    var data  = new FormData(form);
+                    var resp  = await fetch(form.action, { method: 'POST', body: data });
+                    var result = await resp.json();
+
+                    if (result.success) {
+                        showToast('Payment of KES ' + amount.toLocaleString() + ' recorded.', 'success');
+                        setTimeout(function () { location.reload(); }, 1500);
+                    } else {
+                        if (msgEl) {
+                            msgEl.className = 'alert alert-error';
+                            msgEl.textContent = result.error || 'Failed to record payment.';
+                            msgEl.style.display = 'block';
+                        }
+                        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Record Payment'; }
+                    }
+                } catch (err) {
+                    console.error('Payment submission error:', err);
+                    if (msgEl) {
+                        msgEl.className = 'alert alert-error';
+                        msgEl.textContent = 'Network error. Please try again.';
+                        msgEl.style.display = 'block';
+                    }
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Record Payment'; }
+                }
+            });
+        });
+    });
+    </script>
 </body>
 </html>
 

@@ -149,7 +149,8 @@ exports.createInvoice = async (req, res) => {
       dueDate,
       notes,
       terms,
-      currency = 'KES'
+      currency = 'KES',
+      totalAmount: totalAmountInput
     } = req.body;
 
     if (!schoolId || schoolId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(schoolId)) {
@@ -171,16 +172,15 @@ exports.createInvoice = async (req, res) => {
       .filter(id => id && id.toString().trim());
 
     if (invoiceType === 'event' && eventIds.length > 0) {
-      // Auto-generate invoice from confirmed events for this school
+      // Auto-generate invoice from events (status-filtered) for this school
       const events = await Event.find({
         _id: { $in: eventIds },
         targetSchools: {
           $elemMatch: {
-            schoolId: new mongoose.Types.ObjectId(schoolId),
-            rsvpStatus: 'confirmed'
+            schoolId: new mongoose.Types.ObjectId(schoolId)
           }
         },
-        status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed', 'reviewed'] }
+        status: { $in: ['draft', 'scheduled', 'confirmed', 'in_progress', 'completed', 'reviewed'] }
       });
 
       const ratePerStudent = school.paymentTerms?.ratePerStudent || 0;
@@ -272,6 +272,19 @@ exports.createInvoice = async (req, res) => {
         console.error('Error parsing customItems JSON:', parseErr.message);
         return res.status(400).json({ success: false, error: 'Invalid JSON format for custom line items' });
       }
+    } else if (invoiceType === 'custom' && (!customItems || customItems.trim() === '')) {
+      // Allow manual custom invoices without explicit JSON line items.
+      const manualAmount = parseFloat(totalAmountInput);
+      if (isNaN(manualAmount) || manualAmount <= 0) {
+        return res.status(400).json({ success: false, error: 'Custom invoice requires either a line item list or a valid total amount' });
+      }
+      items = [{
+        description: 'Custom invoice amount',
+        quantity: 1,
+        unitPrice: manualAmount,
+        total: manualAmount
+      }];
+      subtotal = manualAmount;
     }
 
     if (items.length === 0) {
@@ -281,8 +294,15 @@ exports.createInvoice = async (req, res) => {
       return res.status(400).json({ success: false, error: 'No billable items found for invoice.' + detail });
     }
 
-    // Calculate totals
-    const totalAmount = subtotal;
+    // Calculate totals — use admin override if provided, otherwise use calculated subtotal
+    const rawTotal = totalAmountInput !== undefined && totalAmountInput !== null && totalAmountInput !== '';
+    const totalAmount = rawTotal
+      ? parseFloat(totalAmountInput)
+      : subtotal;
+
+    if (rawTotal && isNaN(totalAmount) || totalAmount < 0) {
+      return res.status(400).json({ success: false, error: 'Invalid invoice amount entered' });
+    }
     const dueDateValue = dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const issueDateValue = issueDate ? new Date(issueDate) : new Date();
 
@@ -656,13 +676,8 @@ exports.getUninvoicedItems = async (req, res) => {
 
     const uninvoicedEvents = await Event.find({
       ...(invoicedEventIds.length > 0 ? { _id: { $nin: invoicedEventIds } } : {}),
-      targetSchools: {
-        $elemMatch: {
-          schoolId: new mongoose.Types.ObjectId(schoolId),
-          rsvpStatus: 'confirmed'
-        }
-      },
-      status: { $in: ['published', 'scheduled', 'confirmed', 'in_progress', 'completed', 'reviewed'] }
+      'targetSchools.schoolId': new mongoose.Types.ObjectId(schoolId),
+      status: { $in: ['draft', 'scheduled', 'confirmed', 'in_progress', 'completed', 'reviewed'] }
     })
       .select('_id name startDate status costPerParticipant estimatedScoutCount targetSchools')
       .lean();
@@ -671,8 +686,8 @@ exports.getUninvoicedItems = async (req, res) => {
       ? await ServicePackage.find({
           _id: { $nin: invoicedPackageIds },
           isActive: true
-        }).select('_id displayName pricingModel').lean()
-      : await ServicePackage.find({ isActive: true }).select('_id displayName pricingModel').lean();
+        }).select('_id displayName pricingModel ratePerStudent monthlyRetainer').lean()
+      : await ServicePackage.find({ isActive: true }).select('_id displayName pricingModel ratePerStudent monthlyRetainer').lean();
 
     res.json({ success: true, events: uninvoicedEvents, packages: uninvoicedPackages });
   } catch (err) {

@@ -17,7 +17,7 @@ const emailService = require('../../backend/services/emailService');
 const ReportTemplate = require('../../models/ReportTemplate');
 const ScheduledReport = require('../../models/ScheduledReport');
 const SystemSettings = require('../../models/SystemSettings');
-const { getTrainerPerformance } = require('../utils/aggregations');
+const { getTrainerPerformance, getEventEffectiveness, getSchoolEngagement } = require('../utils/aggregations');
 const Event = require('../../models/Event');
 const School = require('../../models/School');
 const User = require('../../models/User');
@@ -37,7 +37,7 @@ exports.exportReport = async (req, res) => {
     switch (reportType) {
       case 'trainers':
         headers = ['Name', 'Email', 'Role', 'Events Completed', 'Total Attendance', 'Reports On-Time', 'Reports Late', 'Avg Feedback', 'Schools Visited'];
-        const rawTrainerData = await getTrainerPerformance({ dateRange });
+        const rawTrainerData = await getTrainerPerformance({ trainerId, dateRange, sortBy: 'eventsCompleted', sortOrder: 'desc' });
         data = rawTrainerData.map(item => ({
           'Name': item.staff?.name || '',
           'Email': item.staff?.email || '',
@@ -53,53 +53,30 @@ exports.exportReport = async (req, res) => {
         break;
 
       case 'events':
-        headers = ['Event Name', 'Type', 'Start Date', 'End Date', 'Location', 'Status', 'Registered', 'Attended', 'Report Submitted'];
-        const events = await Event.find({})
-          .populate('trainers.trainerId', 'name')
-          .populate('targetSchools.schoolId', 'name')
-          .sort({ startDate: -1 });
-        data = events.map(e => ({
-          'Event Name': e.name,
-          'Type': e.eventType,
-          'Start Date': e.startDate.toISOString().split('T')[0],
-          'End Date': e.endDate.toISOString().split('T')[0],
-          'Location': e.location?.name || '',
-          'Status': e.status,
-          'Registered': e.currentParticipants,
-          'Attended': e.review?.actualAttendeeCount || 0,
-          'Report Submitted': e.review?.reportSubmittedAt ? 'Yes' : 'No'
+        headers = ['Event Type', 'Total Events', 'Avg Attendance Rate', 'Avg Trainer-to-Scout Ratio'];
+        const eventData = await getEventEffectiveness({ eventType, dateRange, region });
+        data = eventData.map(item => ({
+          'Event Type': item.eventType,
+          'Total Events': item.totalEvents,
+          'Avg Attendance Rate': item.avgAttendanceRate,
+          'Avg Trainer-to-Scout Ratio': item.avgTrainerToScoutRatio
         }));
         filename += '_events';
         break;
 
       case 'schools':
-        headers = ['School Name', 'City', 'Region', 'Students', 'Service Status', 'Events Attended', 'Avg Attendance', 'Payment Reliability'];
-        const { status } = req.query;
-        let schoolQuery = {};
-
-        if (status) {
-          if (status === 'active') {
-            schoolQuery = { $or: [{ status: 'active' }, { serviceStatus: 'active' }] };
-          } else {
-            schoolQuery = { $or: [{ status }, { serviceStatus: status }] };
-          }
-        }
-
-        const schools = await School.find(schoolQuery);
-        data = [];
-        for (const school of schools) {
-          const eventsCount = await Event.countDocuments({ 'targetSchools.schoolId': school._id });
-          data.push({
-            'School Name': school.name,
-            'City': school.address?.city || '',
-            'Region': school.region || '',
-            'Students': school.studentCount,
-            'Service Status': school.serviceStatus,
-            'Events Attended': eventsCount,
-            'Avg Attendance': school.participationMetrics?.averageAttendanceRate || 0,
-            'Payment Reliability': 'TBD'
-          });
-        }
+        headers = ['School Name', 'Students', 'Events Attended', 'On-Time Payments', 'Total Payments', 'Avg Feedback', 'Engagement Score', 'Service Status'];
+        const schoolData = await getSchoolEngagement({ schoolId, dateRange });
+        data = schoolData.map(item => ({
+          'School Name': item.schoolName,
+          'Students': item.studentCount,
+          'Events Attended': item.eventsAttended,
+          'On-Time Payments': item.onTimePayments,
+          'Total Payments': item.totalPayments,
+          'Avg Feedback': item.avgFeedback,
+          'Engagement Score': item.engagementScore,
+          'Service Status': item.serviceStatus
+        }));
         filename += '_schools';
         break;
 

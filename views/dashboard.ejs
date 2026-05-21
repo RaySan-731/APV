@@ -976,9 +976,17 @@
                         <div class="card-content">
                             <div class="table-export-bar">
                                 <span class="table-export-label"><strong id="schoolsTable-countLabel">0</strong> records</span>
-                                <div class="table-export-actions">
-                                    <button class="btn btn-sm btn-outline" onclick="exportTable('csv','schoolsTable')">Export CSV</button>
-                                    <button class="btn btn-sm btn-primary" onclick="exportTable('pdf','schoolsTable')">Export PDF</button>
+                                <div class="export-dropdown">
+                                    <button type="button" class="btn btn-sm btn-secondary filter-actions-export-btn" onclick="toggleSchoolsExportMenu()">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:inline;vertical-align:middle;margin-right:0.25rem">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                        </svg>
+                                        Export ▾
+                                    </button>
+                                    <div id="schoolsExportMenu" class="dropdown-menu">
+                                        <a href="#" id="exportSchoolsCsvLink">Export CSV</a>
+                                        <a href="#" id="exportSchoolsPdfLink">Export PDF</a>
+                                    </div>
                                 </div>
                             </div>
                             <div class="table-responsive">
@@ -1164,132 +1172,54 @@ function toggleSchoolStatusDropdown(badgeEl) {
     if (!isOpen) {
         dropdown.classList.add('show');
         badgeEl.classList.add('dropdown-open');
-    }
+  }
 }
 
-async function updateSchoolStatus(schoolId, newValue, field, btnEl) {
-    try {
-        var res = await fetch('/api/schools/' + schoolId + '/status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ [field]: newValue })
-        });
-        var data = await res.json();
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Failed to update status: ' + (data.error || 'Unknown error'));
-        }
-    } catch (err) {
-        alert('Error updating status: ' + err.message);
-    }
+// ---------- SCHOOLS EXPORT ----------
+function toggleSchoolsExportMenu() {
+  document.getElementById('schoolsExportMenu').classList.toggle('show');
 }
 
-document.addEventListener('click', function(event) {
-    if (!event.target.closest('.school-status-wrapper')) {
-        document.querySelectorAll('.school-status-dropdown.show').forEach(function(d) { d.classList.remove('show'); });
-        document.querySelectorAll('.school-status-badge.dropdown-open').forEach(function(b) { b.classList.remove('dropdown-open'); });
-    }
+function buildSchoolsExportUrl(format) {
+  const params = new URLSearchParams();
+  var searchEl = document.getElementById('schoolSearch');
+  var statusEl = document.getElementById('statusFilter');
+  var serviceStatusEl = document.getElementById('serviceStatusFilter');
+  var zoneEl = document.getElementById('zoneFilter');
+  if (searchEl && searchEl.value.trim()) params.set('search', searchEl.value.trim());
+  if (statusEl && statusEl.value) params.set('status', statusEl.value);
+  if (serviceStatusEl && serviceStatusEl.value) params.set('serviceStatus', serviceStatusEl.value);
+  if (zoneEl && zoneEl.value) params.set('zone', zoneEl.value);
+  params.set('format', format);
+  return '/api/trainer/schools/export?' + params.toString();
+}
+
+// Sync filter values from URL on page load so export URL builder sees the correct values
+(function syncSchoolsFilters() {
+  var searchEl = document.getElementById('schoolSearch');
+  var statusEl = document.getElementById('statusFilter');
+  var serviceStatusEl = document.getElementById('serviceStatusFilter');
+  var zoneEl = document.getElementById('zoneFilter');
+  var params = new URLSearchParams(window.location.search);
+  if (searchEl && params.get('search')) searchEl.value = params.get('search');
+  if (statusEl && params.get('status')) statusEl.value = params.get('status');
+  if (serviceStatusEl && params.get('serviceStatus')) serviceStatusEl.value = params.get('serviceStatus');
+  if (zoneEl && params.get('zone')) zoneEl.value = params.get('zone');
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+  var csvLink = document.getElementById('exportSchoolsCsvLink');
+  var pdfLink = document.getElementById('exportSchoolsPdfLink');
+  if (csvLink) csvLink.href = buildSchoolsExportUrl('csv');
+  if (pdfLink) pdfLink.href = buildSchoolsExportUrl('pdf');
 });
 
-// ---------- DELETE SCHOOL ----------
-function openDeleteSchoolModal(schoolId, schoolName) {
-    document.getElementById('deleteSchoolId').value = schoolId;
-    document.getElementById('deleteSchoolName').textContent = schoolName;
-    document.getElementById('deleteSchoolModal').style.display = 'flex';
-}
-
-function closeDeleteSchoolModal() {
-    document.getElementById('deleteSchoolModal').style.display = 'none';
-}
-
-async function deleteSchool() {
-    const schoolId = document.getElementById('deleteSchoolId').value;
-    if (!confirm('Are you sure you want to permanently delete this school from the platform? This cannot be undone.')) return;
-    try {
-        const res = await fetch('/api/schools/' + schoolId + '/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const data = await res.json();
-        if (data.success) {
-            window.location.href = '/dashboard/schools';
-        } else {
-            alert('Failed to delete school: ' + (data.error || 'Unknown error'));
-        }
-    } catch (err) {
-        alert('Error deleting school: ' + err.message);
-    }
-}
-
-function openProgramAllocationModal(schoolId, schoolName, allocatedProgramIds) {
-  document.getElementById('modalSchoolName').textContent = schoolName;
-  document.getElementById('programAllocationSchoolId').value = schoolId;
-  
-  const select = document.getElementById('programAllocationSelect');
-  for (let i = 0; i < select.options.length; i++) {
-    select.options[i].selected = false;
-  }
-  
-  if (allocatedProgramIds && allocatedProgramIds.length) {
-    for (let i = 0; i < select.options.length; i++) {
-      if (allocatedProgramIds.includes(select.options[i].value)) {
-        select.options[i].selected = true;
-      }
-    }
-  }
-  
-  document.getElementById('programAllocationModal').style.display = 'flex';
-  document.getElementById('programAllocationMessage').style.display = 'none';
-}
-
-function closeProgramAllocationModal() {
-  document.getElementById('programAllocationModal').style.display = 'none';
-}
-
-document.addEventListener('click', function(event) {
-  const modal = document.getElementById('programAllocationModal');
-  if (event.target === modal) {
-    closeProgramAllocationModal();
+document.addEventListener('click', function(e) {
+  var menu = document.getElementById('schoolsExportMenu');
+  if (menu && !e.target.closest('.export-dropdown')) {
+    menu.classList.remove('show');
   }
 });
-
-async function saveProgramAllocation() {
-  const schoolId = document.getElementById('programAllocationSchoolId').value;
-  const select = document.getElementById('programAllocationSelect');
-  const selectedOptions = Array.from(select.selectedOptions);
-  const programIds = selectedOptions.map(option => option.value);
-  
-  const messageEl = document.getElementById('programAllocationMessage');
-  messageEl.style.display = 'none';
-  
-  try {
-    const response = await fetch(`/api/schools/${schoolId}/update-programs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ programIds })
-    });
-    const result = await response.json();
-    if (response.ok && result.success) {
-      messageEl.textContent = '✓ Programs allocated successfully!';
-      messageEl.className = 'message success';
-      messageEl.style.display = 'block';
-      setTimeout(() => {
-        closeProgramAllocationModal();
-        window.location.reload();
-      }, 1000);
-    } else {
-      messageEl.textContent = '✗ ' + (result.error || 'Error allocating programs');
-      messageEl.className = 'message error';
-      messageEl.style.display = 'block';
-    }
-  } catch (err) {
-    console.error('Error allocating programs:', err);
-    messageEl.textContent = '✗ Network error';
-    messageEl.className = 'message error';
-    messageEl.style.display = 'block';
-  }
-}
                     </script>
                 <% } else if (page === 'school-edit') { %>
                     <!-- School Edit Form -->
@@ -4164,10 +4094,9 @@ document.addEventListener('click', function(event) {
     <div class='modal-footer'>
       <button type='button' class='btn btn-secondary' onclick='closeEditTrainerModal()'>Cancel</button>
       <button type='button' class='btn btn-primary' onclick='saveEditTrainer()'>Save Changes</button>
+      </div>
     </div>
   </div>
-</div>
 
-    <script src="/js/table-export.js"></script>
 </body>
 </html>

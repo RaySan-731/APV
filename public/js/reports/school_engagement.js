@@ -79,7 +79,7 @@ function exportReport(format) {
         dateRange: document.getElementById('dateRange').value
     });
     if (document.getElementById('schoolFilter').value) params.set('schoolId', document.getElementById('schoolFilter').value);
-    window.location.href = `${EXPORT_BASE}/export/${params.toString()}`;
+    window.location.href = `${EXPORT_BASE}/schools?${params.toString()}`;
 }
 
 function resetFilters() {

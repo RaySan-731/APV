@@ -118,12 +118,13 @@ function renderTable(data) {
 
     data.forEach(item => {
         const tr = document.createElement('tr');
+        const avgFeedbackScore = Number(item.avgFeedbackScore || 0).toFixed(1);
         tr.innerHTML = `
             <td><strong>${item.eventType.replace(/_/g, ' ')}</strong></td>
             <td>${item.totalEvents}</td>
-            <td>${item.avgAttendanceRate.toFixed(1)}%</td>
-            <td>${item.avgTrainerToScoutRatio.toFixed(2)}</td>
-            <td>${item.avgFeedbackScore.toFixed(1)}</td>
+            <td>${Number(item.avgAttendanceRate || 0).toFixed(1)}%</td>
+            <td>${Number(item.avgTrainerToScoutRatio || 0).toFixed(2)}</td>
+            <td>${avgFeedbackScore}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -137,7 +138,7 @@ function exportReport(format) {
     });
     if (document.getElementById('eventType').value) params.set('eventType', document.getElementById('eventType').value);
     if (document.getElementById('region').value) params.set('region', document.getElementById('region').value);
-    window.location.href = `${EXPORT_BASE}/export/${params.toString()}`;
+    window.location.href = `${EXPORT_BASE}/events?${params.toString()}`;
 }
 
 function resetFilters() {

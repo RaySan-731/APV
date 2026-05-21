@@ -13,6 +13,6 @@ const { requireAuth } = require('../middleware/auth');
  * Body: { tableId, headers[], rows[], title, filename, excludeColumns }
  * Query: ?format=csv|pdf
  */
-router.post('/table/export', requireAuth, tableExportController.exportTable);
+router.post('/table/export', requireAuth, express.json(), tableExportController.exportTable);
 
 module.exports = router;

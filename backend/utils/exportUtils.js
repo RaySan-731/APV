@@ -130,7 +130,7 @@ async function streamBrandedPdf(res, headers, rows, title, filename) {
       doc.text(String(row[header] ?? ''), 50 + i * colWidth, y, { width: colWidth, align: 'left' });
     });
     y += rowHeight;
-    if (y > doc.page.height - 50) {
+    if (doc.page && y > doc.page.height - 50) {
       doc.addPage();
       y = 50;
     }

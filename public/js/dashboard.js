@@ -109,6 +109,15 @@ document.addEventListener('DOMContentLoaded', function() {
     schoolSearch?.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), updateSchoolFilters()));
      [schoolStatusFilter, serviceStatusFilter, zoneFilter, schoolSortOrder].forEach(el => el?.addEventListener('change', updateSchoolFilters));
 
+    // Sync school filter controls from URL query params (so export URL builder sees the correct values on page load)
+    {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('search') && schoolSearch) schoolSearch.value = params.get('search');
+      if (params.get('status') && schoolStatusFilter) schoolStatusFilter.value = params.get('status');
+      if (params.get('serviceStatus') && serviceStatusFilter) serviceStatusFilter.value = params.get('serviceStatus');
+      if (params.get('zone') && zoneFilter) zoneFilter.value = params.get('zone');
+    }
+
     // Close sidebar when clicking outside on mobile
     document.addEventListener('click', function(e) {
         if (window.innerWidth <= 768) {

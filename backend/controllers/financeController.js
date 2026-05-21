@@ -11,6 +11,7 @@ const School = require('../../models/School');
 const Event = require('../../models/Event');
 const Payment = require('../../models/Payment');
 const json2csv = require('json2csv');
+const { streamBrandedPdf } = require('../utils/exportUtils');
 
 // GET: Financial Dashboard (overview for founders)
 exports.getFinancialDashboard = async (req, res) => {
@@ -387,7 +388,8 @@ exports.getMonthlyTrends = async (dateFilter, schoolId) => {
 // GET: Financial reports (P&L, school revenue, trainer costs)
 exports.getFinancialReports = async (req, res) => {
   try {
-    const { reportType, startDate, endDate, format = 'html' } = req.query;
+    const { reportType, format = 'html' } = req.query;
+    let { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
       const now = new Date();
@@ -572,10 +574,15 @@ exports.getFinancialReports = async (req, res) => {
   }
 };
 
-// POST: Export financial report as CSV
+// POST: Export financial report as CSV or PDF
 exports.exportReportCSV = async (req, res) => {
   try {
     const { reportType, startDate, endDate } = req.body;
+    const exportFormat = ((req.body.export || req.body.format || 'csv') || 'csv').toLowerCase();
+
+    if (!['csv', 'pdf'].includes(exportFormat)) {
+      return res.status(400).json({ success: false, error: 'Invalid export format' });
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -585,7 +592,7 @@ exports.exportReportCSV = async (req, res) => {
 
     switch (reportType) {
       case 'profit_loss':
-        // Simplified P&L as CSV
+        // Simplified P&L export
         const revenue = await Invoice.aggregate([
           { $match: { issueDate: { $gte: start, $lte: end } } },
           { $group: { _id: null, totalRevenue: { $sum: '$totalAmount' } } }
@@ -652,15 +659,29 @@ exports.exportReportCSV = async (req, res) => {
         break;
     }
 
-    const csv = json2csv.parse(data);
-    const filename = `${reportType}_${startDate}_to_${endDate}.csv`;
+    if (exportFormat === 'csv') {
+      const csv = json2csv.parse(data);
+      const filename = `${reportType}_${startDate}_to_${endDate}.csv`;
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(csv);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(csv);
+    }
+
+    const headers = data.length > 0 ? Object.keys(data[0]) : [];
+    const rows = data.map((row) => {
+      const safeRow = {};
+      headers.forEach((header) => {
+        safeRow[header] = row[header] ?? '';
+      });
+      return safeRow;
+    });
+
+    const filename = `${reportType}_${startDate}_to_${endDate}`.replace(/\s+/g, '_');
+    await streamBrandedPdf(res, headers, rows, `${reportType.replace(/_/g, ' ')}`, filename);
   } catch (err) {
-    console.error('Error exporting CSV:', err);
-    res.status(500).json({ success: false, error: 'Failed to export CSV' });
+    console.error('Error exporting report:', err);
+    res.status(500).json({ success: false, error: 'Failed to export report' });
   }
 };
 

@@ -89,7 +89,7 @@ function exportReport(format) {
         params.set('trainerId', document.getElementById('trainerFilter').value);
     }
 
-    window.location.href = `${EXPORT_BASE}/export/${params.toString()}`;
+    window.location.href = `${EXPORT_BASE}/trainers?${params.toString()}`;
 }
 
 function resetFilters() {

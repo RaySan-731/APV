@@ -574,7 +574,7 @@ function validateEventStatusTransition(oldStatus, newStatus) {
   if (!oldStatus || !newStatus) return null; // Skip validation if we don't have both
   const allowed = validStatusTransitions[oldStatus] || [];
   if (!allowed.includes(newStatus)) {
-    return `Invalid status transition: ${oldStatus} → ${newStatus}. Allowed: ${allowed.join(', ')}`;
+    return `Invalid status transition: ${oldStatus} ΓåÆ ${newStatus}. Allowed: ${allowed.join(', ')}`;
   }
   return null;
 }
@@ -2139,7 +2139,7 @@ app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'
     const staff = new Staff(staffData);
 
     await staff.save();
-    console.log('✓ Staff saved successfully:', staff._id, staff.idNumber, staff.name);
+    console.log('Γ£ô Staff saved successfully:', staff._id, staff.idNumber, staff.name);
 
     // Send invitation email (using centralized email service)
     const invitationUrl = `${req.protocol}://${req.get('host')}/activate/${invitationToken}`;
@@ -2218,7 +2218,7 @@ app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'
     res.json({ success: true, staffId: staff._id, name: staff.name, email: staff.email });
 
   } catch (err) {
-    console.error('✗ Error saving staff:', err.message);
+    console.error('Γ£ù Error saving staff:', err.message);
     console.error('Stack:', err.stack);
 
     // Handle MongoDB duplicate key error (E11000)
@@ -2331,7 +2331,7 @@ app.post('/dashboard/staff/update', requireAuth, requirePermission('canEditStaff
       { new: true, runValidators: true }
     );
 
-    console.log('✓ Staff updated successfully:', staff._id, staff.name);
+    console.log('Γ£ô Staff updated successfully:', staff._id, staff.name);
 
     // Log audit
     await logAudit('staff_updated', 'staff', staff._id, staff.name, {
@@ -2352,7 +2352,7 @@ app.post('/dashboard/staff/update', requireAuth, requirePermission('canEditStaff
 
     res.json({ success: true, message: 'Staff member updated successfully', staff });
   } catch (err) {
-    console.error('✗ Error updating staff:', err.message);
+    console.error('Γ£ù Error updating staff:', err.message);
     console.error('Stack:', err.stack);
 
     // Handle MongoDB duplicate key error (E11000)
@@ -2423,7 +2423,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
       return res.status(404).json({ success: false, error: 'Staff member not found' });
     }
 
-    console.log('✓ Staff deleted successfully:', staff._id, staff.name);
+    console.log('Γ£ô Staff deleted successfully:', staff._id, staff.name);
 
     // Log audit
     await logAudit('staff_deleted', 'staff', staff._id, staff.name, {
@@ -2442,7 +2442,7 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
 
     res.json({ success: true, message: 'Staff member deleted successfully' });
   } catch (err) {
-    console.error('✗ Error saving staff:', err.message);
+    console.error('Γ£ù Error saving staff:', err.message);
     console.error('Stack:', err.stack);
 
     // Handle MongoDB duplicate key error (E11000)
@@ -3767,7 +3767,7 @@ app.post('/dashboard/trainer/add', requireAuth, requirePermission('canCreateStaf
 
     // Validation
     if (!name || !email || !status) {
-      console.log('✗ Missing required fields');
+      console.log('Γ£ù Missing required fields');
       return res.status(400).json({ success: false, error: 'Name, email, and status are required' });
     }
 
@@ -3797,7 +3797,7 @@ app.post('/dashboard/trainer/add', requireAuth, requirePermission('canCreateStaf
     const trainer = new Staff(trainerData);
     await trainer.save();
 
-    console.log('✓ Trainer created successfully:', trainer._id, trainer.name);
+    console.log('Γ£ô Trainer created successfully:', trainer._id, trainer.name);
     console.log('=== END ADD TRAINER REQUEST ===\n');
 
     res.json({ 
@@ -3806,7 +3806,7 @@ app.post('/dashboard/trainer/add', requireAuth, requirePermission('canCreateStaf
       trainer: trainer 
     });
   } catch (err) {
-    console.error('✗ Error adding trainer:', err.message);
+    console.error('Γ£ù Error adding trainer:', err.message);
     console.error('Stack:', err.stack);
     console.log('=== END ADD TRAINER REQUEST ===\n');
     res.status(500).json({ success: false, error: 'Error adding trainer: ' + err.message });
@@ -3822,7 +3822,7 @@ app.post('/dashboard/trainer/update', requireAuth, requirePermission('canEditSta
 
     // Validation
     if (!trainerId || !name || !email || !status) {
-      console.log('✗ Missing required fields (trainerId, name, email, status required)');
+      console.log('Γ£ù Missing required fields (trainerId, name, email, status required)');
       return res.status(400).json({ success: false, error: 'Trainer ID, name, email, and status are required' });
     }
 
@@ -3842,11 +3842,11 @@ app.post('/dashboard/trainer/update', requireAuth, requirePermission('canEditSta
     );
 
     if (!updatedTrainer) {
-      console.log('✗ Trainer not found');
+      console.log('Γ£ù Trainer not found');
       return res.status(404).json({ success: false, error: 'Trainer not found' });
     }
 
-    console.log('✓ Trainer updated successfully:', updatedTrainer._id, updatedTrainer.name);
+    console.log('Γ£ô Trainer updated successfully:', updatedTrainer._id, updatedTrainer.name);
     console.log('=== END UPDATE TRAINER REQUEST ===\n');
 
     res.json({ 
@@ -3855,7 +3855,7 @@ app.post('/dashboard/trainer/update', requireAuth, requirePermission('canEditSta
       trainer: updatedTrainer 
     });
    } catch (err) {
-     console.error('✗ Error updating trainer:', err.message);
+     console.error('Γ£ù Error updating trainer:', err.message);
      console.error('Stack:', err.stack);
 
      // Handle MongoDB duplicate key error (E11000)
@@ -3916,23 +3916,23 @@ app.post('/dashboard/trainer/delete', requireAuth, requirePermission('canDeleteS
     console.log('Trainer ID to delete:', trainerId);
 
     if (!trainerId) {
-      console.log('✗ Trainer ID is required');
+      console.log('Γ£ù Trainer ID is required');
       return res.status(400).json({ success: false, error: 'Trainer ID is required' });
     }
 
     const trainer = await Staff.findByIdAndDelete(trainerId);
 
     if (!trainer) {
-      console.log('✗ Trainer not found');
+      console.log('Γ£ù Trainer not found');
       return res.status(404).json({ success: false, error: 'Trainer not found' });
     }
 
-    console.log('✓ Trainer deleted successfully:', trainer._id, trainer.name);
+    console.log('Γ£ô Trainer deleted successfully:', trainer._id, trainer.name);
     console.log('=== END DELETE TRAINER REQUEST ===\n');
 
     res.json({ success: true, message: 'Trainer deleted successfully' });
   } catch (err) {
-    console.error('✗ Error deleting trainer:', err.message);
+    console.error('Γ£ù Error deleting trainer:', err.message);
     console.error('Stack:', err.stack);
     console.log('=== END DELETE TRAINER REQUEST ===\n');
     res.status(500).json({ success: false, error: 'Error deleting trainer: ' + err.message });
@@ -4669,7 +4669,7 @@ app.get('/dashboard/trainer/:trainerId/schools', requireAuth, async (req, res) =
     // Fetch trainer
     const trainer = await Staff.findById(trainerId);
     if (!trainer) {
-      console.log('✗ Trainer not found');
+      console.log('Γ£ù Trainer not found');
       return res.status(404).json({ success: false, error: 'Trainer not found' });
     }
 
@@ -4695,7 +4695,7 @@ app.get('/dashboard/trainer/:trainerId/schools', requireAuth, async (req, res) =
       allocatedSchools: allocatedSchools.map(s => s._id)
     });
   } catch (err) {
-    console.error('✗ Error getting schools:', err.message);
+    console.error('Γ£ù Error getting schools:', err.message);
     console.log('=== END GET TRAINER SCHOOLS REQUEST ===\n');
     res.status(500).json({ success: false, error: 'Error getting schools: ' + err.message });
   }
@@ -4711,14 +4711,14 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
     console.log('School IDs to allocate:', schoolIds);
 
     if (!trainerId) {
-      console.log('✗ Trainer ID is required');
+      console.log('Γ£ù Trainer ID is required');
       return res.status(400).json({ success: false, error: 'Trainer ID is required' });
     }
 
     // Verify trainer exists
     const trainer = await Staff.findById(trainerId);
     if (!trainer) {
-      console.log('✗ Trainer not found');
+      console.log('Γ£ù Trainer not found');
       return res.status(404).json({ success: false, error: 'Trainer not found' });
     }
 
@@ -4772,14 +4772,14 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
       );
       await sch.save();
     }
-    console.log('✓ Removed trainer from all previously allocated schools');
+    console.log('Γ£ô Removed trainer from all previously allocated schools');
 
     // Update trainer's assignedSchools: mark previous assignments as transferred
     await Staff.updateMany(
       { 'assignedSchools.schoolId': { $in: schoolsWithTrainer.map(s => s._id) }, _id: trainerObjectId },
       { $set: { 'assignedSchools.$.status': 'transferred' } }
     );
-    console.log('✓ Marked previous school assignments as transferred');
+    console.log('Γ£ô Marked previous school assignments as transferred');
 
     // Add trainer to selected schools
     const allocatedSchoolIds = [];
@@ -4800,7 +4800,7 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
         });
         await school.save();
         allocatedSchoolIds.push(schoolId.toString());
-        console.log('✓ Added trainer to school:', school.name);
+        console.log('Γ£ô Added trainer to school:', school.name);
 
         // Add to trainer's assignedSchools
         await Staff.findByIdAndUpdate(trainerObjectId, {
@@ -4816,13 +4816,13 @@ app.post('/dashboard/trainer/allocate-schools', requireAuth, requirePermission('
       }
     }
 
-    console.log('✓ Schools allocated to trainer:', allocatedSchoolIds.length, 'saved.');
-    console.log('✓ Schools allocated successfully to trainer:', trainerId, trainer.name);
+    console.log('Γ£ô Schools allocated to trainer:', allocatedSchoolIds.length, 'saved.');
+    console.log('Γ£ô Schools allocated successfully to trainer:', trainerId, trainer.name);
     console.log('=== END ALLOCATE SCHOOLS REQUEST ===\n');
 
     res.json({ success: true, message: 'Schools allocated successfully', allocatedSchoolIds });
   } catch (err) {
-    console.error('✗ Error allocating schools:', err.message);
+    console.error('Γ£ù Error allocating schools:', err.message);
     console.error('Stack:', err.stack);
     console.log('=== END ALLOCATE SCHOOLS REQUEST ===\n');
     res.status(500).json({ success: false, error: 'Error allocating schools: ' + err.message });
@@ -7672,7 +7672,7 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
 
     await event.save();
 
-    // Invoice block — derive schoolId / schoolRsvpEntry from event.targetSchools
+    // Invoice block ΓÇö derive schoolId / schoolRsvpEntry from event.targetSchools
     const confirmedSchools = (event.targetSchools || []).filter(ts => ts.rsvpStatus === 'confirmed');
     if (confirmedSchools.length > 0) {
       for (const idx in confirmedSchools) {
@@ -7756,7 +7756,7 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
           );
           const otherTrainersList = otherTrainers.filter(Boolean);
           const otherTrainersText = otherTrainersList.length > 0
-            ? '<br><strong>Other Trainers:</strong><br>' + otherTrainersList.map(t => '• ' + t).join('<br>')
+            ? '<br><strong>Other Trainers:</strong><br>' + otherTrainersList.map(t => 'ΓÇó ' + t).join('<br>')
             : '';
 
           // Accept/Decline action buttons (links to event page where they can take action)
@@ -7772,8 +7772,8 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
               ${otherTrainersText}
             </div>
             <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
-              <a href="${acceptUrl}" style="background: #22c55e; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 6px; font-weight: bold;">✅ Accept Assignment</a>
-              <a href="${declineUrl}" style="background: #ef4444; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 6px; font-weight: bold;">❌ Decline Assignment</a>
+              <a href="${acceptUrl}" style="background: #22c55e; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 6px; font-weight: bold;">Γ£à Accept Assignment</a>
+              <a href="${declineUrl}" style="background: #ef4444; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 6px; font-weight: bold;">Γ¥î Decline Assignment</a>
             </div>
             <p style="margin-top: 1rem; font-size: 0.875rem; color: #666;">
               Or log into your trainer portal: <a href="${req.protocol}://${req.get('host')}/trainer/events">${req.protocol}://${req.get('host')}/trainer/events</a>
@@ -7815,13 +7815,13 @@ app.post('/api/events/:eventId/assign-trainer', requireAuth, requirePermission('
             subject: `Event Assignment: ${event.name} - Action Required`,
             body: `You have been assigned to <strong>${event.name}</strong> as a <strong>${role || 'assistant_trainer'}</strong>.<br><br>
                    <strong>Event Details:</strong><br>
-                   📅 ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}<br>
-                   📍 ${event.location?.name || 'TBD'}<br>
-                   🏷️ ${event.eventType.replace('_', ' ')}<br>
-                   ${otherTrainersList.length ? '<br><strong>Other Trainers:</strong><br>' + otherTrainersList.map(t => '• ' + t).join('<br>') + '<br><br>' : ''}
+                   ≡ƒôà ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}<br>
+                   ≡ƒôì ${event.location?.name || 'TBD'}<br>
+                   ≡ƒÅ╖∩╕Å ${event.eventType.replace('_', ' ')}<br>
+                   ${otherTrainersList.length ? '<br><strong>Other Trainers:</strong><br>' + otherTrainersList.map(t => 'ΓÇó ' + t).join('<br>') + '<br><br>' : ''}
                    <strong>Please respond to this assignment:</strong><br>
-                   <a href="/trainer/events/${eventId}" style="background: #22c55e; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block; margin-right: 0.5rem;">✅ Accept Assignment</a>
-                   <a href="/trainer/events/${eventId}?action=decline" style="background: #ef4444; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block;">❌ Decline Assignment</a>`,
+                   <a href="/trainer/events/${eventId}" style="background: #22c55e; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block; margin-right: 0.5rem;">Γ£à Accept Assignment</a>
+                   <a href="/trainer/events/${eventId}?action=decline" style="background: #ef4444; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; display: inline-block;">Γ¥î Decline Assignment</a>`,
             messageType: 'direct',
             priority: 'high',
             createdBy: currentAdmin._id
@@ -9615,7 +9615,7 @@ const initializePermissions = async () => {
       );
     }
 
-    console.log('Γ£ô Default permissions initialized');
+    console.log('╬ô┬ú├┤ Default permissions initialized');
   } catch (err) {
     console.error('Permissions init error:', err);
     throw err;

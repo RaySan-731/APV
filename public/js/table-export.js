@@ -161,12 +161,26 @@ async function exportTablePdf(table, config) {
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(err.error || 'Export failed.');
+      const text = await res.text().catch(() => '');
+      let errorMsg = 'Export failed.';
+      try {
+        const err = JSON.parse(text);
+        errorMsg = err.error || errorMsg;
+      } catch (_) { errorMsg = text || errorMsg; }
+      if (res.status === 401) errorMsg = 'Session expired. Please log in again.';
+      if (res.status === 403) errorMsg = 'You do not have permission to export.';
+      alert(errorMsg);
       return;
     }
 
     const blob = await res.blob();
+    if (blob.size === 0) {
+      alert('Empty response from server. Please try again.');
+      return;
+    }
+    if (blob.type && !blob.type.includes('pdf')) {
+      console.warn('Unexpected content type:', blob.type);
+    }
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;

@@ -2483,6 +2483,47 @@ body {
     white-space: nowrap;
 }
 
+/* Export dropdown inside table-export-bar */
+.export-dropdown {
+    position: relative;
+    display: inline-block;
+}
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 140px;
+    z-index: 100;
+    display: none;
+}
+.dropdown-menu.show {
+    display: block;
+}
+.dropdown-menu a {
+    display: block;
+    padding: 0.625rem 1rem;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: background 0.2s;
+    border-radius: 0;
+}
+.dropdown-menu a:hover {
+    background: var(--secondary);
+    color: var(--foreground);
+}
+.dropdown-menu a:first-child {
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+.dropdown-menu a:last-child {
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+
 /* Status light inside table-export-bar counter */
 .table-export-label {
     display: flex;

@@ -1163,20 +1163,38 @@
                         </div>
                     </div>
                     
-                    <script nonce="<%= cspNonce %>">
-function toggleSchoolStatusDropdown(badgeEl) {
-    var dropdown = badgeEl.parentElement.querySelector('.school-status-dropdown');
-    var isOpen = dropdown.classList.contains('show');
-    document.querySelectorAll('.school-status-dropdown.show').forEach(function(d) { d.classList.remove('show'); });
-    document.querySelectorAll('.school-status-badge.dropdown-open').forEach(function(b) { b.classList.remove('dropdown-open'); });
-    if (!isOpen) {
-        dropdown.classList.add('show');
-        badgeEl.classList.add('dropdown-open');
-  }
-}
+                     <script nonce="<%= cspNonce %>">
+ function toggleSchoolStatusDropdown(badgeEl) {
+     var dropdown = badgeEl.parentElement.querySelector('.school-status-dropdown');
+     var isOpen = dropdown.classList.contains('show');
+     document.querySelectorAll('.school-status-dropdown.show').forEach(function(d) { d.classList.remove('show'); });
+     document.querySelectorAll('.school-status-badge.dropdown-open').forEach(function(b) { b.classList.remove('dropdown-open'); });
+     if (!isOpen) {
+         dropdown.classList.add('show');
+         badgeEl.classList.add('dropdown-open');
+   }
+ }
 
-// ---------- SCHOOLS EXPORT ----------
-function toggleSchoolsExportMenu() {
+ window.updateSchoolStatus = async function(schoolId, value, field, btn) {
+     try {
+         var resp = await fetch('/api/schools/' + schoolId + '/status', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ [field]: value })
+         });
+         var data = await resp.json();
+         if (data.success) {
+             location.reload();
+         } else {
+             showToast(data.error || 'Failed to update status', 'error');
+         }
+     } catch (err) {
+         showToast('Network error: ' + err.message, 'error');
+     }
+ };
+
+ // ---------- SCHOOLS EXPORT ----------
+ function toggleSchoolsExportMenu() {
   document.getElementById('schoolsExportMenu').classList.toggle('show');
 }
 

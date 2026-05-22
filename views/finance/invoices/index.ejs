@@ -262,7 +262,7 @@
                 if (e.target === overlay) overlay.style.display = 'none';
             });
             overlay.querySelectorAll('.close-modal-btn').forEach(function (btn) {
-                btn.addEventListener('click', function () { overlay.style.display = 'none'; });
+                if (btn) btn.addEventListener('click', function () { overlay.style.display = 'none'; });
             });
         });
 
@@ -300,7 +300,8 @@
 
         document.querySelectorAll('.payment-form').forEach(function (form) {
             updatePaymentModal(form);
-            form.querySelector('.payment-method').addEventListener('change', function () { updatePaymentModal(form); });
+            var pm = form.querySelector('.payment-method');
+            if (pm) pm.addEventListener('change', function () { updatePaymentModal(form); });
 
             form.addEventListener('submit', function (e) {
                 var balance = parseFloat(form.dataset.balance || '0');
@@ -320,8 +321,8 @@
                 .then(function (data) {
                     console.log('[payment] response data:', data);
                     if (data.success) {
-                        showToast('Payment recorded successfully! New balance: KES ' + parseFloat(data.invoiceBalance || balance - amount).toLocaleString(), 'success');
-                        setTimeout(function () { location.href = location.pathname; }, 1800);
+                        showToast('Payment recorded successfully!', 'success');
+                        setTimeout(function () { location.href = '/finance/invoices'; }, 1800);
                     } else {
                         showMsg(form, 'error', data.error || 'Failed to record payment. Please try again.');
                         setSubmitState(btn, false);

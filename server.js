@@ -4932,7 +4932,7 @@ app.get('/dashboard/schools', requireAuth, requirePermission('canViewSchools'), 
 app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreateSchools'), parseJson, async (req, res) => {
   try {
     const {
-      name, street, city, state, zipCode, country, zone, region,
+      schoolId, name, street, city, state, zipCode, country, zone, region,
       contactName, contactEmail, contactPhone, contactPosition,
       studentCount, programId, paymentMethod, billingCycle,
       primaryTrainerId, notes
@@ -5010,11 +5010,14 @@ app.post('/dashboard/schools/onboard', requireAuth, requirePermission('canCreate
     } else {
       // Legacy: store in servicePackage field
       schoolData.servicePackage = programId;
-      schoolData.programsEnrolled = [];
+       schoolData.programsEnrolled = [];
     }
 
-    // Deduplication: check for an existing school with the same name (case-insensitive)
-    const existingSchool = await School.findOne({ name: { $regex: `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+    // Deduplication: look up an existing school with the same name, excluding the current record being edited
+    const existingSchool = await School.findOne({
+      name: { $regex: `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+      ...(schoolId && mongoose.Types.ObjectId.isValid(schoolId) ? { _id: { $ne: new mongoose.Types.ObjectId(schoolId) } } : {})
+    });
     if (existingSchool) {
       return res.status(200).json({
         success: true,

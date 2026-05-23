@@ -1193,12 +1193,12 @@
      }
  };
 
- // ---------- SCHOOLS EXPORT ----------
- function toggleSchoolsExportMenu() {
-  document.getElementById('schoolsExportMenu').classList.toggle('show');
-}
+  // ---------- SCHOOLS EXPORT ----------
+  function toggleSchoolsExportMenu() {
+   document.getElementById('schoolsExportMenu').classList.toggle('show');
+  }
 
-function buildSchoolsExportUrl(format) {
+  function buildSchoolsExportUrl(format) {
   const params = new URLSearchParams();
   var searchEl = document.getElementById('schoolSearch');
   var statusEl = document.getElementById('statusFilter');
@@ -1238,6 +1238,92 @@ document.addEventListener('click', function(e) {
     menu.classList.remove('show');
   }
 });
+
+  // ---------- PROGRAM ALLOCATION MODAL (from school actions dropdown) ----------
+  function openProgramAllocationModal(schoolId, schoolName, enrolledProgramIds) {
+    document.getElementById('programAllocationSchoolId').value = schoolId;
+    document.getElementById('modalSchoolName').textContent = schoolName;
+    var select = document.getElementById('programAllocationSelect');
+    for (var i = 0; i < select.options.length; i++) {
+      select.options[i].selected = (enrolledProgramIds && enrolledProgramIds.indexOf(select.options[i].value) !== -1);
+    }
+    document.getElementById('programAllocationMessage').style.display = 'none';
+    document.getElementById('programAllocationModal').style.display = 'flex';
+  }
+
+  function closeProgramAllocationModal() {
+    document.getElementById('programAllocationModal').style.display = 'none';
+  }
+
+  async function saveProgramAllocation() {
+    var schoolId = document.getElementById('programAllocationSchoolId').value;
+    var select = document.getElementById('programAllocationSelect');
+    var programIds = [];
+    for (var i = 0; i < select.selectedOptions.length; i++) {
+      programIds.push(select.selectedOptions[i].value);
+    }
+    var messageEl = document.getElementById('programAllocationMessage');
+    messageEl.style.display = 'none';
+    try {
+      var resp = await fetch('/api/schools/' + schoolId + '/update-programs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programIds: programIds })
+      });
+      var data = await resp.json();
+      if (data.success) {
+        messageEl.textContent = '✓ ' + (data.message || 'Programs saved successfully!');
+        messageEl.className = 'message success';
+        messageEl.style.display = 'block';
+        setTimeout(function() {
+          closeProgramAllocationModal();
+          window.location.reload();
+        }, 1200);
+      } else {
+        messageEl.textContent = '✗ ' + (data.error || 'Error saving programs');
+        messageEl.className = 'message error';
+        messageEl.style.display = 'block';
+      }
+    } catch (err) {
+      console.error('Error saving program allocation:', err);
+      messageEl.textContent = '✗ Network error';
+      messageEl.className = 'message error';
+      messageEl.style.display = 'block';
+    }
+  }
+
+  // ---------- DELETE SCHOOL MODAL ----------
+  function openDeleteSchoolModal(schoolId, schoolName) {
+    document.getElementById('deleteSchoolId').value = schoolId;
+    document.getElementById('deleteSchoolName').textContent = schoolName;
+    document.getElementById('deleteSchoolModal').style.display = 'flex';
+  }
+
+  function closeDeleteSchoolModal() {
+    document.getElementById('deleteSchoolModal').style.display = 'none';
+  }
+
+  async function deleteSchool() {
+    var schoolId = document.getElementById('deleteSchoolId').value;
+    if (!schoolId) return;
+    try {
+      var resp = await fetch('/api/schools/' + schoolId + '/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      var data = await resp.json();
+      if (data.success) {
+        closeDeleteSchoolModal();
+        showToast(data.message || 'School deleted successfully', 'success');
+        setTimeout(function() { window.location.reload(); }, 1500);
+      } else {
+        showToast(data.error || 'Failed to delete school', 'error');
+      }
+    } catch (err) {
+      console.error('Error deleting school:', err);
+      showToast('Network error: ' + err.message, 'error');
+    }
+  }
                     </script>
                 <% } else if (page === 'school-edit') { %>
                     <!-- School Edit Form -->
@@ -2476,6 +2562,8 @@ async function saveSchoolAllocation() {
             </div>
             <div class="modal-body">
                 <form id="onboardingForm">
+                    <!-- Hidden school id: used for edit-mode deduplication -->
+                    <input type="hidden" name="schoolId" id="hiddenSchoolId">
                     <!-- Progress indicator -->
                     <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; position: relative;">
                         <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border); z-index: 0;"></div>
@@ -3547,6 +3635,9 @@ async function saveSchoolAllocation() {
                 isEditingMode = true;
                 onboardingTitle.textContent = 'Edit School';
 
+                // Record the school id for deduplication (so the update handler can exclude this record)
+                document.querySelector('[name="schoolId"]').value = schoolId;
+
                 // Fetch school data via the onboarding-data endpoint (flat field names matching the form)
                 fetch(`/api/schools/${schoolId}/onboard-data`)
                   .then(res => {
@@ -3694,8 +3785,9 @@ async function saveSchoolAllocation() {
                contactPosition: document.querySelector('[name="contactPosition"]').value.trim(),
                notes: document.querySelector('[name="notes"]').value.trim(),
                programId: document.getElementById('programSelect').value,
-               primaryTrainerId: document.querySelector('[name="primaryTrainerId"]').value || null
-             };
+               primaryTrainerId: document.querySelector('[name="primaryTrainerId"]').value || null,
+               schoolId: document.querySelector('[name="schoolId"]')?.value || ''
+              };
 
               try {
                 let url, method, data;
@@ -3708,23 +3800,32 @@ async function saveSchoolAllocation() {
                  method = 'POST';
                  data = formData;
                }
-               const res = await fetch(url, {
-                 method: method,
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify(data)
-               });
+                const res = await fetch(url, {
+                  method: method,
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(data)
+                });
                 const result = await res.json();
                 if (result.duplicate && result.schoolId) {
+                  // A school with the same name already exists in the system (create flow only)
                   showMessage(`⚠ School "${result.schoolName}" already exists. Redirecting to existing record...`, false);
                   setTimeout(() => {
                     window.location.href = `/dashboard/schools/${result.schoolId}`;
                   }, 1500);
                 } else if (result.success || result.school) {
-                  showMessage(editingSchoolId ? 'School updated successfully!' : 'School onboarded successfully!');
-                  setTimeout(() => {
+                  if (editingSchoolId) {
+                    // Edit mode: show a blocking confirmation popup so the user always sees the success message
+                    const savedName = (result.school && result.school.name) || (document.querySelector('[name="name"]').value.trim());
+                    closeOnboardingModal();
+                    setTimeout(() => {
+                      window.alert('School "' + savedName + '" updated successfully! Changes have been saved.');
+                      window.location.reload();
+                    }, 100);
+                  } else {
+                    showMessage('School onboarded successfully!');
                     closeOnboardingModal();
                     window.location.reload();
-                  }, 1000);
+                  }
                 } else {
                   showMessage(result.error || 'Operation failed', true);
                   window._onboardingSubmitBusy = false;

@@ -6103,92 +6103,7 @@ app.get('/api/schools/:schoolId/documents', requireAuth, async (req, res) => {
   }
 });
 
-// API: School analytics dashboard data
-app.get('/api/schools/analytics', requireAuth, requirePermission('canViewAnalytics'), async (req, res) => {
-  try {
-    const { timeRange = '6m' } = req.query;
-    let dateFilter = {};
-    if (timeRange === '3m') dateFilter.createdAt = { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) };
-    else if (timeRange === '6m') dateFilter.createdAt = { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) };
-    else if (timeRange === '1y') dateFilter.createdAt = { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) };
-
-    // Total schools count
-    const totalSchools = await School.countDocuments();
-
-    // Schools by status
-    const byStatus = await School.aggregate([
-      { $match: dateFilter.createdAt ? {} : {} },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
-
-    // Schools by service status
-    const byServiceStatus = await School.aggregate([
-      { $group: { _id: '$serviceStatus', count: { $sum: 1 } } }
-    ]);
-
-    // Top schools by engagement (most events) - aggregate from Event.targetSchools
-    const topEngaged = await Event.aggregate([
-      { $unwind: '$targetSchools' },
-      { $group: { _id: '$targetSchools.schoolId', eventCount: { $sum: 1 } } },
-      { $sort: { eventCount: -1 } },
-      { $limit: 5 },
-      {
-        $lookup: {
-          from: 'schools',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'schoolInfo'
-        }
-      },
-      { $unwind: '$schoolInfo' },
-      { $project: { schoolName: '$schoolInfo.name', eventCount: 1, _id: 0 } }
-    ]);
-
-    // Inactive schools (no visit in 90+ days)
-    const inactiveThreshold = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    const inactiveSchools = await School.find({
-      $or: [
-        { lastVisitDate: { $lt: inactiveThreshold } },
-        { lastVisitDate: null }
-      ]
-    }).select('name lastVisitDate').lean();
-
-    // Region breakdown
-    const byRegion = await School.aggregate([
-      { $group: { _id: '$region', count: { $sum: 1 } } }
-    ]);
-
-    // Onboarding trends (last 6 months)
-    const onboardingTrends = await School.aggregate([
-      {
-        $group: {
-          _id: {
-            year: { $year: '$onboardingDate' },
-            month: { $month: '$onboardingDate' }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id.year': -1, '_id.month': -1 } },
-      { $limit: 6 }
-    ]);
-
-    res.json({
-      totalSchools,
-      byStatus,
-      byServiceStatus,
-      topEngaged,
-      inactiveSchools: inactiveSchools.length,
-      inactiveDetails: inactiveSchools.slice(0, 10),
-      byRegion,
-      onboardingTrends
-    });
-  } catch (err) {
-    console.error('Error fetching analytics:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch analytics' });
-  }
-});
-
+// Note: School analytics now served via backend/routes/analytics.js (mounted at /api)
 // Note: Old event creation route removed. Use POST /dashboard/events/create instead.
 
 app.post('/dashboard/programs/add', requireAuth, parseJson, async (req, res) => {
@@ -6599,8 +6514,6 @@ app.get('/dashboard/:page', requireAuth, async (req, res) => {
     res.status(500).render('404', { user: req.session.user });
   }
 });
-
-app.get('/api/dashboard-data', requireAuth, analyticsController.getDashboardData);
 
 app.get('/api/analytics/trainers', requireAuth, requirePermission('canViewAnalytics'), async (req, res) => {
   try {
@@ -9441,6 +9354,13 @@ function requireFounder(req, res, next) {
 // ============ TABLE EXPORT ROUTES ============
 const tableExportRoutes = require('./backend/routes/tableExport');
 app.use('/api', tableExportRoutes);
+
+// ============ ANALYTICS & REPORTS ROUTES (professional dashboard) ============
+const reportsRoutes = require('./backend/routes/reports');
+app.use('/api/reports', reportsRoutes);
+
+const analyticsApiRoutes = require('./backend/routes/analytics');
+app.use('/api', analyticsApiRoutes);
 
 // ============ FINANCE ROUTES ============
 const financeRoutes = require('./backend/routes/finance');

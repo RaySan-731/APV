@@ -760,6 +760,79 @@ exports.removeProgram = async (req, res) => {
     }
   };
 
+  // Submit school 1-5 star review + optional comment for a past event they attended
+  exports.submitEventRating = async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      const { rating, comment } = req.body;
+      const schoolId = req.schoolId;
+
+      if (!mongoose.Types.ObjectId.isValid(eventId)) {
+        return res.status(400).json({ success: false, error: 'Invalid event ID' });
+      }
+
+      const numRating = parseInt(rating, 10);
+      if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+        return res.status(400).json({ success: false, error: 'Review rating must be between 1 and 5 stars' });
+      }
+
+      const event = await Event.findById(eventId);
+      if (!event) {
+        return res.status(404).json({ success: false, error: 'Event not found' });
+      }
+
+      const schoolIndex = event.targetSchools.findIndex(
+        ts => ts.schoolId.toString() === schoolId.toString()
+      );
+
+      if (schoolIndex === -1) {
+        return res.status(404).json({ success: false, error: 'Your school was not invited to this event' });
+      }
+
+      const schoolTarget = event.targetSchools[schoolIndex];
+
+      // Optionally restrict to past/attended events
+      const isPast = event.status === 'completed' || (event.endDate && event.endDate < new Date());
+      const hasAttended = schoolTarget.attendance?.attended > 0 || schoolTarget.rsvpStatus === 'confirmed';
+      if (!isPast && !hasAttended) {
+        return res.status(400).json({ success: false, error: 'You can only review events you have attended' });
+      }
+
+      schoolTarget.schoolRating = schoolTarget.schoolRating || {};
+      schoolTarget.schoolRating.rating = numRating;
+      schoolTarget.schoolRating.comment = (comment || '').trim().substring(0, 1000);
+      schoolTarget.schoolRating.ratedAt = new Date();
+      schoolTarget.schoolRating.ratedBy = req.staff._id;
+
+      await event.save();
+
+      await logAudit(
+        'event_rated',
+        'event',
+        eventId,
+        event.name,
+        {
+          schoolId,
+          rating: numRating,
+          hasComment: !!schoolTarget.schoolRating.comment
+        },
+        {
+          userId: req.staff._id,
+          userName: req.staff.name,
+          userEmail: req.staff.email,
+          userRole: req.staff.role,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        }
+      );
+
+      res.json({ success: true, event });
+    } catch (err) {
+      console.error('Error submitting event rating:', err);
+      res.status(500).json({ success: false, error: 'Failed to submit review' });
+    }
+  };
+
   // Get invoices for school (JSON API)
   exports.getInvoices = async (req, res) => {
     try {

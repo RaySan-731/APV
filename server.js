@@ -2838,6 +2838,12 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     schoolController.updateEventAttendance(req, res);
   });
 
+  // API: Submit school 1-5 star review for an attended event
+  app.post('/api/school/events/:eventId/rating', requireAuth, requireSchoolAdmin, parseJson, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.submitEventRating(req, res);
+  });
+
   // API: Get invoices
   app.get('/api/school/invoices', requireAuth, requireSchoolAdmin, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');

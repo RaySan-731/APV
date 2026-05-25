@@ -67,11 +67,19 @@ const eventSchema = new mongoose.Schema({
        attended: { type: Number, min: 0, default: 0 },
        percentage: { type: Number, min: 0, max: 100, default: 0 },
        recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
-       recordedAt: Date,
-       notes: String
-     },
+        recordedAt: Date,
+        notes: String
+      },
 
-     participantDetails: [{
+      // School's post-event rating and feedback (submitted by school admin after attending)
+      schoolRating: {
+        rating: { type: Number, min: 1, max: 5 },
+        comment: { type: String, trim: true, maxlength: 1000 },
+        ratedAt: Date,
+        ratedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' }
+      },
+
+      participantDetails: [{
        name: String,
        age: Number,
        gender: String,

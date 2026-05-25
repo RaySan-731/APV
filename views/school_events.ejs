@@ -21,6 +21,14 @@
         .filter-btn { padding:0.5rem 1rem; border:1px solid var(--border); background:var(--card); border-radius:var(--radius); cursor:pointer; }
         .filter-btn.active { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); }
         .form-inline { display:flex; gap:0.5rem; align-items:flex-end; }
+        .rating-section { background:var(--muted); padding:0.75rem; border-radius:var(--radius); margin-top:0.75rem; }
+        .rating-status { font-weight:600; margin-bottom:0.35rem; display:block; }
+        .star-rating { font-size:1.6rem; letter-spacing:0.15rem; color:var(--muted); user-select:none; display:inline-flex; }
+        .star-rating span { cursor:pointer; transition:color 0.1s; padding:0 1px; }
+        .star-rating span:hover, .star-rating span.rated { color:#f59e0b; }
+        .rating-display { font-size:1.25rem; color:#f59e0b; letter-spacing:0.1rem; }
+        .attendance-info { font-size:0.82rem; color:var(--muted-foreground); margin:0.25rem 0; }
+        .rating-form textarea { width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:var(--radius); font-size:0.85rem; resize:vertical; min-height:42px; margin-top:0.35rem; }
     </style>
 </head>
 <body>
@@ -84,13 +92,46 @@
                         <p class="placeholder-text">No past events.</p>
                     <% } else { %>
                         <% past.forEach(event => { %>
-                            <div class="event-card">
+                            <% const invitation = event.targetSchools?.find(s => schoolId && s.schoolId.toString() === schoolId.toString()); %>
+                            <% const rating = invitation && invitation.schoolRating ? invitation.schoolRating.rating : null; %>
+                            <% const attended = invitation && invitation.attendance ? (invitation.attendance.attended || invitation.attendance.registered || 0) : 0; %>
+                            <div class="event-card" data-event-id="<%= event._id %>">
                                 <h3><%= event.name || 'Unnamed Event' %></h3>
                                 <div class="event-meta">
                                     <div><%= event.startDate ? new Date(event.startDate).toLocaleDateString() : 'N/A' %> - <%= event.endDate ? new Date(event.endDate).toLocaleDateString() : 'N/A' %></div>
                                     <div><%= event.location?.name || 'TBD' %></div>
                                     <div><span class="badge badge-secondary"><%= event.eventType ? event.eventType.replace('_',' ') : 'Other' %></span></div>
                                 </div>
+                                <% if (event.description) { %><p style="margin:0.25rem 0 0.5rem;font-size:0.9rem;"><%= event.description %></p><% } %>
+                                <% if (attended > 0) { %>
+                                    <div class="attendance-info">✓ Attended by your school: <strong><%= attended %></strong> scouts</div>
+                                <% } else if (invitation) { %>
+                                    <div class="attendance-info">RSVP status: <strong><%= invitation.rsvpStatus %></strong></div>
+                                <% } %>
+                                <% if (invitation) { %>
+                                    <div class="rating-section">
+                                        <span class="rating-status">Your review (1-5 stars):</span>
+                                        <% if (rating) { %>
+                                            <div class="rating-display" style="margin-bottom:0.25rem;"><%= '★'.repeat(rating) %><%= '☆'.repeat(5-rating) %> <span style="font-size:0.85rem;color:var(--muted-foreground);">( <%= rating %>/5 )</span></div>
+                                            <% if (invitation.schoolRating.comment) { %>
+                                                <p style="margin:0 0 0.4rem 0; font-size:0.82rem; font-style:italic; color:var(--muted-foreground);">"<%= invitation.schoolRating.comment %>"</p>
+                                            <% } %>
+                                        <% } else { %>
+                                            <em style="color:var(--muted-foreground); font-size:0.85rem;">No review yet</em>
+                                        <% } %>
+                                         <div class="star-rating" data-event-id="<%= event._id %>">
+                                             <span data-val="1">☆</span>
+                                             <span data-val="2">☆</span>
+                                             <span data-val="3">☆</span>
+                                             <span data-val="4">☆</span>
+                                             <span data-val="5">☆</span>
+                                         </div>
+                                        <textarea class="rating-comment" placeholder="Optional review comments (e.g. great organization, suggestions for improvement...)"></textarea>
+                                        <button type="button" class="btn btn-primary btn-sm submit-rating-btn" data-event-id="<%= event._id %>" style="margin-top:0.4rem;">Submit / Update Review</button>
+                                    </div>
+                                <% } else { %>
+                                    <p class="placeholder-text">You were not invited to this event.</p>
+                                <% } %>
                             </div>
                         <% }) %>
                     <% } %>
@@ -139,6 +180,78 @@
                     }
                 });
             });
+
+            // Interactive star ratings + submit for past events (school can rate attended events)
+            function initPastEventRatings() {
+                document.querySelectorAll('.star-rating').forEach(container => {
+                    const stars = container.querySelectorAll('span[data-val]');
+                    let currentVal = 0;
+
+                    function paint(val) {
+                        stars.forEach(s => {
+                            const v = parseInt(s.dataset.val);
+                            const isRated = v <= val;
+                            s.textContent = isRated ? '★' : '☆';
+                            s.style.color = isRated ? '#f59e0b' : 'var(--muted)';
+                            s.classList.toggle('rated', isRated);
+                        });
+                    }
+
+                    stars.forEach(s => {
+                        s.addEventListener('click', () => {
+                            currentVal = parseInt(s.dataset.val);
+                            container.dataset.selected = currentVal;
+                            paint(currentVal);
+                        });
+                        s.addEventListener('mouseover', () => paint(parseInt(s.dataset.val)));
+                        s.addEventListener('mouseout', () => paint(currentVal || parseInt(container.dataset.selected) || 0));
+                    });
+
+                    paint(0);
+                });
+
+                document.querySelectorAll('.submit-rating-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const eventId = btn.dataset.eventId;
+                        const card = btn.closest('.event-card');
+                        const starContainer = card.querySelector('.star-rating');
+                        const selected = parseInt(starContainer.dataset.selected || '0');
+                        if (!selected || selected < 1 || selected > 5) {
+                            alert('Please click to select 1-5 stars for your review');
+                            return;
+                        }
+                        const commentEl = card.querySelector('.rating-comment');
+                        const comment = commentEl ? commentEl.value.trim() : '';
+
+                        btn.disabled = true;
+                        const originalText = btn.textContent;
+                        btn.textContent = 'Submitting...';
+
+                        try {
+                            const res = await fetch(`/api/school/events/${eventId}/rating`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ rating: selected, comment })
+                            });
+                            const result = await res.json();
+                            if (result.success) {
+                                alert('Thank you — your 1-5 star review has been recorded.');
+                                location.reload();
+                            } else {
+                                alert('Error: ' + (result.error || 'Could not save review'));
+                                btn.disabled = false;
+                                btn.textContent = originalText;
+                            }
+                        } catch (err) {
+                            alert('Network error while saving review');
+                            btn.disabled = false;
+                            btn.textContent = originalText;
+                        }
+                    });
+                });
+            }
+
+            initPastEventRatings();
         });
     </script>
 </body>

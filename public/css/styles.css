@@ -5015,3 +5015,252 @@ fieldset legend {
 .session-row select {
     font-size: 0.875rem;
 }
+
+/* Page subtitle used on invoices list for extra context (keeps header compact) */
+.page-subtitle {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .page-subtitle { display: none; }
+}
+
+/* ============================================================
+   PROFESSIONAL INVOICES LIST PAGE STYLES
+   - Enhanced metrics, filters, table, status, payment modals
+   - Uses existing design tokens for consistency
+   - No functional changes, presentation only
+   ============================================================ */
+
+/* Summary metric cards - professional finance look */
+.invoices-page .invoice-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.invoice-stat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  transition: var(--transition-base);
+}
+
+.invoice-stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px -8px hsl(140, 30%, 15% / 0.13);
+}
+
+.invoice-stat-card .stat-icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.invoice-stat-card.total .stat-icon { background: hsl(150, 60%, 25% / 0.1); color: var(--primary); }
+.invoice-stat-card.amount .stat-icon { background: hsl(35, 82%, 48% / 0.1); color: hsl(35, 82%, 42%); }
+.invoice-stat-card.collected .stat-icon { background: #dcfce7; color: #166534; }
+.invoice-stat-card.outstanding .stat-icon { background: #fee2e2; color: #991b1b; }
+
+.invoice-stat-card .stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.invoice-stat-card .stat-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 0.1rem;
+  line-height: 1;
+}
+
+.invoice-stat-card .stat-value {
+  font-size: 1.28rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Filter toolbar - clean professional bar */
+.invoices-page .invoice-filter-bar {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.95rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.invoices-page .invoice-filter-bar .row {
+  margin-bottom: 0;
+}
+
+.invoices-page .invoice-filter-bar .form-select,
+.invoices-page .invoice-filter-bar .form-control {
+  font-size: 0.875rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  height: auto;
+}
+
+/* Table polish for invoices */
+.invoices-page .invoices-table-wrapper {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.invoices-page .invoices-table {
+  font-size: 0.875rem;
+  margin-bottom: 0;
+}
+
+.invoices-page .invoices-table thead th {
+  background: var(--secondary);
+  color: var(--muted-foreground);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.65rem 0.7rem;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.invoices-page .invoices-table tbody td {
+  padding: 0.55rem 0.7rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.invoices-page .invoices-table tbody tr:hover {
+  background: hsl(150, 25%, 97%);
+}
+
+.invoices-page .invoices-table tbody tr.table-danger {
+  background: #fef2f2;
+}
+
+.invoices-page .invoices-table tbody tr.table-success {
+  background: #f0fdf4;
+}
+
+.invoices-page .invoices-table td.currency {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.invoices-page .invoices-table .balance-cell {
+  font-weight: 700;
+}
+
+/* Status badges - more refined pills */
+.invoices-page .invoices-table .badge {
+  font-size: 0.675rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+  border: 1px solid transparent;
+}
+
+.invoices-page .invoices-table .badge.bg-success { background: #166534; color: #fff; }
+.invoices-page .invoices-table .badge.bg-danger { background: #991b1b; color: #fff; }
+.invoices-page .invoices-table .badge.bg-warning { background: #854d0e; color: #fff; }
+.invoices-page .invoices-table .badge.bg-primary { background: var(--primary); color: #fff; }
+.invoices-page .invoices-table .badge.bg-secondary { background: var(--muted-foreground); color: #fff; }
+
+/* Action buttons in table */
+.invoices-page .invoices-table .btn-group-sm .btn {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+/* Payment modal specific polish (reuses base modal styles) */
+.invoices-page .payment-modal {
+  max-width: 460px;
+  width: 95%;
+}
+
+.invoices-page .payment-modal .modal-header {
+  background: linear-gradient(135deg, var(--primary), hsl(150, 55%, 30%));
+  color: #fff;
+  border-bottom: none;
+  border-radius: 1rem 1rem 0 0;
+}
+
+.invoices-page .payment-modal .modal-header h5 {
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.invoices-page .payment-modal .modal-header .btn-close,
+.invoices-page .payment-modal .modal-header .close {
+  color: rgba(255,255,255,0.85);
+  opacity: 0.9;
+}
+
+.invoices-page .payment-modal .modal-header .btn-close:hover,
+.invoices-page .payment-modal .modal-header .close:hover {
+  color: #fff;
+  opacity: 1;
+}
+
+.invoices-page .payment-modal .modal-body {
+  padding: 1.1rem 1.35rem;
+}
+
+.invoices-page .payment-modal .modal-footer {
+  background: var(--secondary);
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 1rem 1rem;
+}
+
+/* Make .btn-close functional even without Bootstrap */
+.btn-close {
+  background: transparent;
+  border: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  opacity: 0.75;
+  transition: all 0.15s ease;
+  border-radius: 0.25rem;
+}
+.btn-close:hover {
+  opacity: 1;
+  color: var(--destructive);
+  background: rgba(0,0,0,0.04);
+}
+
+/* Small helper for cash hint inside modals */
+.cash-hint {
+  font-style: italic;
+}

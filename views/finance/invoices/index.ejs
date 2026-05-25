@@ -22,96 +22,102 @@
                         <path d="M3 18h18"></path>
                     </svg>
                 </button>
-                <h1 class="page-title">Invoices</h1>
+                <h1 class="page-title">Invoices <span class="page-subtitle">Manage school billings &amp; collections</span></h1>
                 <div class="btn-toolbar">
                     <a href="/finance/invoices/create" class="btn btn-primary btn-sm">New Invoice</a>
                     <a href="/finance/dashboard" class="btn btn-outline-secondary btn-sm ms-2">Dashboard</a>
                 </div>
             </header>
 
-            <div class="container-fluid mt-4">
+            <div class="container-fluid mt-4 invoices-page">
                 <!-- Summary Stats -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title">Total Invoices</h6>
-                                <p class="fs-4"><%= summary.totalCount || 0 %></p>
-                            </div>
+                <div class="invoice-stat-grid">
+                    <div class="invoice-stat-card total">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-label">Total Invoices</div>
+                            <div class="stat-value"><%= summary.totalCount || 0 %></div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title">Total Amount</h6>
-                                <p class="fs-4">KES <%= (summary.totalAmount || 0).toLocaleString() %></p>
-                            </div>
+                    <div class="invoice-stat-card amount">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v12M8 10h8"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-label">Total Amount</div>
+                            <div class="stat-value">KES <%= (summary.totalAmount || 0).toLocaleString() %></div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title">Collected</h6>
-                                <p class="fs-4 text-success">KES <%= (summary.totalPaid || 0).toLocaleString() %></p>
-                            </div>
+                    <div class="invoice-stat-card collected">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-label">Collected</div>
+                            <div class="stat-value">KES <%= (summary.totalPaid || 0).toLocaleString() %></div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6 class="card-title">Outstanding</h6>
-                                <p class="fs-4 text-danger">KES <%= (summary.totalOutstanding || 0).toLocaleString() %></p>
-                            </div>
+                    <div class="invoice-stat-card outstanding">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-label">Outstanding</div>
+                            <div class="stat-value">KES <%= (summary.totalOutstanding || 0).toLocaleString() %></div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Filters -->
-                <form method="GET" class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <select name="schoolId" class="form-select">
-                            <option value="">All Schools</option>
-                            <% schools.forEach(s => { %>
-                                <option value="<%= s._id %>" <%= filters.schoolId == s._id ? 'selected' : '' %>><%= s.name %></option>
-                            <% }); %>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <select name="status" class="form-select">
-                            <option value="">All Status</option>
-                            <option value="issued" <%= filters.status === 'issued' ? 'selected' : '' %>>Issued</option>
-                            <option value="sent" <%= filters.status === 'sent' ? 'selected' : '' %>>Sent</option>
-                            <option value="partial" <%= filters.status === 'partial' ? 'selected' : '' %>>Partial</option>
-                            <option value="paid" <%= filters.status === 'paid' ? 'selected' : '' %>>Paid</option>
-                            <option value="overdue" <%= filters.status === 'overdue' ? 'selected' : '' %>>Overdue</option>
-                            <option value="cancelled" <%= filters.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <input type="date" name="startDate" class="form-control" value="<%= filters.startDate || '' %>">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="date" name="endDate" class="form-control" value="<%= filters.endDate || '' %>">
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-outline-secondary w-100">Filter</button>
-                    </div>
-                </form>
+                <div class="invoice-filter-bar">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <select name="schoolId" class="form-select">
+                                <option value="">All Schools</option>
+                                <% schools.forEach(s => { %>
+                                    <option value="<%= s._id %>" <%= filters.schoolId == s._id ? 'selected' : '' %>><%= s.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select name="status" class="form-select">
+                                <option value="">All Status</option>
+                                <option value="issued" <%= filters.status === 'issued' ? 'selected' : '' %>>Issued</option>
+                                <option value="sent" <%= filters.status === 'sent' ? 'selected' : '' %>>Sent</option>
+                                <option value="partial" <%= filters.status === 'partial' ? 'selected' : '' %>>Partial</option>
+                                <option value="paid" <%= filters.status === 'paid' ? 'selected' : '' %>>Paid</option>
+                                <option value="overdue" <%= filters.status === 'overdue' ? 'selected' : '' %>>Overdue</option>
+                                <option value="cancelled" <%= filters.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="date" name="startDate" class="form-control" value="<%= filters.startDate || '' %>">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="date" name="endDate" class="form-control" value="<%= filters.endDate || '' %>">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-outline-secondary w-100">Filter</button>
+                        </div>
+                    </form>
+                </div>
 
                 <!-- Invoices Table -->
                 <div class="card">
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
+                        <div class="table-responsive invoices-table-wrapper">
+                            <table class="table table-hover invoices-table">
                                 <thead>
                                     <tr>
                                         <th>Invoice #</th>
                                         <th>School</th>
                                         <th>Date</th>
                                         <th>Due Date</th>
-                                        <th>Amount</th>
-                                        <th>Paid</th>
-                                        <th>Balance</th>
+                                        <th class="currency">Amount</th>
+                                        <th class="currency">Paid</th>
+                                        <th class="currency">Balance</th>
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
@@ -123,11 +129,11 @@
                                              <td><% if (inv.schoolId) { %><a href="/schools/<%= inv.schoolId._id %>"><%= inv.schoolId.name %></a><% } else { %><span class="text-muted">School deleted</span><% } %></td>
                                              <td><%= new Date(inv.issueDate).toLocaleDateString() %></td>
                                              <td><%= new Date(inv.dueDate).toLocaleDateString() %></td>
-                                             <td>KES <%= inv.totalAmount.toLocaleString() %></td>
-                                             <td>KES <%= inv.amountPaid.toLocaleString() %></td>
-                                             <td class="<%= inv.balance > 0 ? 'text-danger fw-bold' : '' %>">
-                                                 KES <%= inv.balance.toLocaleString() %>
-                                             </td>
+                                              <td class="currency">KES <%= inv.totalAmount.toLocaleString() %></td>
+                                              <td class="currency">KES <%= inv.amountPaid.toLocaleString() %></td>
+                                              <td class="currency balance-cell <%= inv.balance > 0 ? 'text-danger fw-bold' : '' %>">
+                                                  KES <%= inv.balance.toLocaleString() %>
+                                              </td>
                                              <td>
                                                  <span class="badge bg-<%= 
                                                      inv.status === 'paid' ? 'success' :
@@ -159,13 +165,12 @@
                          <!-- Payment Modals (rendered outside the table for valid HTML) -->
                          <% invoices.forEach(inv => { %>
                              <!-- Payment Modal -->
-                             <div class="modal-overlay" id="paymentModal<%= inv._id %>" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-                                 <div class="modal-dialog">
-                                     <div class="modal-content">
+                              <div class="modal-overlay" id="paymentModal<%= inv._id %>" style="display:none;">
+                                  <div class="modal-content payment-modal">
                                          <form action="/finance/invoices/<%= inv._id %>/payments" method="POST" enctype="multipart/form-data" class="payment-form" data-invoice="<%= inv._id %>" data-balance="<%= inv.balance %>" data-invoice-number="<%= inv.invoiceNumber %>">
                                              <div class="modal-header">
                                                  <h5 class="modal-title">Record Payment - <%= inv.invoiceNumber %></h5>
-                                                 <button type="button" class="btn-close close-modal-btn" aria-label="Close"></button>
+                                                  <button type="button" class="btn-close close-modal-btn" aria-label="Close">×</button>
                                              </div>
                                              <div class="modal-body">
                                                  <div class="mb-3">
@@ -206,10 +211,9 @@
                                                  <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
                                                  <button type="submit" class="btn btn-primary payment-submit-btn">Record Payment</button>
                                              </div>
-                                         </form>
-                                     </div>
-                                 </div>
-                             </div>
+                                          </form>
+                                      </div>
+                                  </div>
                          <% }); %>
 
                          <!-- Pagination -->

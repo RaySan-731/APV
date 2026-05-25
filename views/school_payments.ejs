@@ -30,6 +30,38 @@
         .sent-section th, .sent-section td { padding:0.6rem 0.75rem; text-align:left; border-bottom:1px solid var(--border); }
         .sent-section th { color:var(--muted-foreground); font-weight:600; font-size:0.75rem; text-transform:uppercase; }
         .sent-section .send-note { display:block; margin:0.75rem 0 0; font-size:0.8rem; color:var(--muted-foreground); }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #166534;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 8px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+            z-index: 10001;
+            max-width: 340px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            animation: toastSlideIn 0.25s ease forwards;
+        }
+        .toast.error { background: #b91c1c; }
+        .toast::before {
+            content: "✓";
+            font-weight: bold;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+        .toast.error::before { content: "✕"; }
+        @keyframes toastSlideIn {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -129,13 +161,22 @@
                                     <div style="margin:0.5rem 0;">
                                         <span class="status-badge status-<%= invoice.status || 'unknown' %>"><%= invoice.status || 'unknown' %></span>
                                     </div>
-                                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem;">
-                                        <a href="/api/school/invoices/<%= invoice._id %>/download" class="btn btn-outline btn-sm" target="_blank">Download Receipt</a>
-                                        <% if (invoice.status && ['issued','sent','partial','overdue'].includes(invoice.status)) { %>
-                                            <button class="btn btn-primary btn-sm pay-invoice-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>" data-invoice-balance="<%= ((invoice.totalAmount || 0) - (invoice.amountPaid || 0)).toFixed(2) %>">Pay with M-Pesa</button>
-                                            <button class="btn btn-outline btn-sm raise-query-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>">Raise Query</button>
-                                        <% } %>
-                                    </div>
+                                     <div style="display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem;">
+                                         <a href="/api/school/invoices/<%= invoice._id %>/download" class="btn btn-outline btn-sm" target="_blank">Download Receipt</a>
+                                         <% if (invoice.mpesaReceipt && invoice.mpesaReceipt.receiptUrl) { %>
+                                             <a href="<%= invoice.mpesaReceipt.receiptUrl %>" 
+                                                class="btn btn-outline btn-sm" 
+                                                style="border-color:#166534;color:#166534;"
+                                                target="_blank"
+                                                title="Official M-Pesa transaction receipt (generated automatically on payment confirmation)">
+                                                Download M-Pesa Receipt
+                                             </a>
+                                         <% } %>
+                                         <% if (invoice.status && ['issued','sent','partial','overdue'].includes(invoice.status)) { %>
+                                             <button class="btn btn-primary btn-sm pay-invoice-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>" data-invoice-balance="<%= ((invoice.totalAmount || 0) - (invoice.amountPaid || 0)).toFixed(2) %>">Pay with M-Pesa</button>
+                                             <button class="btn btn-outline btn-sm raise-query-btn" data-invoice-id="<%= invoice._id %>" data-invoice-num="<%= invoice.invoiceNumber %>">Raise Query</button>
+                                         <% } %>
+                                     </div>
                                 </div>
                             </div>
                         <% }) %>
@@ -274,13 +315,107 @@
 
             cancelPayBtn?.addEventListener('click', () => payModal.style.display = 'none');
 
+            // Simple auto-dismissing toast (replaces blocking alert)
+            function showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(10px)';
+                    setTimeout(() => toast.remove(), 300);
+                }, 2600);
+            }
+
+            // Polls the invoice status after STK push until it becomes paid/partial
+            function startPaymentPolling(invoiceId, initialMessage) {
+                const invoiceList = document.querySelector('.invoice-list');
+                if (!invoiceList) {
+                    // Fallback: just reload after a delay
+                    setTimeout(() => window.location.reload(), 8000);
+                    return;
+                }
+
+                // Create a persistent waiting banner
+                const banner = document.createElement('div');
+                banner.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;border-radius:8px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;';
+                banner.innerHTML = `
+                    <span style="font-size:1.1rem;">⏳</span>
+                    <div>
+                        <strong>Payment in progress</strong><br>
+                        <span style="font-size:0.9rem;">Waiting for M-Pesa confirmation... (this usually takes 10–60 seconds)</span>
+                    </div>
+                `;
+                invoiceList.parentNode.insertBefore(banner, invoiceList);
+
+                let attempts = 0;
+                const maxAttempts = 25; // ~100 seconds total
+                const interval = 4000;
+
+                const poll = async () => {
+                    attempts++;
+                    try {
+                        const res = await fetch(`/api/school/invoices/${invoiceId}`);
+                        const data = await res.json();
+
+                        if (data.success && data.invoice) {
+                            const status = data.invoice.status;
+
+                            if (['paid', 'partial'].includes(status)) {
+                                // Success! Stop polling and reload once
+                                banner.style.background = '#dcfce7';
+                                banner.style.borderColor = '#22c55e';
+                                banner.style.color = '#166534';
+                                banner.innerHTML = `
+                                    <span style="font-size:1.1rem;">✅</span>
+                                    <div>
+                                        <strong>Payment confirmed!</strong><br>
+                                        <span style="font-size:0.9rem;">Refreshing to show updated status...</span>
+                                    </div>
+                                `;
+
+                                clearInterval(pollInterval);
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 900);
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Polling error (will retry):', e);
+                    }
+
+                    if (attempts >= maxAttempts) {
+                        clearInterval(pollInterval);
+                        banner.style.background = '#fee2e2';
+                        banner.style.borderColor = '#ef4444';
+                        banner.style.color = '#991b1b';
+                        banner.innerHTML = `
+                            <span>⚠️</span>
+                            <div>
+                                Still waiting for confirmation.<br>
+                                <button onclick="window.location.reload()" style="margin-top:4px;padding:4px 10px;border:1px solid #991b1b;border-radius:4px;background:transparent;color:inherit;cursor:pointer;">Refresh now</button>
+                            </div>
+                        `;
+                    }
+                };
+
+                const pollInterval = setInterval(poll, interval);
+
+                // Do first check a bit faster
+                setTimeout(poll, 2500);
+            }
+
             payForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const invoiceId = document.getElementById('payInvoiceId').value;
                 const phone = payPhone.value.trim();
 
                 if (!phone) {
-                    alert('Please enter your phone number to receive the STK prompt.');
+                    showToast('Please enter your phone number to receive the STK prompt.', 'error');
                     return;
                 }
 
@@ -292,12 +427,14 @@
                 const result = await res.json();
 
                 if (result.success) {
-                    alert(result.message || 'STK push sent. Please approve on your phone.');
+                    showToast(result.message || 'STK push sent. Please approve on your phone.', 'success');
                     payModal.style.display = 'none';
                     payForm.reset();
-                    window.location.reload();
+
+                    // Start smart polling for payment confirmation (no more manual refresh needed)
+                    startPaymentPolling(invoiceId, result.message);
                 } else {
-                    alert('Payment error: ' + (result.error || 'Unable to initiate payment.'));
+                    showToast('Payment error: ' + (result.error || 'Unable to initiate payment.'), 'error');
                 }
             });
 
@@ -339,7 +476,11 @@
                                     <td>${inv.status ? '<span class="status-badge status-' + inv.status + '">' + inv.status + '</span>' : '—'}</td>
                                     <td>${issuedName}</td>
                                     <td>${sentName}</td>
-                                    <td><a href="/api/school/invoices/${inv._id || ''}/download" class="btn btn-outline btn-sm" target="_blank">Download</a></td>
+                                     <td>
+                                         <a href="/api/school/invoices/${inv._id || ''}/download" class="btn btn-outline btn-sm" target="_blank">Download</a>
+                                         ${inv.mpesaReceipt && inv.mpesaReceipt.receiptUrl ? 
+                                           `<a href="${inv.mpesaReceipt.receiptUrl}" class="btn btn-outline btn-sm" style="border-color:#166534;color:#166534;margin-left:4px;" target="_blank" title="M-Pesa Receipt">M-Pesa</a>` : ''}
+                                     </td>
                                 </tr>`;
                         }).join('');
                     }

@@ -55,6 +55,10 @@ const paymentSchema = new mongoose.Schema({
   checkoutRequestId: String,
   transactionMeta: mongoose.Schema.Types.Mixed,
 
+  // Raw M-Pesa STK callback data (for auditing & debugging)
+  mpesaCallbackRaw: mongoose.Schema.Types.Mixed,
+  mpesaCallbackReceivedAt: Date,
+
   // For payroll payments
   payrollId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payroll' },
   trainerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
@@ -111,6 +115,7 @@ paymentSchema.index({ invoiceNumber: 1 });
 paymentSchema.index({ invoiceId: 1, paymentDate: -1 });
 
 paymentSchema.index({ trainerId: 1 });
-paymentSchema.index({ createdAt: -1 });
+  paymentSchema.index({ createdAt: -1 });
+  paymentSchema.index({ checkoutRequestId: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

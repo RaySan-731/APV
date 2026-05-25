@@ -2844,6 +2844,12 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
     schoolController.getInvoices(req, res);
   });
 
+  // API: Get single invoice (used for status polling after STK push)
+  app.get('/api/school/invoices/:invoiceId', requireAuth, requireSchoolAdmin, async (req, res) => {
+    const schoolController = require('./backend/controllers/schoolController');
+    schoolController.getInvoice(req, res);
+  });
+
   // API: Get invoices sent to the school (with founder/admin sender/issuer info)
   app.get('/api/school/sent-invoices', requireAuth, requireSchoolAdmin, async (req, res) => {
     const schoolController = require('./backend/controllers/schoolController');
@@ -3157,6 +3163,39 @@ app.post('/dashboard/staff/delete', requireAuth, requirePermission('canDeleteSta
       const invoices = await Invoice.find({ schoolId: req.schoolId })
         .sort({ issueDate: -1 })
         .lean();
+
+      // Attach latest M-Pesa receipt (if any) so we can show "Download M-Pesa Receipt" button
+      const mpesaReceiptPayments = await Payment.find({
+        schoolId: req.schoolId,
+        method: 'mpesa',
+        status: 'completed',
+        receiptUrl: { $exists: true, $ne: null }
+      })
+        .sort({ paidDate: -1, createdAt: -1 })
+        .select('invoiceId receiptUrl receiptFileName paidDate')
+        .lean();
+
+      const latestReceiptByInvoice = {};
+      for (const p of mpesaReceiptPayments) {
+        if (p.invoiceId) {
+          const key = p.invoiceId.toString();
+          if (!latestReceiptByInvoice[key]) {
+            latestReceiptByInvoice[key] = {
+              receiptUrl: p.receiptUrl,
+              receiptFileName: p.receiptFileName,
+              paidDate: p.paidDate
+            };
+          }
+        }
+      }
+
+      invoices.forEach(inv => {
+        const key = inv._id.toString();
+        if (latestReceiptByInvoice[key]) {
+          inv.mpesaReceipt = latestReceiptByInvoice[key];
+        }
+      });
+
       const stats = await Invoice.aggregate([
         { $match: { schoolId: new mongoose.Types.ObjectId(req.schoolId) } },
         {

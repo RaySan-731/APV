@@ -18,6 +18,8 @@ const Message = require('../../models/Message');
 const Notification = require('../../models/Notification');
 const VisitLog = require('../../models/VisitLog');
 const AuditLog = require('../../models/AuditLog');
+const Payment = require('../../models/Payment');
+const InvoicePDFService = require('../services/invoicePDFService');
 const Program = require('../../models/Program');
 const PaymentService = require('../services/paymentService');
 const MpesaService = require('../services/mpesaService');
@@ -770,6 +772,29 @@ exports.removeProgram = async (req, res) => {
     }
   };
 
+  // Get single invoice for the logged-in school (for polling status after payment)
+  exports.getInvoice = async (req, res) => {
+    try {
+      const invoiceId = req.params.invoiceId;
+      if (!/^[0-9a-fA-F]{24}$/.test(invoiceId)) {
+        return res.status(400).json({ success: false, error: 'Invalid invoice ID' });
+      }
+
+      const invoice = await Invoice.findOne({
+        _id: invoiceId,
+        schoolId: req.schoolId
+      }).lean();
+
+      if (!invoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+
+      res.json({ success: true, invoice });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  };
+
   // Get invoices sent to a school, populated with founder/admin sender info
   exports.getSentInvoices = async (req, res) => {
     try {
@@ -778,6 +803,33 @@ exports.removeProgram = async (req, res) => {
         .populate('sentBy', 'name email role')
         .sort({ issueDate: -1 })
         .lean();
+
+      // Also attach M-Pesa receipts for the sent invoices view
+      const mpesaReceipts = await Payment.find({
+        schoolId: req.schoolId,
+        method: 'mpesa',
+        status: 'completed',
+        receiptUrl: { $exists: true, $ne: null }
+      })
+        .sort({ paidDate: -1, createdAt: -1 })
+        .select('invoiceId receiptUrl receiptFileName')
+        .lean();
+
+      const receiptMap = {};
+      for (const p of mpesaReceipts) {
+        if (p.invoiceId) {
+          const key = p.invoiceId.toString();
+          if (!receiptMap[key]) {
+            receiptMap[key] = { receiptUrl: p.receiptUrl, receiptFileName: p.receiptFileName };
+          }
+        }
+      }
+
+      invoices.forEach(inv => {
+        const key = inv._id.toString();
+        if (receiptMap[key]) inv.mpesaReceipt = receiptMap[key];
+      });
+
       res.json({ success: true, invoices });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -842,49 +894,81 @@ exports.removeProgram = async (req, res) => {
   };
 
   exports.mpesaStkCallback = async (req, res) => {
-    try {
-      const callbackSecret = process.env.MPESA_STK_CALLBACK_SECRET;
-      if (callbackSecret) {
-        const incomingSecret = req.headers['x-mpesa-callback-secret'];
-        if (!incomingSecret || incomingSecret !== callbackSecret) {
-          return res.status(401).json({ success: false, error: 'Unauthorized callback' });
+    // Always acknowledge M-Pesa immediately (they retry on non-2xx)
+    const rawBody = req.body || {};
+    console.log('=== MPESA STK CALLBACK RECEIVED ===');
+    console.log(JSON.stringify(rawBody, null, 2));
+
+    // Respond fast
+    res.json({ success: true, received: true });
+
+    // Process asynchronously (do not block the response)
+    setImmediate(async () => {
+      try {
+        const payload = rawBody;
+        const callbackBody = payload.Body?.stkCallback || payload;
+
+        const checkoutRequestId = callbackBody.CheckoutRequestID || callbackBody.checkoutRequestID;
+        if (!checkoutRequestId) {
+          console.error('MPESA callback missing CheckoutRequestID', payload);
+          return;
         }
+
+        const resultCode = Number(callbackBody.ResultCode ?? callbackBody.resultCode ?? -1);
+        const resultDesc = callbackBody.ResultDesc || callbackBody.resultDesc || 'Unknown result';
+        const callbackMetadata = callbackBody.CallbackMetadata || callbackBody.callbackMetadata || {};
+
+        const items = callbackMetadata.Item || callbackMetadata.item || [];
+        const amountItem = items.find(item => (item.Name || item.name) === 'Amount');
+        const receiptItem = items.find(item => (item.Name || item.name) === 'MpesaReceiptNumber');
+
+        await PaymentService.completePendingPayment({
+          checkoutRequestId,
+          mpesaReceiptNumber: receiptItem?.Value ?? receiptItem?.value,
+          resultCode,
+          resultDesc,
+          amount: amountItem?.Value ?? amountItem?.value,
+          transactionMeta: callbackBody,
+          mpesaCallbackRaw: rawBody   // <-- full raw data stored here
+        });
+      } catch (err) {
+        console.error('MPESA callback async processing error:', err);
       }
-
-      const payload = req.body || {};
-      const callbackBody = payload.Body?.stkCallback;
-      if (!callbackBody) {
-        return res.status(400).json({ success: false, error: 'Invalid callback payload' });
-      }
-
-      const checkoutRequestId = callbackBody.CheckoutRequestID;
-      const resultCode = Number(callbackBody.ResultCode || -1);
-      const resultDesc = callbackBody.ResultDesc || 'Unknown result';
-      const callbackMetadata = callbackBody.CallbackMetadata || {};
-
-      const amountItem = (callbackMetadata.Item || []).find(item => item.Name === 'Amount');
-      const receiptItem = (callbackMetadata.Item || []).find(item => item.Name === 'MpesaReceiptNumber');
-
-      await PaymentService.completePendingPayment({
-        checkoutRequestId,
-        mpesaReceiptNumber: receiptItem?.Value,
-        resultCode,
-        resultDesc,
-        amount: amountItem?.Value,
-        transactionMeta: callbackBody
-      });
-
-      res.json({ success: true });
-    } catch (err) {
-      console.error('MPESA callback error:', err);
-      res.status(500).json({ success: false, error: 'Failed to process callback' });
-    }
+    });
   };
 
- // Download invoice (placeholder - could forward to finance controller)
- exports.downloadInvoice = async (req, res) => {
-   res.status(501).json({ success: false, error: 'Not implemented' });
- };
+  // Download invoice / receipt PDF for the school (now fully implemented)
+  exports.downloadInvoice = async (req, res) => {
+    try {
+      const invoiceId = req.params.invoiceId;
+
+      if (!/^[0-9a-fA-F]{24}$/.test(invoiceId)) {
+        return res.status(400).json({ success: false, error: 'Invalid invoice ID' });
+      }
+
+      // Strict ownership check
+      const invoice = await Invoice.findOne({
+        _id: invoiceId,
+        schoolId: req.schoolId
+      }).select('invoiceNumber').lean();
+
+      if (!invoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+
+      const pdfBuffer = await InvoicePDFService.generateInvoicePDF(invoiceId);
+
+      const safeNumber = (invoice.invoiceNumber || invoiceId).replace(/[^a-zA-Z0-9_-]/g, '');
+      const filename = `receipt_${safeNumber}.pdf`;   // Labeled as receipt to match the button text
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error('Error generating invoice PDF for school:', err);
+      res.status(500).json({ success: false, error: 'Failed to generate receipt' });
+    }
+  };
 
  // Raise payment query (placeholder)
  exports.raisePaymentQuery = async (req, res) => {

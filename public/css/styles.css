@@ -5264,3 +5264,581 @@ fieldset legend {
 .cash-hint {
   font-style: italic;
 }
+
+/* ============================================================
+   SCHOOL DASHBOARD - PROFESSIONAL UI/UX ENHANCEMENTS
+   - Polished stats, welcome, programs, quick actions
+   - Modal improvements for Add Program
+   - Replaces & extends the previous inline <style>
+   ============================================================ */
+
+/* Stats grid - use consistent professional stat cards */
+.school-dashboard .stats-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.school-dashboard .stats-section .stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.school-dashboard .stats-section .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px -8px hsl(140, 30%, 15% / 0.14);
+}
+
+.school-dashboard .stats-section .stat-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--secondary);
+  color: var(--primary);
+}
+
+.school-dashboard .stats-section .stat-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.school-dashboard .stats-section .stat-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.school-dashboard .stats-section .stat-value {
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.school-dashboard .stats-section .stat-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  margin-top: 0.15rem;
+}
+
+/* Welcome section */
+.school-dashboard .welcome-section {
+  background: linear-gradient(135deg, var(--primary), hsl(150, 55%, 32%));
+  color: #fff;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: var(--shadow-card);
+}
+
+.school-dashboard .welcome-section .welcome-content h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.school-dashboard .welcome-section .school-name {
+  margin: 0;
+  opacity: 0.92;
+  font-size: 0.95rem;
+}
+
+.school-dashboard .welcome-section .welcome-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Pending actions */
+.school-dashboard .pending-actions {
+  margin-bottom: 1.5rem;
+}
+
+.school-dashboard .pending-actions h3 {
+  font-size: 1rem;
+  margin-bottom: 0.6rem;
+  color: var(--foreground);
+}
+
+.school-dashboard .actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.school-dashboard .action-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+.school-dashboard .action-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px -2px hsl(150, 60%, 25% / 0.15);
+}
+
+.school-dashboard .action-icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  background: var(--secondary);
+  color: var(--primary);
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.school-dashboard .action-details {
+  flex: 1;
+}
+
+.school-dashboard .action-count {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.school-dashboard .action-message {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+}
+
+/* Programs section */
+.school-dashboard .programs-section .programs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.school-dashboard .program-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.9rem 1.1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: box-shadow 0.2s;
+}
+
+.school-dashboard .program-item:hover {
+  box-shadow: var(--shadow-soft);
+}
+
+.school-dashboard .program-info h4 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+}
+
+.school-dashboard .program-description {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+  line-height: 1.35;
+}
+
+.school-dashboard .program-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+}
+
+.school-dashboard .program-actions {
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+
+/* Grid for next event + service status */
+.school-dashboard .grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.school-dashboard .next-event,
+.school-dashboard .service-status {
+  padding: 1rem 1.15rem;
+}
+
+.school-dashboard .event-preview h4 {
+  margin: 0.1rem 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.school-dashboard .status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.school-dashboard .status-light {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.school-dashboard .status-light.status-inactive { background: #f59e0b; }
+.school-dashboard .status-light.status-pending { background: #3b82f6; }
+
+/* Quick links - modern horizontal scrollable on mobile, grid on desktop */
+.school-dashboard .quick-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.school-dashboard .quick-link-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 0.6rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--foreground);
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 500;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.school-dashboard .quick-link-card:hover {
+  background: var(--secondary);
+  transform: translateY(-1px);
+  border-color: var(--primary);
+}
+
+.school-dashboard .quick-link-card svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--primary);
+}
+
+/* Recent students & notifications lists */
+.school-dashboard .recent-student-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.7rem 0.85rem;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.school-dashboard .notification-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.school-dashboard .notification-item {
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius);
+  background: var(--background);
+  border: 1px solid var(--border);
+}
+
+.school-dashboard .notification-item.unread {
+  border-left: 3px solid var(--primary);
+  background: hsl(150, 40%, 97%);
+}
+
+/* Modal program details area */
+.program-details {
+  font-size: 0.9rem;
+}
+
+.program-details:empty {
+  display: none;
+}
+
+.program-details p {
+  margin: 0.15rem 0;
+}
+
+/* Small utility */
+.school-dashboard .placeholder-text {
+  color: var(--muted-foreground);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Section headers used throughout school dashboard */
+.school-dashboard .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.school-dashboard .section-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.school-dashboard .view-all {
+  font-size: 0.8rem;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.school-dashboard .view-all:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================
+   SCHOOL PROFILE PAGE - PROFESSIONAL POLISH
+   - Modern definition lists, section cards, edit form
+   - Consistent with dashboard/invoices improvements
+   - Scoped via .school-profile on content
+   ============================================================ */
+
+.school-profile .dashboard-content {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.school-profile .card {
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.school-profile .card-header {
+  background: linear-gradient(90deg, var(--primary), hsl(150, 55%, 32%));
+  color: #fff;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: none;
+}
+
+.school-profile .card-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.school-profile .card-header .btn {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.3);
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.school-profile .card-header .btn:hover {
+  background: rgba(255,255,255,0.25);
+  border-color: #fff;
+}
+
+.school-profile .card-body {
+  padding: 1.5rem;
+  background: var(--card);
+}
+
+.school-profile .profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.school-profile .profile-section {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.35rem;
+  box-shadow: 0 2px 8px -2px hsl(140, 30%, 15% / 0.06);
+}
+
+.school-profile .profile-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.school-profile .profile-section h3 svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+}
+
+.school-profile .profile-dl {
+  margin: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.school-profile .profile-dl dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  margin-bottom: 0.1rem;
+}
+
+.school-profile .profile-dl dd {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--foreground);
+  line-height: 1.35;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.school-profile .profile-dl dd:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.school-profile .profile-dl a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.school-profile .profile-dl a:hover {
+  text-decoration: underline;
+}
+
+/* Edit mode form polish */
+.school-profile #profileEditMode {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-top: 0.25rem;
+}
+
+.school-profile .form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.school-profile .form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  margin-bottom: 0.35rem;
+}
+
+.school-profile .form-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  background: var(--card);
+  color: var(--foreground);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.school-profile .form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.school-profile .form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .school-profile .profile-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .school-profile .form-actions {
+    flex-direction: column;
+  }
+  
+  .school-profile .form-actions .btn {
+    width: 100%;
+  }
+}
+
+/* Status badge in profile context */
+.school-profile .status-badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* Small helper inside edit mode */
+.school-profile .edit-form-header {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+
+.school-profile .edit-form-header h4 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+  color: var(--primary);
+}
+
+.school-profile .edit-form-header p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+}

@@ -6,58 +6,6 @@
     <title>School Dashboard - Arrow-Park Ventures</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
-    <style nonce="<%= cspNonce %>">
-        .recent-students-section .recent-students-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        .recent-student-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem;
-            background: var(--background);
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-        }
-        .recent-student-item .student-info h4 {
-            margin: 0 0 0.25rem 0;
-            font-size: 0.95rem;
-            color: var(--foreground);
-        }
-        .recent-student-item .student-meta {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 0.85rem;
-            color: var(--muted-foreground);
-        }
-        .recent-student-item .trainer-name {
-            font-weight: 500;
-        }
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-        .section-header h3 {
-            margin: 0;
-            font-size: 1.1rem;
-        }
-        .view-all {
-            font-size: 0.85rem;
-            color: var(--primary);
-            text-decoration: none;
-        }
-        .view-all:hover {
-            text-decoration: underline;
-        }
-        .stat-icon.students {
-            /* Add specific styling if needed */
-        }
-    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -119,7 +67,7 @@
                 </div>
             </header>
 
-            <div class="dashboard-content">
+            <div class="dashboard-content school-dashboard">
                 <!-- Welcome Section -->
                 <section class="welcome-section card">
                     <div class="welcome-content">
@@ -388,6 +336,34 @@
                 </section>
             </div>
         </main>
+    </div>
+
+    <!-- Add Program Modal (was missing - this fixes the "Add Program" button UX) -->
+    <div id="addProgramModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>Enroll in a New Program</h3>
+                <button type="button" id="closeAddProgramModal" class="btn-close" aria-label="Close">×</button>
+            </div>
+            <form id="addProgramForm">
+                <div class="modal-body">
+                    <div class="form-group mb-3">
+                        <label for="programSelect" class="form-label">Available Programs</label>
+                        <select id="programSelect" class="form-select" required>
+                            <option value="">Loading programs...</option>
+                        </select>
+                    </div>
+                    <div id="programDetails" class="program-details" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--muted); border-radius: var(--radius); font-size: 0.9rem;">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+                    <div class="mt-2 text-muted small">Selecting a program will show details here. Enrollment is instant and can be managed later.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancelAddProgram" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Enroll in Program</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script nonce="<%= cspNonce %>">

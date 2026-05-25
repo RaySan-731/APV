@@ -3048,16 +3048,28 @@ async function saveSchoolAllocation() {
             const isVisible = notificationDropdown.style.display === 'block';
             notificationDropdown.style.display = isVisible ? 'none' : 'block';
             if (!isVisible) {
+              // Always reset to the Notifications tab when the bell opens the dropdown.
+              // This prevents the user from seeing only the Compose form (or an old tab state)
+              // even though the badge shows there are unread notifications.
+              currentTab = 'notifications';
+              tabButtons.forEach(b => b.classList.remove('active'));
+              const notificationsTabBtn = Array.from(tabButtons).find(b => b.dataset.tab === 'notifications');
+              if (notificationsTabBtn) notificationsTabBtn.classList.add('active');
+
+              if (notificationsTabContent) notificationsTabContent.style.display = 'block';
+              if (composeTabContent) composeTabContent.style.display = 'none';
+
               loadNotificationsData();
             }
           });
 
           // Close dropdown when clicking outside
-          document.addEventListener('click', function(e) {
-            if (!notificationDropdown.contains(e.target) && e.target !== notificationBell) {
-              notificationDropdown.style.display = 'none';
-            }
-          });
+           document.addEventListener('click', function(e) {
+             if (!notificationDropdown.contains(e.target) && !notificationBell.contains(e.target)) {
+               notificationDropdown.style.display = 'none';
+             }
+           });
+
 
           // Tab switching
           tabButtons.forEach(btn => {
@@ -3589,8 +3601,13 @@ async function saveSchoolAllocation() {
           // But we already added event listeners in renderNotifications after creating items. That code uses .addEventListener and will call viewAnnouncementModal and markMessageAsRead.
 
           // I need to update renderNotifications to call viewAnnouncementModal and viewMessageModal instead of redirecting.
+          // But we already added event listeners in renderNotifications after creating items. That code uses .addEventListener and will call viewAnnouncementModal and markMessageAsRead.
 
-         })();
+          // Load initial notifications (populates badge count and caches data for instant dropdown open)
+          loadNotificationsData();
+
+        })();
+
        </script>
 
        <!-- School Onboarding Modal JavaScript -->

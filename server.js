@@ -8276,10 +8276,20 @@ app.get('/api/messages', requireAuth, async (req, res) => {
 
     let query;
     if (folder === 'inbox') {
-      query = {
-        'recipients.staffId': staffId,
-        'recipients.deleted': { $ne: true }
-      };
+      const userRole = req.session.user.role;
+      const isHighLevel = ['admin', 'founder', 'commissioner', 'supervisor'].includes(userRole);
+
+      if (isHighLevel) {
+        // Founders and high-level admins see all messages in the notification dropdown
+        query = {
+          'recipients.deleted': { $ne: true }
+        };
+      } else {
+        query = {
+          'recipients.staffId': staffId,
+          'recipients.deleted': { $ne: true }
+        };
+      }
     } else if (folder === 'sent') {
       query = { senderId: staffId };
     } else if (folder === 'important') {

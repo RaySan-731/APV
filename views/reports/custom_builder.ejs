@@ -1,6 +1,7 @@
 <%
 /**
- * Custom Report Builder View
+ * Reports Center
+ * Founder/Admin view for all wrap-up reports + other system reports
  * Path: views/reports/custom_builder.ejs
  */
 %>
@@ -9,18 +10,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Report Builder - APV</title>
+    <title>Reports Center - APV</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="icon" href="/favicon.ico">
     <style nonce="<%= cspNonce %>">
-        .builder-section { margin-bottom: 2rem; }
-        .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--foreground); }
-        .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-        .checkbox-label { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); cursor: pointer; }
-        .checkbox-label:hover { background: var(--accent); }
-        .preview-section { margin-top: 2rem; }
-        .saved-templates { margin-top: 1rem; }
-        .template-card { padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; background: var(--card); }
+        .reports-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; min-width: 140px; }
+        .stat-number { font-size: 1.75rem; font-weight: 700; line-height: 1; }
+        .report-row:hover { background: var(--muted); }
+        .report-modal { max-width: 900px; width: 95%; }
+        .report-section { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+        .report-section:last-child { border-bottom: none; }
+        .badge-sm { font-size: 0.7rem; padding: 0.1rem 0.4rem; }
+        .filter-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
@@ -31,126 +33,337 @@
             <header class="dashboard-header">
                 <button class="mobile-sidebar-toggle" id="mobileSidebarToggle">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 12h18"></path>
-                        <path d="M3 6h18"></path>
-                        <path d="M3 18h18"></path>
+                        <path d="M3 12h18"></path><path d="M3 6h18"></path><path d="M3 18h18"></path>
                     </svg>
                 </button>
-                <h1 class="page-title">Custom Report Builder</h1>
+                <h1 class="page-title">Reports Center</h1>
                 <div class="user-info"><span>Welcome, <%= user.name %></span></div>
             </header>
 
             <div class="dashboard-content">
-                <!-- Saved Templates -->
+
+                <!-- Stats -->
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-number"><%= submittedReports.length %></div>
+                        <div style="font-size: 0.85rem; color: var(--muted-foreground);">Wrap-up Reports Submitted</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number"><%= scheduledReports.length %></div>
+                        <div style="font-size: 0.85rem; color: var(--muted-foreground);">Active Scheduled Reports</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number"><%= submittedReports.filter(r => r.review?.reportSubmittedAt && (Date.now() - new Date(r.review.reportSubmittedAt).getTime()) < 30*24*60*60*1000).length %></div>
+                        <div style="font-size: 0.85rem; color: var(--muted-foreground);">Submitted in Last 30 Days</div>
+                    </div>
+                </div>
+
+                <!-- Post-Event Wrap-Up Reports -->
+                <div class="content-card" style="margin-bottom: 2rem;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>Post-Event Wrap-Up Reports</h3>
+                        <input type="text" id="reportSearch" placeholder="Search events or trainers..." 
+                               style="padding: 0.4rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); min-width: 220px;"
+                               onkeyup="filterReports()">
+                    </div>
+                    <div class="card-content">
+                        <% if (submittedReports.length === 0) { %>
+                            <p class="placeholder-text">No wrap-up reports have been submitted yet.</p>
+                        <% } else { %>
+                            <div class="table-responsive">
+                                <table class="data-table" id="reportsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Event</th>
+                                            <th>Date</th>
+                                            <th>Trainer(s)</th>
+                                            <th>Submitted</th>
+                                            <th>Attendees</th>
+                                            <th>Satisfaction</th>
+                                            <th style="width: 120px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reportsBody">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+
+                <!-- Automated / Scheduled Reports -->
+                <div class="content-card" style="margin-bottom: 2rem;">
+                    <div class="card-header">
+                        <h3>Automated &amp; Scheduled Reports</h3>
+                    </div>
+                    <div class="card-content">
+                        <% if (scheduledReports.length === 0) { %>
+                            <p class="placeholder-text">No automated reports are currently scheduled.</p>
+                        <% } else { %>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Type</th>
+                                            <th>Frequency</th>
+                                            <th>Next Run</th>
+                                            <th>Created By</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% scheduledReports.forEach(report => { %>
+                                            <tr>
+                                                <td><strong><%= report.name %></strong></td>
+                                                <td><span class="badge badge-secondary"><%= report.reportType %></span></td>
+                                                <td><%= report.frequency %></td>
+                                                <td><%= new Date(report.nextSendAt).toLocaleDateString() %></td>
+                                                <td><%= report.createdBy?.name || 'System' %></td>
+                                                <td><span class="badge badge-success">Active</span></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+
+                <!-- Quick Links to Other Reports -->
                 <div class="content-card">
-                    <div class="card-header"><h3>Saved Templates</h3></div>
-                    <div class="card-content">
-                        <div id="templatesList" class="saved-templates">
-                            <!-- Loaded via JS -->
-                        </div>
+                    <div class="card-header"><h3>Other Reports &amp; Analytics</h3></div>
+                    <div class="card-content" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                        <a href="/dashboard/analytics#trainer-performance" class="btn btn-outline" style="padding: 1rem; text-align: left; display: block;">
+                            <strong>Trainer Performance</strong><br>
+                            <small>Analytics dashboard</small>
+                        </a>
+                        <a href="/dashboard/analytics#event-engagement" class="btn btn-outline" style="padding: 1rem; text-align: left; display: block;">
+                            <strong>Event Effectiveness</strong><br>
+                            <small>Analytics dashboard</small>
+                        </a>
+                        <a href="/dashboard/analytics#school-participation" class="btn btn-outline" style="padding: 1rem; text-align: left; display: block;">
+                            <strong>School Engagement</strong><br>
+                            <small>Analytics dashboard</small>
+                        </a>
+                        <a href="/finance/dashboard" class="btn btn-outline" style="padding: 1rem; text-align: left; display: block;">
+                            <strong>Financial Reports</strong><br>
+                            <small>Finance dashboard &amp; exports</small>
+                        </a>
+                        <a href="/dashboard/reports/builder" class="btn btn-outline" style="padding: 1rem; text-align: left; display: block; opacity: 0.6;">
+                            <strong>Custom Report Builder</strong><br>
+                            <small>(Legacy - coming soon)</small>
+                        </a>
                     </div>
                 </div>
 
-                <!-- Builder Form -->
-                <div class="content-card">
-                    <div class="card-header"><h3>Build Custom Report</h3></div>
-                    <div class="card-content">
-                        <form id="builderForm">
-                            <!-- Dimensions -->
-                            <div class="builder-section">
-                                <div class="section-title">Group By (Dimensions)</div>
-                                <div class="checkbox-group">
-                                    <label class="checkbox-label"><input type="radio" name="groupBy" value="eventType" checked> Event Type</label>
-                                    <label class="checkbox-label"><input type="radio" name="groupBy" value="region"> Region</label>
-                                </div>
-                            </div>
-
-                            <!-- Metrics -->
-                            <div class="builder-section">
-                                <div class="section-title">Metrics</div>
-                                <div class="checkbox-group">
-                                    <label class="checkbox-label"><input type="checkbox" name="metrics" value="totalEvents" checked> Total Events</label>
-                                    <label class="checkbox-label"><input type="checkbox" name="metrics" value="totalScouts"> Total Scouts</label>
-                                    <label class="checkbox-label"><input type="checkbox" name="metrics" value="avgAttendance"> Avg Attendance Rate (%)</label>
-                                </div>
-                            </div>
-
-                            <!-- Filters -->
-                            <div class="builder-section">
-                                <div class="section-title">Filters</div>
-                                <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                                    <label>Date Range
-                                        <select name="dateRange">
-                                            <option value="30d">Last 30 Days</option>
-                                            <option value="90d">Last 90 Days</option>
-                                            <option value="1y">Last Year</option>
-                                        </select>
-                                    </label>
-                                    <label>Event Types
-                                        <select name="eventTypes" multiple style="height: 100px;">
-                                            <% eventTypes.forEach(type => { %>
-                                                <option value="<%= type %>"><%= type.replace('_', ' ') %></option>
-                                            <% }) %>
-                                        </select>
-                                    </label>
-                                    <label>Schools
-                                        <select name="schoolIds" multiple style="height: 100px;">
-                                            <% schools.forEach(school => { %>
-                                                <option value="<%= school._id %>"><%= school.name %></option>
-                                            <% }) %>
-                                        </select>
-                                    </label>
-                                    <label>Trainers
-                                        <select name="trainerIds" multiple style="height: 100px;">
-                                            <% trainers.forEach(trainer => { %>
-                                                <option value="<%= trainer._id %>"><%= trainer.name %></option>
-                                            <% }) %>
-                                        </select>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- Actions -->
-                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                                <button type="button" class="btn btn-primary" onclick="previewReport()">Preview Report</button>
-                                <button type="button" class="btn btn-secondary" onclick="saveTemplate()">Save Template</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Preview -->
-                <div id="previewSection" class="content-card preview-section" style="display: none;">
-                    <div class="card-header"><h3>Report Preview</h3></div>
-                    <div class="card-content">
-                        <div class="table-responsive">
-                        <table class="data-table" id="previewTable">
-                            <thead id="previewHead"></thead>
-                            <tbody id="previewBody"></tbody>
-                        </table>
-                            </div>
-                    </div>
-                </div>
             </div>
         </main>
     </div>
 
-    <!-- Save Template Modal -->
-    <div id="saveTemplateModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header"><h3>Save Template</h3><button onclick="closeModal('saveTemplateModal')" class="close-btn">&times;</button></div>
-            <div class="modal-body">
-                <label>Template Name<input type="text" id="templateName" placeholder="e.g., Monthly Event Summary"></label>
-                <label>Description<textarea id="templateDesc" placeholder="Brief description..."></textarea></label>
-                <label><input type="checkbox" id="templateShared" checked> Share with team</label>
+    <!-- Full Wrap-Up Report Modal -->
+    <div id="reportModal" class="modal-overlay" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
+        <div class="modal-content report-modal" style="max-height: 90vh; overflow-y: auto; background: var(--card);">
+            <div class="modal-header" style="position: sticky; top: 0; background: var(--card); z-index: 10;">
+                <h3 id="modalEventTitle">Post-Event Wrap-Up Report</h3>
+                <button onclick="closeReportModal()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="modalReportBody" style="padding: 1.25rem;">
+                <!-- Dynamically rendered report content -->
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('saveTemplateModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmSaveTemplate()">Save</button>
+                <button class="btn btn-secondary" onclick="closeReportModal()">Close</button>
+                <button class="btn btn-primary" onclick="printReport()">Print / Save as PDF</button>
             </div>
         </div>
     </div>
 
-    <script src="/js/reports/custom_builder.js"></script>
+    <script nonce="<%= cspNonce %>">
+        // Data injected by server
+        window.submittedReports = <%- JSON.stringify(submittedReports || []) %>;
+
+        function formatDate(d) {
+            if (!d) return '—';
+            return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function renderReportsTable(filteredReports) {
+            const tbody = document.getElementById('reportsBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (!filteredReports || filteredReports.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--muted-foreground);">No matching reports found.</td></tr>';
+                return;
+            }
+
+            filteredReports.forEach((event, index) => {
+                const review = event.review || {};
+                const trainers = (event.trainers || []).map(t => t.trainerId?.name || 'Unknown').join(', ');
+                const submitted = review.reportSubmittedAt ? formatDate(review.reportSubmittedAt) : '—';
+                const actual = review.actualAttendeeCount || '—';
+                const reg = review.registeredAttendeeCount ? ` / ${review.registeredAttendeeCount}` : '';
+                const sat = review.satisfactionRatings 
+                    ? `★${review.satisfactionRatings.trainerSatisfaction || 0} / ${review.satisfactionRatings.scoutSatisfaction || 0}` 
+                    : '—';
+
+                const row = document.createElement('tr');
+                row.className = 'report-row';
+                row.innerHTML = `
+                    <td><strong>${event.name}</strong></td>
+                    <td>${formatDate(event.endDate)}</td>
+                    <td>${trainers}</td>
+                    <td>${submitted}</td>
+                    <td>${actual}${reg}</td>
+                    <td>${sat}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="showFullReport(${index})">View Full</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function filterReports() {
+            const term = (document.getElementById('reportSearch')?.value || '').toLowerCase().trim();
+            if (!window.submittedReports) return;
+
+            const filtered = window.submittedReports.filter(ev => {
+                const name = (ev.name || '').toLowerCase();
+                const trainers = (ev.trainers || []).map(t => (t.trainerId?.name || '')).join(' ').toLowerCase();
+                return name.includes(term) || trainers.includes(term);
+            });
+
+            renderReportsTable(filtered);
+        }
+
+        // Show detailed wrap-up report in modal
+        function showFullReport(index) {
+            const event = window.submittedReports[index];
+            if (!event) return;
+
+            const review = event.review || {};
+            const modal = document.getElementById('reportModal');
+            const body = document.getElementById('modalReportBody');
+            const title = document.getElementById('modalEventTitle');
+
+            title.textContent = `${event.name} — Wrap-Up Report`;
+
+            let html = `
+                <div style="margin-bottom: 1rem; color: var(--muted-foreground);">
+                    <strong>Submitted:</strong> ${review.reportSubmittedAt ? new Date(review.reportSubmittedAt).toLocaleString() : '—'} 
+                    ${review.reportSubmittedBy?.name ? `by ${review.reportSubmittedBy.name}` : ''}
+                </div>
+            `;
+
+            // Attendance
+            html += `
+                <div class="report-section">
+                    <h4>1. Attendance</h4>
+                    <p><strong>Actual Attendees:</strong> ${review.actualAttendeeCount ?? 'Not recorded'}</p>
+                    <p><strong>Registered:</strong> ${review.registeredAttendeeCount ?? 'N/A'}</p>
+                </div>
+            `;
+
+            // Activity Summary
+            if (review.activitySessions && review.activitySessions.length) {
+                html += `<div class="report-section"><h4>2. Activity Summary</h4><ul>`;
+                review.activitySessions.forEach(s => {
+                    html += `<li><strong>${s.name}</strong> (${s.durationMinutes || 0} min, ${s.participationLevel || 'medium'}) — ${s.description || ''}</li>`;
+                });
+                html += `</ul></div>`;
+            }
+
+            if (review.newToolsUsed || review.newMethodsUsed) {
+                html += `<p><strong>New Tools/Methods:</strong> ${[review.newToolsUsed, review.newMethodsUsed].filter(Boolean).join(' / ')}</p>`;
+            }
+
+            // Outcomes
+            html += `<div class="report-section"><h4>3. Outcomes &amp; Impact</h4>`;
+            if (review.scoutEngagement) html += `<p><strong>Scout Engagement:</strong> ${review.scoutEngagement}</p>`;
+            if (review.skillsGained?.length) html += `<p><strong>Skills Gained:</strong> ${review.skillsGained.join(', ')}</p>`;
+            if (review.notableAchievements) html += `<p><strong>Notable Achievements:</strong> ${review.notableAchievements}</p>`;
+            html += `</div>`;
+
+            // Challenges
+            html += `<div class="report-section"><h4>4. Challenges &amp; Issues</h4>`;
+            if (review.logisticalIssues) html += `<p><strong>Logistical:</strong> ${review.logisticalIssues}</p>`;
+            if (review.behavioralIssues) html += `<p><strong>Behavioral:</strong> ${review.behavioralIssues}</p>`;
+            if (review.suggestionsForImprovement) html += `<p><strong>Suggestions:</strong> ${review.suggestionsForImprovement}</p>`;
+            html += `</div>`;
+
+            // Satisfaction
+            if (review.satisfactionRatings) {
+                html += `
+                    <div class="report-section"><h4>5. Satisfaction Ratings</h4>
+                    <p><strong>Trainer:</strong> ${'★'.repeat(review.satisfactionRatings.trainerSatisfaction || 0)}</p>
+                    <p><strong>Scouts:</strong> ${'★'.repeat(review.satisfactionRatings.scoutSatisfaction || 0)}</p>
+                    </div>
+                `;
+            }
+
+            // Follow-up
+            if (review.recommendedNextTraining || review.scoutsNeedingSupport || review.adminTasks) {
+                html += `<div class="report-section"><h4>6. Follow-Up Actions</h4>`;
+                if (review.recommendedNextTraining) html += `<p><strong>Recommended Next Training:</strong> ${review.recommendedNextTraining}</p>`;
+                if (review.scoutsNeedingSupport) html += `<p><strong>Scouts Needing Support:</strong> ${review.scoutsNeedingSupport}</p>`;
+                if (review.adminTasks) html += `<p><strong>Admin Tasks:</strong> ${review.adminTasks}</p>`;
+                html += `</div>`;
+            }
+
+            // Narrative
+            if (review.trainerReport) {
+                html += `
+                    <div class="report-section">
+                        <h4>7. Event Report Narrative</h4>
+                        <div style="white-space: pre-wrap; background: var(--muted); padding: 1rem; border-radius: var(--radius);">
+                            ${review.trainerReport}
+                        </div>
+                    </div>
+                `;
+            }
+
+            body.innerHTML = html;
+            modal.style.display = 'flex';
+        }
+
+        function closeReportModal() {
+            document.getElementById('reportModal').style.display = 'none';
+        }
+
+        function printReport() {
+            const body = document.getElementById('modalReportBody');
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html><head><title>Wrap-Up Report</title>
+                <style>body { font-family: system-ui; padding: 2rem; } h4 { margin-top: 1.5rem; }</style>
+                </head><body>${body.innerHTML}</body></html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 300);
+        }
+
+        // Initial render
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.submittedReports && window.submittedReports.length > 0) {
+                renderReportsTable(window.submittedReports);
+            }
+
+            // Keyboard escape for modal
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('reportModal');
+                    if (modal.style.display === 'flex') closeReportModal();
+                }
+            });
+        });
+
+        // Make functions globally available if needed
+        window.showFullReport = showFullReport;
+        window.filterReports = filterReports;
+    </script>
 </body>
 </html>

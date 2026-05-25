@@ -198,9 +198,16 @@ async function loadNotificationsPanel() {
         if (data.success && data.notifications.length > 0) {
             container.innerHTML = data.notifications.map(notif => {
                 const isMessage = notif.type === 'new_message';
-                const viewButton = isMessage
-                    ? `<button class="btn btn-sm btn-primary" onclick="openMessageModal('${notif.entityId}')">View</button>`
-                    : (notif.actionUrl ? `<a href="${notif.actionUrl}" class="btn btn-sm btn-primary">${notif.actionLabel || 'View'}</a>` : '');
+                let viewButton = '';
+                if (isMessage) {
+                    viewButton = `<button class="btn btn-sm btn-primary" onclick="openMessageModal('${notif.entityId}')">View</button>`;
+                } else if (notif.type === 'report_reminder' && notif.entityId) {
+                    // Always point trainers to their own event detail page for report submission
+                    const trainerReportUrl = `/trainer/events/${notif.entityId}`;
+                    viewButton = `<a href="${trainerReportUrl}" class="btn btn-sm btn-primary">Submit Report</a>`;
+                } else if (notif.actionUrl) {
+                    viewButton = `<a href="${notif.actionUrl}" class="btn btn-sm btn-primary">${notif.actionLabel || 'View'}</a>`;
+                }
 
                 return `
                 <div class="notification-item ${!notif.isRead ? 'unread' : ''}" data-id="${notif._id}">

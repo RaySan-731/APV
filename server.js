@@ -6316,7 +6316,7 @@ app.get('/dashboard/reports/schools', requireAuth, async (req, res) => {
   }
 });
 
-// Custom Report Builder page
+// Reports Center (formerly Custom Report Builder) - View all wrap-up and system reports
 app.get('/dashboard/reports/builder', requireAuth, async (req, res) => {
   try {
     if (req.session.user && req.session.user.role === 'trainer') {
@@ -6326,15 +6326,36 @@ app.get('/dashboard/reports/builder', requireAuth, async (req, res) => {
     if (!perm || !perm.permissions.canGenerateReports) {
       return res.status(403).render('404', { user: req.session.user, error: 'Access denied. Insufficient permissions.' });
     }
-    const schools = await School.find({}).select('name _id').sort({ name: 1 }).lean();
-    const trainers = await Staff.find({ role: { $in: ['trainer', 'senior trainer', 'supervisor'] } }).select('name _id').sort({ name: 1 }).lean();
-    const events = await Event.distinct('eventType');
-    return res.render('reports/custom_builder', { user: req.session.user, schools, trainers, eventTypes: events, page: 'reports-builder' });
-   } catch (err) {
-     console.error('Custom report builder error:', err);
-     res.status(500).render('404', { user: req.session.user });
-   }
- });
+
+    // Fetch all submitted post-event wrap-up reports
+    const submittedReports = await Event.find({
+      'review.reportSubmittedAt': { $exists: true, $ne: null }
+    })
+      .populate('trainers.trainerId', 'name email')
+      .populate('review.reportSubmittedBy', 'name')
+      .select('name startDate endDate eventType status trainers review targetSchools')
+      .sort({ 'review.reportSubmittedAt': -1 })
+      .limit(100)
+      .lean();
+
+    // Also fetch active scheduled reports for the "Automated Reports" section
+    const scheduledReports = await ScheduledReport.find({ isActive: true })
+      .populate('createdBy', 'name')
+      .sort({ nextSendAt: 1 })
+      .limit(20)
+      .lean();
+
+    return res.render('reports/custom_builder', {
+      user: req.session.user,
+      submittedReports,
+      scheduledReports,
+      page: 'reports-builder'
+    });
+  } catch (err) {
+    console.error('Reports center error:', err);
+    res.status(500).render('404', { user: req.session.user });
+  }
+});
 
 // ============ COMMUNICATION PAGE ROUTES ============
 // Redirect old routes to dashboard - notifications are now in dropdown
@@ -8911,6 +8932,36 @@ app.post('/api/notifications/:notificationId/dismiss', requireAuth, async (req, 
   } catch (err) {
     console.error('Error dismissing notification:', err);
     res.status(500).json({ success: false, error: 'Failed to dismiss notification' });
+  }
+});
+
+// Bulk dismiss all report_reminder notifications for a specific event (used after trainer submits report)
+app.post('/api/notifications/dismiss-report-reminders', requireAuth, parseJson, async (req, res) => {
+  try {
+    const { eventId } = req.body || {};
+    if (!eventId) {
+      return res.status(400).json({ success: false, error: 'eventId is required' });
+    }
+
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(404).json({ success: false, error: 'Staff profile not found' });
+    }
+
+    await Notification.updateMany(
+      {
+        recipientId: currentStaff._id,
+        type: 'report_reminder',
+        entityId: eventId,
+        dismissed: { $ne: true }
+      },
+      { $set: { dismissed: true, dismissedAt: new Date() } }
+    );
+
+    res.json({ success: true, message: 'Report reminders dismissed' });
+  } catch (err) {
+    console.error('Error dismissing report reminders:', err);
+    res.status(500).json({ success: false, error: 'Failed to dismiss report reminders' });
   }
 });
 

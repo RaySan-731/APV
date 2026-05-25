@@ -170,7 +170,8 @@ class NotificationScheduler {
         type: 'report_reminder',
         title: 'Report Overdue',
         message: `Please submit your post-event report for "${event.name}" (ended ${new Date(event.endDate).toLocaleDateString()})`,
-        actionUrl: '/dashboard/events/' + event._id + '/review',
+        actionUrl: `/trainer/events/${event._id}`,
+        actionLabel: 'Submit Report',
         entityType: 'event',
         entityId: event._id,
         priority: 'high',
@@ -207,7 +208,7 @@ class NotificationScheduler {
                   <p>This is a reminder that the post-event report for <strong>${event.name}</strong> is now overdue.</p>
                   <p><strong>Event Dates:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</p>
                   <p>Please submit your report as soon as possible.</p>
-                  <p><a href="${process.env.BASE_URL || 'http://localhost:3001'}/dashboard/events/${event._id}">Go to Event</a></p>
+                  <p><a href="${process.env.BASE_URL || 'http://localhost:3001'}/trainer/events/${event._id}" style="background:#3b82f6;color:white;padding:8px 16px;text-decoration:none;border-radius:4px;">Submit Report Now</a></p>
                 `,
                 priority: 'high'
               }),

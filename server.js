@@ -1867,6 +1867,11 @@ app.post('/trainer/events/:eventId/submit-report', requireAuth, parseJson, async
       return res.status(403).json({ success: false, error: 'Not assigned to this event' });
     }
 
+    // Ensure review subdocument exists (for legacy events)
+    if (!event.review) {
+      event.review = {};
+    }
+
     // --- Update core review fields ---
     event.review.trainerReport = trainerReport;
     event.review.reportSubmittedAt = new Date();

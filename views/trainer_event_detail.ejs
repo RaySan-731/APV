@@ -89,17 +89,62 @@
                 <!-- Trainer Assignment Status (computed server-side) -->
                 <% 
                     // Find the current trainer's assignment in this event
-                    // staffId is passed from server (current staff's _id)
-                    const myAssignment = event.trainers.find(t => {
-                        if (!t.trainerId) return false;
-                        const trainerId = t.trainerId._id ? t.trainerId._id.toString() : t.trainerId.toString();
-                        return trainerId === staffId;
-                    });
+                     // staffId is passed from server (current staff's _id)
+                     const trainersList = event.trainers || [];
+                     const myAssignment = trainersList.find(t => {
+                         if (!t.trainerId) return false;
+                         const trainerId = t.trainerId._id ? t.trainerId._id.toString() : t.trainerId.toString();
+                         return trainerId === staffId;
+                     });
                     const assignmentStatus = myAssignment ? myAssignment.status : 'not_assigned';
                     const needsResponse = assignmentStatus === 'assigned' && ['scheduled', 'published', 'draft'].includes(event.status);
-                %>
+                 %>
 
-                <% if (needsResponse) { %>
+                  <%
+                      // === Server-side EJS helpers (duplicated from client JS for template rendering) ===
+                      function formatEventType(type) {
+                          const types = { 'camp': 'Camp', 'hike': 'Hike', 'team_building': 'Team Building', 'training_session': 'Training Session', 'inter_school_competition': 'Inter-School Competition', 'other': 'Other' };
+                          return types[type] || type || 'Event';
+                      }
+                      function formatStatus(status) {
+                          return status ? status.replace('_', ' ') : '';
+                      }
+                      function getStatusBadgeClass(status) {
+                          const map = { 'draft': 'badge-secondary', 'scheduled': 'badge-accent', 'published': 'badge-primary', 'confirmed': 'badge-success', 'in_progress': 'badge-warning', 'completed': 'badge-success', 'reviewed': 'badge-primary', 'cancelled': 'badge-danger', 'archived': 'badge-secondary' };
+                          return map[status] || 'badge-secondary';
+                      }
+                      function getEventTypeBadgeClass(type) {
+                          const map = { 'camp': 'badge-primary', 'hike': 'badge-success', 'team_building': 'badge-accent', 'training_session': 'badge-secondary', 'inter_school_competition': 'badge-warning', 'other': 'badge-secondary' };
+                          return map[type] || 'badge-secondary';
+                      }
+                      function formatRole(role) {
+                          const roles = { 'lead_trainer': 'Lead Trainer', 'assistant_trainer': 'Assistant Trainer', 'coordinator': 'Coordinator', 'volunteer': 'Volunteer' };
+                          return roles[role] || role || '';
+                      }
+                      function formatAssignmentStatus(status) {
+                          return status ? status.replace('_', ' ') : '';
+                      }
+                      function getAssignmentStatusBadge(status) {
+                          const map = { 'assigned': 'badge-warning', 'confirmed': 'badge-success', 'declined': 'badge-danger', 'removed': 'badge-danger' };
+                          return map[status] || 'badge-secondary';
+                      }
+                      function formatRsvpStatus(status) {
+                          return status ? status.replace('_', ' ') : '';
+                      }
+                      function getRsvpStatusBadge(status) {
+                          const map = { 'invited': 'badge-secondary', 'confirmed': 'badge-success', 'declined': 'badge-danger', 'pending': 'badge-warning', 'no_response': 'badge-secondary' };
+                          return map[status] || 'badge-secondary';
+                      }
+                      function getReviewStatusBadge(status) {
+                          const map = { 'pending': 'badge-warning', 'approved': 'badge-success', 'needs_revision': 'badge-accent', 'rejected': 'badge-danger' };
+                          return map[status] || 'badge-secondary';
+                      }
+                      function formatReviewStatus(status) {
+                          return status ? status.replace('_', ' ') : '';
+                      }
+                  %>
+
+                 <% if (needsResponse) { %>
                 <!-- Assignment Action Buttons -->
                 <div id="assignmentActions" style="margin-bottom: 1.5rem;">
                     <div class="content-card" style="border-left: 4px solid var(--warning);">
@@ -228,7 +273,7 @@
                                             <strong><%= t.trainerId?.name || 'Unknown Trainer' %></strong>
                                             <div style="font-size: 0.875rem; color: var(--muted-foreground);">
                                                 <%= formatRole(t.role) %> |
-                                                Status: <span class="badge <%= assignmentBadgeClass(t.status) %>"><%= formatAssignmentStatus(t.status) %></span>
+                                                Status: <span class="badge <%= getAssignmentStatusBadge(t.status) %>"><%= formatAssignmentStatus(t.status) %></span>
                                                 <% if (t.notes) { %>
                                                     <br><em>"<%= t.notes %>"</em>
                                                 <% } %>

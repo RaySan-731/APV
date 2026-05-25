@@ -174,7 +174,8 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeReportModal()">Close</button>
-                <button class="btn btn-primary" onclick="printReport()">Print / Save as PDF</button>
+                <button class="btn btn-outline" onclick="exportReportCSV()">Export CSV</button>
+                <button class="btn btn-primary" onclick="exportReportPDF()">Export PDF</button>
             </div>
         </div>
     </div>
@@ -327,23 +328,190 @@
 
             body.innerHTML = html;
             modal.style.display = 'flex';
+            window.currentReportIndex = index;
         }
 
         function closeReportModal() {
             document.getElementById('reportModal').style.display = 'none';
+            window.currentReportIndex = null;
         }
 
-        function printReport() {
-            const body = document.getElementById('modalReportBody');
+        function exportReportPDF() {
+            const index = window.currentReportIndex;
+            if (index === null || index === undefined) {
+                alert('No report selected');
+                return;
+            }
+            const event = window.submittedReports[index];
+            const review = event.review || {};
+            const trainers = (event.trainers || []).map(t => t.trainerId?.name || 'Unknown').join(', ');
+
             const printWindow = window.open('', '_blank');
+            const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            let content = `
+                <div style="max-width: 900px; margin: 0 auto; font-family: 'Segoe UI', system-ui, sans-serif; color: #111;">
+                    <!-- Header -->
+                    <div style="border-bottom: 3px solid #1e40af; padding-bottom: 12px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div>
+                            <div style="font-size: 22px; font-weight: 700; color: #1e40af; letter-spacing: 1px;">ARROW-PARK VENTURES</div>
+                            <div style="font-size: 13px; color: #555;">Management System</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 11px; color: #666;">CONFIDENTIAL</div>
+                            <div style="font-size: 12px; font-weight: 600;">Post-Event Wrap-Up Report</div>
+                        </div>
+                    </div>
+
+                    <h1 style="font-size: 20px; margin: 0 0 6px 0; color: #111;">${event.name}</h1>
+                    <div style="margin-bottom: 20px; color: #555; font-size: 13px;">
+                        ${formatDate(event.startDate)} – ${formatDate(event.endDate)} &nbsp;&nbsp;|&nbsp;&nbsp; 
+                        Trainers: <strong>${trainers}</strong>
+                    </div>
+
+                    <table style="width:100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 6px 10px; background:#f8f9fc; border:1px solid #e2e8f0; width: 180px;"><strong>Submitted</strong></td>
+                            <td style="padding: 6px 10px; border:1px solid #e2e8f0;">${review.reportSubmittedAt ? new Date(review.reportSubmittedAt).toLocaleString() : '—'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 10px; background:#f8f9fc; border:1px solid #e2e8f0;"><strong>Submitted By</strong></td>
+                            <td style="padding: 6px 10px; border:1px solid #e2e8f0;">${review.reportSubmittedBy?.name || '—'}</td>
+                        </tr>
+                    </table>
+            `;
+
+            // Attendance
+            content += `
+                <h3 style="font-size:14px; margin:20px 0 8px; color:#1e40af; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">1. Attendance</h3>
+                <table style="width:100%; border-collapse: collapse; font-size:13px; margin-bottom:16px;">
+                    <tr><td style="padding:4px 8px; border:1px solid #e2e8f0; width:200px;">Actual Attendees</td><td style="padding:4px 8px; border:1px solid #e2e8f0;">${review.actualAttendeeCount ?? 'Not recorded'}</td></tr>
+                    <tr><td style="padding:4px 8px; border:1px solid #e2e8f0;">Registered Attendees</td><td style="padding:4px 8px; border:1px solid #e2e8f0;">${review.registeredAttendeeCount ?? 'N/A'}</td></tr>
+                </table>
+            `;
+
+            // Activity Summary
+            if (review.activitySessions && review.activitySessions.length) {
+                content += `<h3 style="font-size:14px; margin:20px 0 8px; color:#1e40af; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">2. Activity Summary</h3>`;
+                content += `<ul style="margin:0 0 12px 20px; padding:0;">`;
+                review.activitySessions.forEach(s => {
+                    content += `<li style="margin-bottom:4px;"><strong>${s.name}</strong> (${s.durationMinutes || 0} min, participation: ${s.participationLevel || 'medium'}) — ${s.description || ''}</li>`;
+                });
+                content += `</ul>`;
+            }
+
+            // Outcomes
+            content += `<h3 style="font-size:14px; margin:20px 0 8px; color:#1e40af; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">3. Outcomes &amp; Impact</h3>`;
+            if (review.scoutEngagement) content += `<p><strong>Scout Engagement:</strong> ${review.scoutEngagement}</p>`;
+            if (review.skillsGained?.length) content += `<p><strong>Skills Gained:</strong> ${review.skillsGained.join(', ')}</p>`;
+            if (review.notableAchievements) content += `<p><strong>Notable Achievements:</strong> ${review.notableAchievements}</p>`;
+
+            // Challenges
+            content += `<h3 style="font-size:14px; margin:20px 0 8px; color:#1e40af; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">4. Challenges &amp; Issues</h3>`;
+            if (review.logisticalIssues) content += `<p><strong>Logistical Issues:</strong> ${review.logisticalIssues}</p>`;
+            if (review.behavioralIssues) content += `<p><strong>Behavioral Issues:</strong> ${review.behavioralIssues}</p>`;
+            if (review.suggestionsForImprovement) content += `<p><strong>Suggestions for Improvement:</strong> ${review.suggestionsForImprovement}</p>`;
+
+            // Satisfaction
+            if (review.satisfactionRatings) {
+                content += `<h3 style="font-size:14px; margin:20px 0 8px; color:#1e40af; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">5. Satisfaction Ratings</h3>`;
+                content += `<p><strong>Trainer Satisfaction:</strong> ${review.satisfactionRatings.trainerSatisfaction || 0}/5</p>`;
+                content += `<p><strong>Scout Satisfaction:</strong> ${review.satisfactionRatings.scoutSatisfaction || 0}/5</p>`;
+            }
+
+            // Follow-up
+            content += `<h3 style="font-size:14px; margin:20px 0 8px; color:#1e40af; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">6. Follow-Up Actions</h3>`;
+            if (review.recommendedNextTraining) content += `<p><strong>Recommended Next Training:</strong> ${review.recommendedNextTraining}</p>`;
+            if (review.scoutsNeedingSupport) content += `<p><strong>Scouts Needing Support:</strong> ${review.scoutsNeedingSupport}</p>`;
+            if (review.adminTasks) content += `<p><strong>Admin Tasks:</strong> ${review.adminTasks}</p>`;
+
+            // Narrative
+            if (review.trainerReport) {
+                content += `
+                    <h3 style="font-size:14px; margin:20px 0 8px; color:#1e40af; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">7. Event Report Narrative</h3>
+                    <div style="white-space: pre-wrap; background:#f8f9fc; padding:14px; border:1px solid #e2e8f0; border-radius:4px; line-height:1.5;">
+                        ${review.trainerReport.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+                    </div>
+                `;
+            }
+
+            content += `
+                    <div style="margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 11px; color: #666; display:flex; justify-content: space-between;">
+                        <div>Generated on ${now}</div>
+                        <div>Arrow-Park Ventures • Confidential</div>
+                    </div>
+                </div>
+            `;
+
             printWindow.document.write(`
-                <html><head><title>Wrap-Up Report</title>
-                <style>body { font-family: system-ui; padding: 2rem; } h4 { margin-top: 1.5rem; }</style>
-                </head><body>${body.innerHTML}</body></html>
+                <html>
+                <head>
+                    <title>${event.name} - Wrap-Up Report</title>
+                    <style>
+                        @media print {
+                            body { margin: 0; padding: 20px; }
+                            h3 { page-break-after: avoid; }
+                        }
+                        body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.45; color: #222; }
+                        h3 { color: #1e40af; font-size: 13px; margin: 18px 0 6px; }
+                        p { margin: 4px 0; }
+                    </style>
+                </head>
+                <body>${content}</body>
+                </html>
             `);
             printWindow.document.close();
             printWindow.focus();
-            setTimeout(() => printWindow.print(), 300);
+            setTimeout(() => printWindow.print(), 400);
+        }
+
+        function exportReportCSV() {
+            const index = window.currentReportIndex;
+            if (index === null || index === undefined) {
+                alert('No report selected');
+                return;
+            }
+            const event = window.submittedReports[index];
+            const review = event.review || {};
+            const trainers = (event.trainers || []).map(t => t.trainerId?.name || 'Unknown').join(' | ');
+
+            const rows = [
+                ['Field', 'Value'],
+                ['Event Name', event.name],
+                ['Event Start Date', event.startDate],
+                ['Event End Date', event.endDate],
+                ['Trainers', trainers],
+                ['Report Submitted At', review.reportSubmittedAt],
+                ['Submitted By', review.reportSubmittedBy?.name || ''],
+                ['Actual Attendees', review.actualAttendeeCount || ''],
+                ['Registered Attendees', review.registeredAttendeeCount || ''],
+                ['Scout Engagement', review.scoutEngagement || ''],
+                ['Skills Gained', (review.skillsGained || []).join('; ')],
+                ['Notable Achievements', review.notableAchievements || ''],
+                ['Logistical Issues', review.logisticalIssues || ''],
+                ['Behavioral Issues', review.behavioralIssues || ''],
+                ['Suggestions for Improvement', review.suggestionsForImprovement || ''],
+                ['Trainer Satisfaction', review.satisfactionRatings?.trainerSatisfaction || ''],
+                ['Scout Satisfaction', review.satisfactionRatings?.scoutSatisfaction || ''],
+                ['Recommended Next Training', review.recommendedNextTraining || ''],
+                ['Scouts Needing Support', review.scoutsNeedingSupport || ''],
+                ['Admin Tasks', review.adminTasks || ''],
+                ['Narrative Report', (review.trainerReport || '').replace(/\n/g, ' | ') ]
+            ];
+
+            let csvContent = rows.map(row => 
+                row.map(field => `"${String(field || '').replace(/"/g, '""')}"`).join(',')
+            ).join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.href = url;
+            link.download = `wrapup_report_${event.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.csv`;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // Initial render
@@ -364,6 +532,8 @@
         // Make functions globally available if needed
         window.showFullReport = showFullReport;
         window.filterReports = filterReports;
+        window.exportReportPDF = exportReportPDF;
+        window.exportReportCSV = exportReportCSV;
     </script>
 </body>
 </html>

@@ -2705,13 +2705,62 @@ async function openManageEventModal(eventId) {
                     reviewContent.innerHTML = '<p>No report submitted yet.</p>';
                 }
             } else {
-                // Report exists
+                // Report exists — render full structured wrap-up report
                 trainerReportForm.style.display = 'none';
-                let html = '<div style="background: var(--muted); padding: 1rem; border-radius: var(--radius);">';
-                html += `<p><strong>Trainer Report:</strong><br>${review.trainerReport.replace(/\n/g, '<br>')}</p>`;
-                if (review.actualAttendeeCount !== undefined) {
-                    html += `<p><strong>Actual Attendee Count:</strong> ${review.actualAttendeeCount}</p>`;
+                let html = '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+
+                // Attendance summary
+                html += `<p><strong>Attendance:</strong> ${review.registeredAttendeeCount != null ? review.registeredAttendeeCount + ' registered, ' : ''}${review.actualAttendeeCount ?? '—'} actual</p>`;
+
+                // Activity sessions
+                if (review.activitySessions && review.activitySessions.length) {
+                    html += '<div><strong>Sessions Conducted:</strong><ul style="margin:0.25rem 0 0 1.25rem; font-size:0.875rem;">';
+                    review.activitySessions.forEach(s => {
+                        html += `<li>${s.name} ${s.durationMinutes ? `(${s.durationMinutes} min)` : ''} — participation: ${s.participationLevel}${s.description ? `: ${s.description}` : ''}</li>`;
+                    });
+                    html += '</ul></div>';
                 }
+
+                if (review.newToolsUsed || review.newMethodsUsed) {
+                    const parts = [];
+                    if (review.newToolsUsed) parts.push(review.newToolsUsed);
+                    if (review.newMethodsUsed) parts.push(review.newMethodsUsed);
+                    html += `<p><strong>New Tools/Methods:</strong> ${parts.join(' / ')}</p>`;
+                }
+
+                // Outcomes & Impact
+                const outcomes = [];
+                if (review.scoutEngagement) outcomes.push(`Engagement: <span class="badge ${review.scoutEngagement==='High'?'badge-success':review.scoutEngagement==='Low'?'badge-danger':'badge-warning'}">${review.scoutEngagement}</span>`);
+                if (review.skillsGained?.length) outcomes.push(`Skills: ${review.skillsGained.join(', ')}`);
+                if (review.notableAchievements) outcomes.push(`Achievements: ${review.notableAchievements}`);
+                if (outcomes.length) html += `<p><strong>Outcomes:</strong> ${outcomes.join(' | ')}</p>`;
+
+                // Challenges
+                const challenges = [];
+                if (review.logisticalIssues) challenges.push(`Logistical: ${review.logisticalIssues}`);
+                if (review.behavioralIssues) challenges.push(`Behavioral: ${review.behavioralIssues}`);
+                if (review.suggestionsForImprovement) challenges.push(`Suggestions: ${review.suggestionsForImprovement}`);
+                if (challenges.length) html += `<p><strong>Challenges:</strong> ${challenges.join(' | ')}</p>`;
+
+                // Satisfaction Ratings
+                if (review.satisfactionRatings) {
+                    const ts = review.satisfactionRatings.trainerSatisfaction || 0;
+                    const ss = review.satisfactionRatings.scoutSatisfaction || 0;
+                    html += `<p><strong>Satisfaction:</strong> Trainer ${ts}/5, Scouts ${ss}/5</p>`;
+                }
+
+                // Follow-Up Actions (optional)
+                if (review.recommendedNextTraining || review.scoutsNeedingSupport || review.adminTasks) {
+                    html += '<p><strong>Follow-Up:</strong>';
+                    if (review.recommendedNextTraining) html += ` Next training: ${review.recommendedNextTraining}`;
+                    if (review.scoutsNeedingSupport) html += ` | Scouts needing support`;
+                    if (review.adminTasks) html += ` | Admin tasks: ${review.adminTasks}`;
+                    html += '</p>';
+                }
+
+                // Training Narrative
+                html += `<p><strong>Report:</strong><br>${(review.trainerReport || '').replace(/\n/g, '<br>')}</p>`;
+
                 if (review.reportSubmittedAt) {
                     html += `<p><small>Submitted: ${new Date(review.reportSubmittedAt).toLocaleString()}</small></p>`;
                 }

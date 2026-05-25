@@ -1316,7 +1316,7 @@ app.get('/api/trainer/dashboard', requireAuth, async (req, res) => {
           { 'review.reportSubmittedAt': { $exists: false } },
           { 'review.reportSubmittedAt': null }
         ]
-      }).lean(),
+      }).select('name startDate endDate eventType location review').lean(),
       // Unread messages count
       Message.countDocuments({
         'recipients.staffId': trainerId,
@@ -1664,6 +1664,51 @@ app.delete('/api/trainer/certifications/:index', requireAuth, async (req, res) =
 
 // === TRAINER EVENT MANAGEMENT ===
 
+// === EJS HELPER FUNCTIONS ===
+app.use((req, res, next) => {
+  res.locals.formatEventType = function(type) {
+    const types = { 'camp': 'Camp', 'hike': 'Hike', 'team_building': 'Team Building', 'training_session': 'Training Session', 'inter_school_competition': 'Inter-School Competition', 'other': 'Other' };
+    return types[type] || type;
+  };
+  res.locals.getEventTypeBadgeClass = function(type) {
+    const map = { 'camp': 'badge-primary', 'hike': 'badge-success', 'team_building': 'badge-accent', 'training_session': 'badge-secondary', 'inter_school_competition': 'badge-warning', 'other': 'badge-secondary' };
+    return map[type] || 'badge-secondary';
+  };
+  res.locals.formatStatus = function(status) {
+    return (status || '').replace('_', ' ');
+  };
+  res.locals.getStatusBadgeClass = function(status) {
+    const map = { 'draft': 'badge-secondary', 'scheduled': 'badge-accent', 'published': 'badge-primary', 'confirmed': 'badge-success', 'in_progress': 'badge-warning', 'completed': 'badge-success', 'reviewed': 'badge-primary', 'cancelled': 'badge-danger', 'archived': 'badge-secondary' };
+    return map[status] || 'badge-secondary';
+  };
+  res.locals.formatRole = function(role) {
+    const roles = { 'lead_trainer': 'Lead Trainer', 'assistant_trainer': 'Assistant Trainer', 'coordinator': 'Coordinator', 'volunteer': 'Volunteer' };
+    return roles[role] || role;
+  };
+  res.locals.formatAssignmentStatus = function(status) {
+    return (status || '').replace('_', ' ');
+  };
+  res.locals.getAssignmentStatusBadge = function(status) {
+    const map = { 'assigned': 'badge-warning', 'confirmed': 'badge-success', 'declined': 'badge-danger', 'removed': 'badge-danger' };
+    return map[status] || 'badge-secondary';
+  };
+  res.locals.formatRsvpStatus = function(status) {
+    return (status || '').replace('_', ' ');
+  };
+  res.locals.getRsvpStatusBadge = function(status) {
+    const map = { 'invited': 'badge-secondary', 'confirmed': 'badge-success', 'declined': 'badge-danger', 'pending': 'badge-warning', 'no_response': 'badge-secondary' };
+    return map[status] || 'badge-secondary';
+  };
+  res.locals.formatReviewStatus = function(status) {
+    return (status || '').replace('_', ' ');
+  };
+  res.locals.getReviewStatusBadge = function(status) {
+    const map = { 'pending': 'badge-warning', 'approved': 'badge-success', 'needs_revision': 'badge-accent', 'rejected': 'badge-danger' };
+    return map[status] || 'badge-secondary';
+  };
+  next();
+});
+
 // GET trainer events page with calendar
 app.get('/trainer/events', requireAuth, async (req, res) => {
   if (!req.session.user || req.session.user.role !== 'trainer') {
@@ -1681,34 +1726,39 @@ app.get('/trainer/events/:eventId', requireAuth, async (req, res) => {
     return res.redirect('/dashboard');
   }
    try {
-     const event = await Event.findById(req.params.eventId)
-       .populate('trainers.trainerId', 'name email idNumber role')
-       .populate('targetSchools.schoolId', 'name address city contactPerson')
-       .lean();
+    const event = await Event.findById(req.params.eventId)
+      .populate('trainers.trainerId', 'name email idNumber role')
+      .populate('targetSchools.schoolId', 'name address city contactPerson')
+      .lean();
 
-     if (!event) {
-       return res.status(404).render('404', { user: req.session.user, error: 'Event not found' });
-     }
+    if (!event) {
+      return res.status(404).render('404', { user: req.session.user, error: 'Event not found' });
+    }
 
-     // Verify trainer is assigned to this event
-     const currentStaff = await getCurrentStaff(req);
-     if (!currentStaff) {
-       return res.status(403).render('404', { user: req.session.user, error: 'Staff profile not found' });
-     }
-     const isAssigned = event.trainers.some(t => t.trainerId.toString() === currentStaff._id.toString());
-     if (!isAssigned) {
-       return res.status(403).render('404', { user: req.session.user, error: 'Access denied. You are not assigned to this event.' });
-     }
+    const currentStaff = await getCurrentStaff(req);
+    if (!currentStaff) {
+      return res.status(403).render('404', { user: req.session.user, error: 'Trainer profile not found. Please contact admin.' });
+    }
 
-     res.render('trainer_event_detail', {
-       user: req.session.user,
-       event,
-       page: 'trainer_event_detail',
-       staffId: currentStaff._id.toString()
-     });
-  } catch (err) {
+    // Null-safe assignment check (event.trainers may be missing on very old records)
+    const trainersList = event.trainers || [];
+    const isAssigned = trainersList.some(t => {
+      const tid = t.trainerId?._id ? t.trainerId._id.toString() : t.trainerId?.toString();
+      return tid === currentStaff._id.toString();
+    });
+    if (!isAssigned) {
+     return res.status(403).render('404', { user: req.session.user, error: 'Access denied. You are not assigned to this event.' });
+   }
+
+    res.render('trainer_event_detail', {
+      user: req.session.user,
+      event,
+      page: 'trainer_event_detail',
+      staffId: currentStaff._id.toString()
+    });
+ } catch (err) {
     console.error('Error loading event detail:', err);
-    res.status(500).render('404', { user: req.session.user, error: 'Failed to load event' });
+    res.status(500).render('404', { user: req.session.user, error: 'Failed to load event: ' + err.message });
   }
 });
 
@@ -1792,7 +1842,13 @@ app.post('/trainer/events/:eventId/decline', requireAuth, parseJson, async (req,
 // POST: Trainer submits event report
 app.post('/trainer/events/:eventId/submit-report', requireAuth, parseJson, async (req, res) => {
   try {
-    const { trainerReport, actualAttendeeCount } = req.body;
+    const {
+      trainerReport, actualAttendeeCount, registeredAttendeeCount,
+      activitySessions, newToolsUsed, newMethodsUsed,
+      scoutEngagement, skillsGained, notableAchievements,
+      logisticalIssues, behavioralIssues, suggestionsForImprovement,
+      satisfactionRatings, recommendedNextTraining, scoutsNeedingSupport, adminTasks
+    } = req.body;
     const currentStaff = await getCurrentStaff(req);
     if (!currentStaff) {
       return res.status(404).json({ success: false, error: 'Staff profile not found' });
@@ -1811,13 +1867,55 @@ app.post('/trainer/events/:eventId/submit-report', requireAuth, parseJson, async
       return res.status(403).json({ success: false, error: 'Not assigned to this event' });
     }
 
-    // Update review fields
+    // --- Update core review fields ---
     event.review.trainerReport = trainerReport;
     event.review.reportSubmittedAt = new Date();
     event.review.reportSubmittedBy = trainerId;
-    if (actualAttendeeCount) {
+
+    if (actualAttendeeCount !== undefined) {
       event.review.actualAttendeeCount = parseInt(actualAttendeeCount);
     }
+    if (registeredAttendeeCount !== undefined) {
+      event.review.registeredAttendeeCount = parseInt(registeredAttendeeCount);
+    }
+
+    // --- Activity Summary ---
+    if (activitySessions && Array.isArray(activitySessions)) {
+      event.review.activitySessions = activitySessions.map(s => ({
+        name: s.name?.trim(),
+        description: s.description?.trim() || undefined,
+        durationMinutes: s.durationMinutes ? parseInt(s.durationMinutes) : undefined,
+        participationLevel: s.participationLevel || 'medium'
+      })).filter(s => s.name);
+    }
+    if (newToolsUsed !== undefined) event.review.newToolsUsed = newToolsUsed.trim() || undefined;
+    if (newMethodsUsed !== undefined) event.review.newMethodsUsed = newMethodsUsed.trim() || undefined;
+
+    // --- Outcomes & Impact ---
+    if (scoutEngagement) event.review.scoutEngagement = scoutEngagement;
+    if (skillsGained && Array.isArray(skillsGained)) {
+      event.review.skillsGained = skillsGained.map(s => s.trim()).filter(Boolean);
+    }
+    if (notableAchievements !== undefined) event.review.notableAchievements = notableAchievements.trim() || undefined;
+
+    // --- Challenges ---
+    if (logisticalIssues !== undefined) event.review.logisticalIssues = logisticalIssues.trim() || undefined;
+    if (behavioralIssues !== undefined) event.review.behavioralIssues = behavioralIssues.trim() || undefined;
+    if (suggestionsForImprovement !== undefined) event.review.suggestionsForImprovement = suggestionsForImprovement.trim() || undefined;
+
+    // --- Satisfaction Ratings ---
+    if (satisfactionRatings) {
+      event.review.satisfactionRatings = {
+        trainerSatisfaction: parseInt(satisfactionRatings.trainerSatisfaction) || 0,
+        scoutSatisfaction: parseInt(satisfactionRatings.scoutSatisfaction) || 0
+      };
+    }
+
+    // --- Follow-Up Actions (optional) ---
+    if (recommendedNextTraining !== undefined) event.review.recommendedNextTraining = recommendedNextTraining.trim() || undefined;
+    if (scoutsNeedingSupport !== undefined) event.review.scoutsNeedingSupport = scoutsNeedingSupport.trim() || undefined;
+    if (adminTasks !== undefined) event.review.adminTasks = adminTasks.trim() || undefined;
+
     await event.save();
 
     // Notify admins
@@ -1827,7 +1925,7 @@ app.post('/trainer/events/:eventId/submit-report', requireAuth, parseJson, async
         recipientId: admin._id,
         type: 'report_reminder',
         title: 'Report submitted',
-        message: `${currentStaff.name} submitted a report for ${event.name}`,
+        message: `${currentStaff.name} submitted a wrap-up report for ${event.name}`,
         actionUrl: `/dashboard/events/${eventId}`,
         entityType: 'event',
         entityId: eventId,
@@ -1906,25 +2004,32 @@ app.get('/api/trainer/events', requireAuth, async (req, res) => {
     }
 
      const events = await Event.find(query)
-       .select('name startDate endDate eventType status location trainers.trainerId trainers.status trainers.role')
+       .select('name startDate endDate eventType status location trainers.trainerId trainers.status trainers.role review')
        .sort({ startDate: 1 })
        .lean();
 
-    // Transform for calendar
-    const calendarEvents = events.map(ev => {
-      const trainerAssignment = ev.trainers.find(t => t.trainerId.toString() === trainerId.toString());
-      return {
-        id: ev._id,
-        title: ev.name,
-        start: ev.startDate,
-        end: ev.endDate,
-        type: ev.eventType,
-        status: ev.status,
-        location: ev.location?.name || '',
-        trainerRoles: ev.trainers.filter(t => t.trainerId.toString() === trainerId.toString()).map(t => t.role),
-        trainerAssignmentStatus: trainerAssignment ? trainerAssignment.status : 'not_assigned'
-      };
-    });
+     // Transform for calendar
+     const calendarEvents = events.map(ev => {
+       const trainerAssignment = ev.trainers.find(t => {
+         const tid = t.trainerId?._id ? t.trainerId._id.toString() : t.trainerId?.toString();
+         return tid === trainerId.toString();
+       });
+       return {
+         id: ev._id,
+         title: ev.name,
+         start: ev.startDate,
+         end: ev.endDate,
+         type: ev.eventType,
+         status: ev.status,
+         location: ev.location?.name || '',
+         trainerRoles: ev.trainers.filter(t => {
+           const tid = t.trainerId?._id ? t.trainerId._id.toString() : t.trainerId?.toString();
+           return tid === trainerId.toString();
+         }).map(t => t.role),
+         trainerAssignmentStatus: trainerAssignment ? trainerAssignment.status : 'not_assigned',
+         review: ev.review
+       };
+     });
 
     res.json({ success: true, events: calendarEvents });
   } catch (err) {

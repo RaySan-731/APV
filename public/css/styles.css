@@ -4990,3 +4990,28 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .programs-grid {
     position: relative;
 }
+
+/* --- Trainer wrap-up report form styling --- */
+fieldset {
+    border-color: var(--border);
+}
+
+fieldset legend {
+    font-weight: 600;
+    padding: 0 0.5rem;
+    font-size: 0.95rem;
+}
+
+.star-rating span {
+    transition: color 0.15s ease;
+    user-select: none;
+}
+
+.star-rating span:hover {
+    color: var(--accent) !important;
+}
+
+.session-row input,
+.session-row select {
+    font-size: 0.875rem;
+}

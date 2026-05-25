@@ -288,7 +288,7 @@
                 <% if (event.status === 'completed') { %>
                     <div class="content-card" style="margin-bottom: 1.5rem;">
                         <div class="card-header">
-                            <h3>Event Report</h3>
+                            <h3>Post-Event Wrap-Up Report</h3>
                             <% if (!event.review?.reportSubmittedAt) { %>
                                 <span class="badge badge-warning">Action Required</span>
                             <% } %>
@@ -297,10 +297,68 @@
                             <% if (event.review?.reportSubmittedAt) { %>
                                 <div style="margin-bottom: 1rem; padding: 1rem; background: var(--muted); border-radius: var(--radius);">
                                     <p><strong>Submitted:</strong> <%= new Date(event.review.reportSubmittedAt).toLocaleString() %></p>
-                                    <p><strong>Actual Attendee Count:</strong> <%= event.review.actualAttendeeCount || 'Not recorded' %></p>
-                                    <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">
+                                    <p><strong>Actual Attendees:</strong> <%= event.review.actualAttendeeCount ?? 'Not recorded' %>
+                                        <% if (event.review.registeredAttendeeCount != null) { %> / <%= event.review.registeredAttendeeCount %> registered <% } %>
+                                    </p>
+                                </div>
+
+                                <% if (event.review.activitySessions?.length) { %>
+                                <div style="margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                    <h4>Activity Summary</h4>
+                                    <ul style="margin: 0.5rem 0; padding-left: 1.25rem;">
+                                    <% event.review.activitySessions.forEach(s => { %>
+                                        <li><%= s.name %> <small>(<%= s.durationMinutes ?? 0 %> min, participation: <%= s.participationLevel ?? 'N/A' %>)</small><% if (s.description) { %> — <%= s.description %><% } %></li>
+                                    <% }); %>
+                                    </ul>
+                                    <% if (event.review.newToolsUsed || event.review.newMethodsUsed) { %>
+                                        <p><strong>New Tools/Methods Used:</strong>
+                                            <% const parts2=[]; if (event.review.newToolsUsed) parts2.push(event.review.newToolsUsed); if (event.review.newMethodsUsed) parts2.push(event.review.newMethodsUsed); %>
+                                            <%= parts2.join(' / ') %>
+                                        </p>
+                                    <% } %>
+                                </div>
+                                <% } %>
+
+                                <% if (event.review.skillsGained?.length || event.review.notableAchievements) { %>
+                                <div style="margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                    <h4>Outcomes &amp; Impact</h4>
+                                    <% if (event.review.scoutEngagement) { %><p><strong>Scout Engagement:</strong> <span class="badge <%= event.review.scoutEngagement==='High'?'badge-success':event.review.scoutEngagement==='Low'?'badge-danger':'badge-warning' %>"><%= event.review.scoutEngagement %></span></p><% } %>
+                                    <% if (event.review.skillsGained?.length) { %><p><strong>Skills Gained:</strong> <%= event.review.skillsGained.join(', ') %></p><% } %>
+                                    <% if (event.review.notableAchievements) { %><p><strong>Achievements:</strong> <%= event.review.notableAchievements %></p><% } %>
+                                </div>
+                                <% } %>
+
+                                <% if (event.review.logisticalIssues || event.review.behavioralIssues || event.review.suggestionsForImprovement) { %>
+                                <div style="margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                    <h4>Challenges &amp; Issues</h4>
+                                    <% if (event.review.logisticalIssues) { %><p><strong>Logistical:</strong> <%= event.review.logisticalIssues %></p><% } %>
+                                    <% if (event.review.behavioralIssues) { %><p><strong>Behavioral:</strong> <%= event.review.behavioralIssues %></p><% } %>
+                                    <% if (event.review.suggestionsForImprovement) { %><p><strong>Suggestions:</strong> <%= event.review.suggestionsForImprovement %></p><% } %>
+                                </div>
+                                <% } %>
+
+                                <% if (event.review.satisfactionRatings) { %>
+                                <div style="margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                    <h4>Satisfaction Ratings</h4>
+                                    <p><strong>Trainer Satisfaction:</strong> <%= '&#9733;'.repeat(event.review.satisfactionRatings.trainerSatisfaction || 0) + '&#9734;'.repeat(5 - (event.review.satisfactionRatings.trainerSatisfaction || 0)) %> (<%= event.review.satisfactionRatings.trainerSatisfaction || 0 %>/5)</p>
+                                    <p><strong>Scout Satisfaction:</strong> <%= '&#9733;'.repeat(event.review.satisfactionRatings.scoutSatisfaction || 0) + '&#9734;'.repeat(5 - (event.review.satisfactionRatings.scoutSatisfaction || 0)) %> (<%= event.review.satisfactionRatings.scoutSatisfaction || 0 %>/5)</p>
+                                </div>
+                                <% } %>
+
+                                <% if (event.review.recommendedNextTraining || event.review.scoutsNeedingSupport || event.review.adminTasks) { %>
+                                <div style="margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);">
+                                    <h4>Follow-Up Actions</h4>
+                                    <% if (event.review.recommendedNextTraining) { %><p><strong>Recommended Next Training:</strong> <%= event.review.recommendedNextTraining %></p><% } %>
+                                    <% if (event.review.scoutsNeedingSupport) { %><p><strong>Scouts Needing Support:</strong> <%= event.review.scoutsNeedingSupport %></p><% } %>
+                                    <% if (event.review.adminTasks) { %><p><strong>Admin Tasks:</strong> <%= event.review.adminTasks %></p><% } %>
+                                </div>
+                                <% } %>
+
+                                <div style="margin-bottom: 1rem; padding: 1rem; background: var(--muted); border-radius: var(--radius);">
+                                    <h4>Event Report</h4>
                                     <div style="white-space: pre-line;"><%= event.review.trainerReport %></div>
                                 </div>
+
                                 <% if (event.review.reviewStatus) { %>
                                     <div style="padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 1rem;">
                                         <h4>Admin Review</h4>
@@ -315,17 +373,200 @@
                                 <% } %>
                             <% } else { %>
                                 <form id="reportForm" onsubmit="submitReport(event)">
-                                    <div style="margin-bottom: 1rem;">
-                                        <label for="actualAttendeeCount" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Actual Attendee Count</label>
-                                        <input type="number" id="actualAttendeeCount" name="actualAttendeeCount" min="0" required
-                                               style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 300px;">
+                                    <!-- Event Overview (auto-populated display) -->
+                                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--muted); border-radius: var(--radius); font-size: 0.9rem;">
+                                        <h4 style="margin-top: 0;">Event Overview</h4>
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+                                            <div><strong>Event:</strong> <%= event.name %></div>
+                                            <div><strong>Date:</strong> <%= new Date(event.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></div>
+                                            <div><strong>Location:</strong> <%= event.location?.name || 'TBD' %></div>
+                                            <div><strong>Registered:</strong> <span id="summaryRegistered">0</span></div>
+                                            <div><strong>Trainers:</strong> <%= event.trainers?.length || 0 %></div>
+                                        </div>
                                     </div>
-                                    <div style="margin-bottom: 1rem;">
-                                        <label for="trainerReport" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Event Report</label>
-                                        <textarea id="trainerReport" name="trainerReport" rows="8" required
-                                                  style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);"></textarea>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary">Submit Report</button>
+
+                                    <!-- 1. Attendance -->
+                                    <fieldset style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;">
+                                        <legend style="font-weight: 600; padding: 0 0.5rem;">1. Attendance</legend>
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                            <div>
+                                                <label for="registeredAttendeeCount" style="display:block; margin-bottom:0.35rem; font-weight:500;">Registered Attendees</label>
+                                                <input type="number" id="registeredAttendeeCount" name="registeredAttendeeCount" min="0" placeholder="e.g. 50"
+                                                       style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                            </div>
+                                            <div>
+                                                <label for="actualAttendeeCount" style="display:block; margin-bottom:0.35rem; font-weight:500;">Actual Attendees</label>
+                                                <input type="number" id="actualAttendeeCount" name="actualAttendeeCount" min="0" required
+                                                       style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                            </div>
+                                        </div>
+                                    </fieldset>
+
+                                    <!-- 2. Activity Summary -->
+                                    <fieldset style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;">
+                                        <legend style="font-weight: 600; padding: 0 0.5rem;">2. Activity Summary</legend>
+                                        <div style="margin-bottom: 1rem;">
+                                            <label style="display:block; margin-bottom:0.35rem; font-weight:500;">Sessions / Activities Conducted</label>
+                                            <div id="sessionList">
+                                                <div class="session-row" style="display:grid; grid-template-columns: 1fr 2fr 80px 120px; gap:0.5rem; align-items:end; margin-bottom:0.5rem;">
+                                                    <div>
+                                                        <label style="font-size:0.85rem;">Session Name</label>
+                                                        <input type="text" name="sessionName_0" placeholder="e.g. Leadership Drill"
+                                                               style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                                    </div>
+                                                    <div>
+                                                        <label style="font-size:0.85rem;">Description</label>
+                                                        <input type="text" name="sessionDesc_0" placeholder="Brief description"
+                                                               style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                                    </div>
+                                                    <div>
+                                                        <label style="font-size:0.85rem;">Duration (min)</label>
+                                                        <input type="number" name="sessionDuration_0" min="0" placeholder="60"
+                                                               style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                                    </div>
+                                                    <div>
+                                                        <label style="font-size:0.85rem;">Participation</label>
+                                                        <select name="sessionParticipation_0"
+                                                                style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                                            <option value="high">High</option>
+                                                            <option value="medium" selected>Medium</option>
+                                                            <option value="low">Low</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-secondary" id="addSessionBtn" style="margin-top:0.5rem;">+ Add Session</button>
+                                        </div>
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                            <div>
+                                                <label for="newToolsUsed" style="display:block; margin-bottom:0.35rem; font-weight:500;">New Tools / Equipment Used</label>
+                                                <input type="text" id="newToolsUsed" name="newToolsUsed" placeholder="e.g. Portable PA system, climbing gear"
+                                                       style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                            </div>
+                                            <div>
+                                                <label for="newMethodsUsed" style="display:block; margin-bottom:0.35rem; font-weight:500;">New Methods Used</label>
+                                                <input type="text" id="newMethodsUsed" name="newMethodsUsed" placeholder="e.g. Peer-led facilitation"
+                                                       style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                            </div>
+                                        </div>
+                                    </fieldset>
+
+                                    <!-- 3. Outcomes & Impact -->
+                                    <fieldset style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;">
+                                        <legend style="font-weight: 600; padding: 0 0.5rem;">3. Outcomes &amp; Impact</legend>
+                                        <div style="margin-bottom: 1rem;">
+                                            <label style="display:block; margin-bottom:0.35rem; font-weight:500;">Scout Engagement Level</label>
+                                            <select name="scoutEngagement"
+                                                    style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%; max-width:300px;">
+                                                <option value="High">High</option>
+                                                <option value="Medium" selected>Medium</option>
+                                                <option value="Low">Low</option>
+                                            </select>
+                                        </div>
+                                        <div style="margin-bottom: 1rem;">
+                                            <label style="display:block; margin-bottom:0.35rem; font-weight:500;">Skills Gained / Reinforced <small>(comma-separated)</small></label>
+                                            <input type="text" name="skillsGained" placeholder="e.g. Leadership, Teamwork, Discipline, Navigation"
+                                                   style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="notableAchievements" style="display:block; margin-bottom:0.35rem; font-weight:500;">Notable Achievements</label>
+                                            <textarea id="notableAchievements" name="notableAchievements" rows="3"
+                                                      placeholder="Badges earned, competitions won, milestones reached..."
+                                                      style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;"></textarea>
+                                        </div>
+                                    </fieldset>
+
+                                    <!-- 4. Challenges & Issues -->
+                                    <fieldset style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;">
+                                        <legend style="font-weight: 600; padding: 0 0.5rem;">4. Challenges &amp; Issues</legend>
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                            <div>
+                                                <label for="logisticalIssues" style="display:block; margin-bottom:0.35rem; font-weight:500;">Logistical Issues</label>
+                                                <textarea id="logisticalIssues" name="logisticalIssues" rows="3"
+                                                          placeholder="Venue, equipment, timing problems..."
+                                                          style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;"></textarea>
+                                            </div>
+                                            <div>
+                                                <label for="behavioralIssues" style="display:block; margin-bottom:0.35rem; font-weight:500;">Behavioral / Participation Concerns</label>
+                                                <textarea id="behavioralIssues" name="behavioralIssues" rows="3"
+                                                          placeholder="Any notable concerns..."
+                                                          style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;"></textarea>
+                                            </div>
+                                        </div>
+                                        <div style="margin-top: 1rem;">
+                                            <label for="suggestionsForImprovement" style="display:block; margin-bottom:0.35rem; font-weight:500;">Suggestions for Improvement</label>
+                                            <textarea id="suggestionsForImprovement" name="suggestionsForImprovement" rows="3"
+                                                      placeholder="How can future events be improved?"
+                                                      style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;"></textarea>
+                                        </div>
+                                    </fieldset>
+
+                                    <!-- 5. Satisfaction Ratings -->
+                                    <fieldset style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;">
+                                        <legend style="font-weight: 600; padding: 0 0.5rem;">5. Satisfaction Ratings</legend>
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                            <div>
+                                                <label style="display:block; margin-bottom:0.35rem; font-weight:500;">How satisfied were you with this event?</label>
+                                                <div class="star-rating" id="trainerSatisfaction" data-value="3" style="font-size:1.5rem; cursor:pointer; color:var(--muted); letter-spacing:0.25rem;">
+                                                    <span data-val="1">&#9733;</span>
+                                                    <span data-val="2">&#9733;</span>
+                                                    <span data-val="3">&#9733;</span>
+                                                    <span data-val="4">&#9734;</span>
+                                                    <span data-val="5">&#9734;</span>
+                                                </div>
+                                                <input type="hidden" name="trainerSatisfaction" id="trainerSatisfactionInput" value="3">
+                                            </div>
+                                            <div>
+                                                <label style="display:block; margin-bottom:0.35rem; font-weight:500;">How satisfied were the scouts?</label>
+                                                <div class="star-rating" id="scoutSatisfaction" data-value="3" style="font-size:1.5rem; cursor:pointer; color:var(--muted); letter-spacing:0.25rem;">
+                                                    <span data-val="1">&#9733;</span>
+                                                    <span data-val="2">&#9733;</span>
+                                                    <span data-val="3">&#9733;</span>
+                                                    <span data-val="4">&#9734;</span>
+                                                    <span data-val="5">&#9734;</span>
+                                                </div>
+                                                <input type="hidden" name="scoutSatisfaction" id="scoutSatisfactionInput" value="3">
+                                            </div>
+                                        </div>
+                                    </fieldset>
+
+                                    <!-- 6. Follow-Up Actions (Optional) -->
+                                    <fieldset style="border: 1px dashed var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;">
+                                        <legend style="font-weight:600; padding:0 0.5rem; color:var(--muted-foreground);">6. Follow-Up Actions <small>(Optional)</small></legend>
+                                        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                            <div>
+                                                <label for="recommendedNextTraining" style="display:block; margin-bottom:0.35rem; font-weight:500;">Recommended Next Training</label>
+                                                <input type="text" id="recommendedNextTraining" name="recommendedNextTraining"
+                                                       placeholder="e.g. Advanced Navigation Camp"
+                                                       style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                            </div>
+                                            <div>
+                                                <label for="adminTasks" style="display:block; margin-bottom:0.35rem; font-weight:500;">Admin Tasks Needed</label>
+                                                <input type="text" id="adminTasks" name="adminTasks"
+                                                       placeholder="e.g. Issue certificates, process payments"
+                                                       style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                                            </div>
+                                        </div>
+                                        <div style="margin-top:1rem;">
+                                            <label for="scoutsNeedingSupport" style="display:block; margin-bottom:0.35rem; font-weight:500;">Scouts Needing Extra Support / Mentoring</label>
+                                            <textarea id="scoutsNeedingSupport" name="scoutsNeedingSupport" rows="3"
+                                                      placeholder="List any scouts flagged for follow-up mentoring or extra support..."
+                                                      style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;"></textarea>
+                                        </div>
+                                    </fieldset>
+
+                                    <!-- 7. General Event Report Narrative -->
+                                    <fieldset style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;">
+                                        <legend style="font-weight: 600; padding: 0 0.5rem;">7. General Event Report</legend>
+                                        <div>
+                                            <label for="trainerReport" style="display:block; margin-bottom:0.35rem; font-weight:500;">Event Report</label>
+                                            <textarea id="trainerReport" name="trainerReport" rows="6" required
+                                                      placeholder="Summarise the overall event — highlights, observations, closing remarks..."
+                                                      style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;"></textarea>
+                                        </div>
+                                    </fieldset>
+
+                                    <button type="submit" class="btn btn-primary" id="submitReportBtn">Submit Wrap-Up Report</button>
                                 </form>
                             <% } %>
                         </div>
@@ -411,14 +652,55 @@
 
         async function submitReport(e) {
             e.preventDefault();
-            const report = document.getElementById('trainerReport').value;
-            const attendeeCount = document.getElementById('actualAttendeeCount').value;
+            const submitBtn = document.getElementById('submitReportBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            const form = document.getElementById('reportForm');
+            const formData = new FormData(form);
+
+            const sessions = [];
+            let idx = 0;
+            while (true) {
+                const name = formData.get(`sessionName_${idx}`);
+                if (!name && idx === 0) break;
+                if (!name) break;
+                sessions.push({
+                    name: name.trim(),
+                    description: (formData.get(`sessionDesc_${idx}`) || '').trim(),
+                    durationMinutes: parseInt(formData.get(`sessionDuration_${idx}`)) || undefined,
+                    participationLevel: formData.get(`sessionParticipation_${idx}`)
+                });
+                idx++;
+            }
+
+            const payload = {
+                registeredAttendeeCount: formData.get('registeredAttendeeCount') ? parseInt(formData.get('registeredAttendeeCount')) : undefined,
+                actualAttendeeCount: parseInt(formData.get('actualAttendeeCount')),
+                activitySessions: sessions,
+                newToolsUsed: formData.get('newToolsUsed') || undefined,
+                newMethodsUsed: formData.get('newMethodsUsed') || undefined,
+                scoutEngagement: formData.get('scoutEngagement'),
+                skillsGained: formData.get('skillsGained') ? formData.get('skillsGained').split(',').map(s => s.trim()).filter(Boolean) : [],
+                notableAchievements: formData.get('notableAchievements') || undefined,
+                logisticalIssues: formData.get('logisticalIssues') || undefined,
+                behavioralIssues: formData.get('behavioralIssues') || undefined,
+                suggestionsForImprovement: formData.get('suggestionsForImprovement') || undefined,
+                satisfactionRatings: {
+                    trainerSatisfaction: parseInt(formData.get('trainerSatisfaction')),
+                    scoutSatisfaction: parseInt(formData.get('scoutSatisfaction'))
+                },
+                recommendedNextTraining: formData.get('recommendedNextTraining') || undefined,
+                scoutsNeedingSupport: formData.get('scoutsNeedingSupport') || undefined,
+                adminTasks: formData.get('adminTasks') || undefined,
+                trainerReport: formData.get('trainerReport')
+            };
 
             try {
                 const response = await fetch(`/trainer/events/${currentEventId}/submit-report`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trainerReport: report, actualAttendeeCount: attendeeCount })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
@@ -427,12 +709,89 @@
                     window.location.reload();
                 } else {
                     alert('Failed to submit report: ' + data.error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Wrap-Up Report';
                 }
             } catch (err) {
                 console.error('Error:', err);
                 alert('Connection error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Wrap-Up Report';
             }
         }
+
+        function initStarRating(containerId, inputId) {
+            const container = document.getElementById(containerId);
+            const input = document.getElementById(inputId);
+            const stars = container.querySelectorAll('span[data-val]');
+
+            function setRating(val) {
+                container.dataset.value = val;
+                input.value = val;
+                stars.forEach(s => {
+                    const rated = parseInt(s.dataset.val) <= val;
+                    s.style.color = rated ? 'var(--accent)' : 'var(--muted)';
+                    s.classList.toggle('rated', rated);
+                });
+            }
+
+            stars.forEach(s => {
+                s.addEventListener('click', () => setRating(parseInt(s.dataset.val)));
+                s.classList.add('rated');
+            });
+
+            setRating(parseInt(container.dataset.value) || 3);
+        }
+
+        initStarRating('trainerSatisfaction', 'trainerSatisfactionInput');
+        initStarRating('scoutSatisfaction', 'scoutSatisfactionInput');
+
+        let sessionCount = 0;
+        document.getElementById('addSessionBtn')?.addEventListener('click', function () {
+            sessionCount++;
+            const list = document.getElementById('sessionList');
+            const row = document.createElement('div');
+            row.className = 'session-row';
+            row.style.cssText = 'display:grid; grid-template-columns: 1fr 2fr 80px 120px; gap:0.5rem; align-items:end; margin-bottom:0.5rem;';
+            row.innerHTML = `
+                <div>
+                    <label style="font-size:0.85rem;">Session Name</label>
+                    <input type="text" name="sessionName_${sessionCount}" placeholder="e.g. Team Challenge"
+                           style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem;">Description</label>
+                    <input type="text" name="sessionDesc_${sessionCount}" placeholder="Brief description"
+                           style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem;">Duration (min)</label>
+                    <input type="number" name="sessionDuration_${sessionCount}" min="0" placeholder="60"
+                           style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem;">Participation</label>
+                    <select name="sessionParticipation_${sessionCount}"
+                            style="padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); width:100%;">
+                        <option value="high">High</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+            `;
+            list.appendChild(row);
+        });
+
+        (function prefillSummary() {
+            const summaryEl = document.getElementById('summaryRegistered');
+            const regInput = document.getElementById('registeredAttendeeCount');
+            if (!summaryEl || !regInput) return;
+            const totalRegistered = (<%- JSON.stringify(event) %>.targetSchools || []).reduce((sum, s) => {
+                return sum + (s.attendance ? (s.attendance.registered || 0) : 0);
+            }, 0);
+            summaryEl.textContent = totalRegistered;
+            if (!regInput.value) regInput.value = totalRegistered || '';
+        })();
 
         }
 

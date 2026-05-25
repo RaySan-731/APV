@@ -20,10 +20,36 @@ async function initializePage() {
     await loadEvents();
     updateStats();
 
-    // Switch to calendar view if ?view=calendar is in the URL (e.g. from the dashboard "View Schedule" quick action)
+    // Switch to calendar view if ?view=calendar is in the URL
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('view') === 'calendar') {
       switchView('calendar');
+      return;
+    }
+
+    // Auto-apply status filter if ?status=<value> is in the URL (e.g. ?status=completed)
+    const statusParam = urlParams.get('status');
+    if (statusParam) {
+      const statusSelect = document.getElementById('statusFilter');
+      if (statusSelect) {
+        const matchingOption = Array.from(statusSelect.options).find(opt => opt.value === statusParam);
+        if (matchingOption) {
+          statusSelect.value = statusParam;
+        }
+      }
+    }
+
+    // If ?eventId= is present, navigate straight to the event detail page
+    const eventIdParam = urlParams.get('eventId');
+    if (eventIdParam) {
+      window.location.href = `/trainer/events/${eventIdParam}`;
+      return;
+    }
+
+    // Switch to the "past" tab if completing reports page
+    const viewParam = urlParams.get('view');
+    if (viewParam === 'report' || statusParam === 'completed') {
+      switchTab('past');
     }
 }
 
@@ -140,8 +166,11 @@ function switchTab(tab) {
     document.getElementById('upcomingTabBtn').classList.toggle('active', tab === 'upcoming');
     document.getElementById('pastTabBtn').classList.toggle('active', tab === 'past');
 
-    // Clear filters when switching tabs for better UX
-    document.getElementById('statusFilter').value = '';
+    // Only clear status filter when user manually switches tabs (not initial page load)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.get('status')) {
+        document.getElementById('statusFilter').value = '';
+    }
     applyFilters();
 }
 

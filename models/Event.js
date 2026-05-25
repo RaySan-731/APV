@@ -177,9 +177,49 @@ const eventSchema = new mongoose.Schema({
 
     // Attendance verification
     actualAttendeeCount: { type: Number, min: 0 },
+    registeredAttendeeCount: { type: Number, min: 0 },
     attendanceVerified: { type: Boolean, default: false },
     attendanceVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
     attendanceVerifiedAt: Date,
+
+    // --- Activity Summary ---
+    activitySessions: [{
+      name: { type: String, trim: true },
+      description: String,
+      durationMinutes: { type: Number, min: 0 },
+      participationLevel: {
+        type: String,
+        enum: ['high', 'medium', 'low'],
+        default: 'medium'
+      }
+    }],
+    newToolsUsed: String,
+    newMethodsUsed: String,
+
+    // --- Outcomes & Impact ---
+    skillsGained: [{ type: String, trim: true }],
+    scoutEngagement: {
+      type: String,
+      enum: ['High', 'Medium', 'Low'],
+      default: 'Medium'
+    },
+    notableAchievements: String,
+
+    // --- Challenges & Issues ---
+    logisticalIssues: String,
+    behavioralIssues: String,
+    suggestionsForImprovement: String,
+
+    // --- Satisfaction Ratings ---
+    satisfactionRatings: {
+      trainerSatisfaction: { type: Number, min: 1, max: 5 },
+      scoutSatisfaction: { type: Number, min: 1, max: 5 }
+    },
+
+    // --- Follow-Up Actions (optional) ---
+    recommendedNextTraining: String,
+    scoutsNeedingSupport: String,
+    adminTasks: String,
 
     // Admin review & approval
     reviewStatus: {

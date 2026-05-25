@@ -218,8 +218,10 @@
         }, duration);
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        console.log('[payment-detail] DOMContentLoaded — starting payment form wiring');
+    // Initialize payment form AJAX handling immediately (script is at bottom of body).
+    // Avoids any DOMContentLoaded timing issues that can cause native form submission.
+    (function initPaymentFormDetail() {
+        console.log('[payment-detail] initPaymentFormDetail — wiring AJAX handler (reliable bottom-of-page init)');
 
         function updatePaymentModal(form) {
             var method  = form.querySelector('.payment-method');
@@ -261,10 +263,9 @@
                 if (isNaN(amount) || amount <= 0 || amount > balance) return;
 
                 e.preventDefault();
-                console.log('[payment-detail] submit intercepted, amount=', amount);
+                console.log('[payment-detail] submit intercepted via AJAX, amount=', amount);
 
                 var btn  = form.querySelector('.payment-submit-btn');
-                var msg  = form.querySelector('.modal-payment-msg');
                 setSubmitState(btn, true);
 
                 fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' })
@@ -273,7 +274,12 @@
                     console.log('[payment-detail] response data:', data);
                     if (data.success) {
                         showToast('Payment recorded successfully!', 'success');
-                        setTimeout(function () { location.href = '/finance/invoices'; }, 1800);
+                        setSubmitState(btn, false);
+                        var formContainer = form.closest ? form.closest('.card') : null;
+                        if (formContainer) {
+                            formContainer.innerHTML = '<div class="alert alert-success mb-0">Payment recorded successfully. <a href="javascript:location.reload()">Refresh page</a> to view updated balance and payment history.</div>';
+                        }
+                        // No automatic redirect — confirmation is shown via toast + in-place message
                     } else {
                         showMsg(form, 'error', data.error || 'Failed to record payment.');
                         setSubmitState(btn, false);
@@ -286,7 +292,7 @@
                 });
             });
         });
-    });
+    })();
     </script>
 </body>
 </html>

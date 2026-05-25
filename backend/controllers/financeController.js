@@ -592,7 +592,7 @@ exports.exportReportCSV = async (req, res) => {
 
     switch (reportType) {
       case 'profit_loss':
-        // Simplified P&L export
+        // Simplified P&L export (matches the on-screen report)
         const revenue = await Invoice.aggregate([
           { $match: { issueDate: { $gte: start, $lte: end } } },
           { $group: { _id: null, totalRevenue: { $sum: '$totalAmount' } } }
@@ -601,15 +601,25 @@ exports.exportReportCSV = async (req, res) => {
           { $match: { paidDate: { $gte: start, $lte: end }, status: 'approved' } },
           { $group: { _id: null, totalExpenses: { $sum: '$netAmount' } } }
         ]);
+        const payroll = await Payroll.aggregate([
+          { $match: { periodStart: { $gte: start }, periodEnd: { $lte: end }, status: { $in: ['approved', 'paid'] } } },
+          { $group: { _id: null, totalPayroll: { $sum: '$netAmount' } } }
+        ]);
+        const totalRevenue = revenue[0]?.totalRevenue || 0;
+        const totalExpenses = expenses[0]?.totalExpenses || 0;
+        const totalPayroll = payroll[0]?.totalPayroll || 0;
         data = [{
           Metric: 'Total Revenue',
-          Value: revenue[0]?.totalRevenue || 0
+          Value: totalRevenue
         }, {
           Metric: 'Total Expenses',
-          Value: expenses[0]?.totalExpenses || 0
+          Value: totalExpenses
+        }, {
+          Metric: 'Total Payroll',
+          Value: totalPayroll
         }, {
           Metric: 'Net Income',
-          Value: (revenue[0]?.totalRevenue || 0) - (expenses[0]?.totalExpenses || 0)
+          Value: totalRevenue - totalExpenses - totalPayroll
         }];
         break;
 
@@ -659,6 +669,10 @@ exports.exportReportCSV = async (req, res) => {
         break;
     }
 
+    if (exportFormat === 'pdf' && (!data || data.length === 0)) {
+      return res.status(400).json({ success: false, error: 'No data available for PDF export' });
+    }
+
     if (exportFormat === 'csv') {
       const csv = json2csv.parse(data);
       const filename = `${reportType}_${startDate}_to_${endDate}.csv`;
@@ -678,10 +692,25 @@ exports.exportReportCSV = async (req, res) => {
     });
 
     const filename = `${reportType}_${startDate}_to_${endDate}`.replace(/\s+/g, '_');
-    await streamBrandedPdf(res, headers, rows, `${reportType.replace(/_/g, ' ')}`, filename);
+    try {
+      await streamBrandedPdf(res, headers, rows, `${reportType.replace(/_/g, ' ')}`, filename);
+    } catch (pdfErr) {
+      console.error('PDF generation failed:', pdfErr);
+      if (!res.headersSent) {
+        return res.status(500).json({ success: false, error: 'PDF generation failed: ' + (pdfErr.message || pdfErr) });
+      }
+      throw pdfErr; // let outer catch handle if headers sent
+    }
   } catch (err) {
     console.error('Error exporting report:', err);
-    res.status(500).json({ success: false, error: 'Failed to export report' });
+    if (!res.headersSent) {
+      const message = process.env.NODE_ENV === 'production' 
+        ? 'Failed to export report' 
+        : ('Failed to export report: ' + (err.message || err));
+      res.status(500).json({ success: false, error: message });
+    } else {
+      console.error('Could not send error JSON because headers were already sent.');
+    }
   }
 };
 

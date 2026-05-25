@@ -23,13 +23,20 @@
                 <h1 class="page-title">Trainer Cost Report</h1>
                 <div class="btn-toolbar">
                     <a href="/finance/reports" class="btn btn-outline-secondary btn-sm">Back</a>
-                    <form action="/finance/reports/export" method="POST" class="d-inline">
+                    <form action="/finance/reports/export" method="POST" class="d-inline" id="exportForm">
                         <input type="hidden" name="reportType" value="trainer_costs">
                         <input type="hidden" name="startDate" value="<%= startDate %>">
                         <input type="hidden" name="endDate" value="<%= endDate %>">
-                        <button type="submit" name="export" value="csv" class="btn btn-outline-success btn-sm ms-2">Export CSV</button>
-                        <button type="submit" name="export" value="pdf" class="btn btn-success btn-sm ms-1">Export PDF</button>
+                        <input type="hidden" name="export" id="exportFormat" value="csv">
+                        <button type="button" onclick="setExportAndSubmit('csv')" class="btn btn-outline-success btn-sm ms-2">Export CSV</button>
+                        <button type="button" onclick="setExportAndSubmit('pdf')" class="btn btn-success btn-sm ms-1">Export PDF</button>
                     </form>
+                    <script nonce="<%= cspNonce %>">
+                        function setExportAndSubmit(format) {
+                            document.getElementById('exportFormat').value = format;
+                            document.getElementById('exportForm').submit();
+                        }
+                    </script>
                 </div>
             </header>
 

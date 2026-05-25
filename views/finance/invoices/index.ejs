@@ -116,101 +116,104 @@
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <% invoices.forEach(inv => { %>
-                                        <tr class="<%= inv.status === 'overdue' ? 'table-danger' : inv.status === 'paid' ? 'table-success' : '' %>">
-                                            <td><%= inv.invoiceNumber %></td>
-                                            <td><% if (inv.schoolId) { %><a href="/schools/<%= inv.schoolId._id %>"><%= inv.schoolId.name %></a><% } else { %><span class="text-muted">School deleted</span><% } %></td>
-                                            <td><%= new Date(inv.issueDate).toLocaleDateString() %></td>
-                                            <td><%= new Date(inv.dueDate).toLocaleDateString() %></td>
-                                            <td>KES <%= inv.totalAmount.toLocaleString() %></td>
-                                            <td>KES <%= inv.amountPaid.toLocaleString() %></td>
-                                            <td class="<%= inv.balance > 0 ? 'text-danger fw-bold' : '' %>">
-                                                KES <%= inv.balance.toLocaleString() %>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-<%= 
-                                                    inv.status === 'paid' ? 'success' :
-                                                    inv.status === 'overdue' ? 'danger' :
-                                                    inv.status === 'partial' ? 'warning' :
-                                                    inv.status === 'cancelled' ? 'secondary' :
-                                                    'primary'
-                                                %>">
-                                                    <%= inv.status %>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm">
-                                                    <a href="/finance/invoices/<%= inv._id %>" class="btn btn-outline-primary">View</a>
-                                                    <a href="/finance/invoices/<%= inv._id %>/download" class="btn btn-outline-secondary" target="_blank">PDF</a>
-                                                    <% if (inv.status !== 'paid' && inv.status !== 'cancelled') { %>
-                                                        <button type="button" class="btn btn-outline-success" onclick="openPaymentModal('<%= inv._id %>')">
-                                                            Record Payment
-                                                        </button>
-                                                    <% } %>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                 <tbody>
+                                     <% invoices.forEach(inv => { %>
+                                         <tr class="<%= inv.status === 'overdue' ? 'table-danger' : inv.status === 'paid' ? 'table-success' : '' %>">
+                                             <td><%= inv.invoiceNumber %></td>
+                                             <td><% if (inv.schoolId) { %><a href="/schools/<%= inv.schoolId._id %>"><%= inv.schoolId.name %></a><% } else { %><span class="text-muted">School deleted</span><% } %></td>
+                                             <td><%= new Date(inv.issueDate).toLocaleDateString() %></td>
+                                             <td><%= new Date(inv.dueDate).toLocaleDateString() %></td>
+                                             <td>KES <%= inv.totalAmount.toLocaleString() %></td>
+                                             <td>KES <%= inv.amountPaid.toLocaleString() %></td>
+                                             <td class="<%= inv.balance > 0 ? 'text-danger fw-bold' : '' %>">
+                                                 KES <%= inv.balance.toLocaleString() %>
+                                             </td>
+                                             <td>
+                                                 <span class="badge bg-<%= 
+                                                     inv.status === 'paid' ? 'success' :
+                                                     inv.status === 'overdue' ? 'danger' :
+                                                     inv.status === 'partial' ? 'warning' :
+                                                     inv.status === 'cancelled' ? 'secondary' :
+                                                     'primary'
+                                                 %>">
+                                                     <%= inv.status %>
+                                                 </span>
+                                             </td>
+                                             <td>
+                                                 <div class="btn-group btn-group-sm">
+                                                     <a href="/finance/invoices/<%= inv._id %>" class="btn btn-outline-primary">View</a>
+                                                     <a href="/finance/invoices/<%= inv._id %>/download" class="btn btn-outline-secondary" target="_blank">PDF</a>
+                                                     <% if (inv.status !== 'paid' && inv.status !== 'cancelled') { %>
+                                                         <button type="button" class="btn btn-outline-success" onclick="openPaymentModal('<%= inv._id %>')">
+                                                             Record Payment
+                                                         </button>
+                                                     <% } %>
+                                                 </div>
+                                             </td>
+                                         </tr>
+                                     <% }); %>
+                                 </tbody>
+                             </table>
+                         </div>
 
-                                        <!-- Payment Modal -->
-                                        <div class="modal-overlay" id="paymentModal<%= inv._id %>" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-                                            <div class="modal-dialog">
-                                                <div class="modal-content">
-                                                    <form action="/finance/invoices/<%= inv._id %>/payments" method="POST" enctype="multipart/form-data" class="payment-form" data-invoice="<%= inv._id %>" data-balance="<%= inv.balance %>" data-invoice-number="<%= inv.invoiceNumber %>">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title">Record Payment - <%= inv.invoiceNumber %></h5>
-                                                            <button type="button" class="btn-close close-modal-btn" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <div class="mb-3">
-                                                                <label class="form-label">Amount (KES)</label>
-                                                                <input type="number" name="amount" class="form-control payment-amount" max="<%= inv.balance %>" step="0.01" min="0.01" required>
-                                                                <small class="text-muted">Outstanding balance: KES <%= inv.balance.toLocaleString() %></small>
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label class="form-label">Payment Date</label>
-                                                                <input type="date" name="paymentDate" class="form-control payment-date" value="<%= new Date().toISOString().split('T')[0] %>" required>
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label class="form-label">Payment Method</label>
-                                                                <select name="method" class="form-select payment-method" required>
-                                                                    <option value="mpesa">M-Pesa</option>
-                                                                    <option value="bank_transfer">Bank Transfer</option>
-                                                                    <option value="cheque">Cheque</option>
-                                                                    <option value="cash">Cash</option>
-                                                                </select>
-                                                            </div>
-                                                            <div class="mb-3 reference-field">
-                                                                <label class="form-label">Reference <span class="text-muted cash-hint" style="display:none;">(optional — auto-generated for cash)</span></label>
-                                                                <input type="text" name="reference" class="form-control payment-reference" placeholder="e.g. MPESA-XXXX or Receipt #">
-                                                            </div>
-                                                            <div class="mb-3 receipt-field">
-                                                                <label class="form-label">Receipt / Proof of Payment <span class="text-muted cash-hint" style="display:none;">(not required for cash)</span></label>
-                                                                <input type="file" name="receipt" class="form-control payment-receipt" accept="image/jpeg,image/png,image/gif,application/pdf,.doc,.docx,.xls,.xlsx">
-                                                                <small class="text-muted">Accepted: JPG, PNG, PDF, DOC, XLS (max 5 MB)</small>
-                                                            </div>
-                                                            <div class="mb-3 received-by-field" style="display:none;">
-                                                                <label class="form-label">Received By <span class="text-danger">*</span></label>
-                                                                <input type="text" name="received_by" class="form-control" placeholder="Name of person who handed over the cash">
-                                                                <small class="text-muted">Required for all cash payments.</small>
-                                                            </div>
-                                                            <div class="modal-payment-msg" style="display:none;"></div>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
-                                                            <button type="submit" class="btn btn-primary payment-submit-btn">Record Payment</button>
-                                                        </div>
-    </form>
-                </div>
-                                            </div>
-                                        </div>
-                                    <% }); %>
-                                </tbody>
-                            </table>
-                        </div>
+                         <!-- Payment Modals (rendered outside the table for valid HTML) -->
+                         <% invoices.forEach(inv => { %>
+                             <!-- Payment Modal -->
+                             <div class="modal-overlay" id="paymentModal<%= inv._id %>" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+                                 <div class="modal-dialog">
+                                     <div class="modal-content">
+                                         <form action="/finance/invoices/<%= inv._id %>/payments" method="POST" enctype="multipart/form-data" class="payment-form" data-invoice="<%= inv._id %>" data-balance="<%= inv.balance %>" data-invoice-number="<%= inv.invoiceNumber %>">
+                                             <div class="modal-header">
+                                                 <h5 class="modal-title">Record Payment - <%= inv.invoiceNumber %></h5>
+                                                 <button type="button" class="btn-close close-modal-btn" aria-label="Close"></button>
+                                             </div>
+                                             <div class="modal-body">
+                                                 <div class="mb-3">
+                                                     <label class="form-label">Amount (KES)</label>
+                                                     <input type="number" name="amount" class="form-control payment-amount" max="<%= inv.balance %>" step="0.01" min="0.01" required>
+                                                     <small class="text-muted">Outstanding balance: KES <%= inv.balance.toLocaleString() %></small>
+                                                 </div>
+                                                 <div class="mb-3">
+                                                     <label class="form-label">Payment Date</label>
+                                                     <input type="date" name="paymentDate" class="form-control payment-date" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                                 </div>
+                                                 <div class="mb-3">
+                                                     <label class="form-label">Payment Method</label>
+                                                     <select name="method" class="form-select payment-method" required>
+                                                         <option value="mpesa">M-Pesa</option>
+                                                         <option value="bank_transfer">Bank Transfer</option>
+                                                         <option value="cheque">Cheque</option>
+                                                         <option value="cash">Cash</option>
+                                                     </select>
+                                                 </div>
+                                                 <div class="mb-3 reference-field">
+                                                     <label class="form-label">Reference <span class="text-muted cash-hint" style="display:none;">(optional — auto-generated for cash)</span></label>
+                                                     <input type="text" name="reference" class="form-control payment-reference" placeholder="e.g. MPESA-XXXX or Receipt #">
+                                                 </div>
+                                                 <div class="mb-3 receipt-field">
+                                                     <label class="form-label">Receipt / Proof of Payment <span class="text-muted cash-hint" style="display:none;">(not required for cash)</span></label>
+                                                     <input type="file" name="receipt" class="form-control payment-receipt" accept="image/jpeg,image/png,image/gif,application/pdf,.doc,.docx,.xls,.xlsx">
+                                                     <small class="text-muted">Accepted: JPG, PNG, PDF, DOC, XLS (max 5 MB)</small>
+                                                 </div>
+                                                 <div class="mb-3 received-by-field" style="display:none;">
+                                                     <label class="form-label">Received By <span class="text-danger">*</span></label>
+                                                     <input type="text" name="received_by" class="form-control" placeholder="Name of person who handed over the cash">
+                                                     <small class="text-muted">Required for all cash payments.</small>
+                                                 </div>
+                                                 <div class="modal-payment-msg" style="display:none;"></div>
+                                             </div>
+                                             <div class="modal-footer">
+                                                 <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
+                                                 <button type="submit" class="btn btn-primary payment-submit-btn">Record Payment</button>
+                                             </div>
+                                         </form>
+                                     </div>
+                                 </div>
+                             </div>
+                         <% }); %>
 
-                        <!-- Pagination -->
-                        <% if (pagination.pages > 1) { %>
+                         <!-- Pagination -->
+                         <% if (pagination.pages > 1) { %>
                             <nav class="mt-4">
                                 <ul class="pagination">
                                     <% for (let i = 1; i <= pagination.pages; i++) { %>
@@ -254,9 +257,13 @@
         if (el) { el.style.display = 'flex'; }
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        console.log('[payment] DOMContentLoaded — starting payment form wiring');
+    // Initialize payment modals + AJAX form handling immediately.
+    // The script runs at the bottom of the body, so all .payment-form elements exist.
+    // Using an IIFE avoids any race with DOMContentLoaded (which may have already fired).
+    (function initPaymentForms() {
+        console.log('[payment] initPaymentForms — wiring AJAX handlers (reliable bottom-of-page init)');
 
+        // Modal close handlers (click outside + close buttons)
         document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
             overlay.addEventListener('click', function (e) {
                 if (e.target === overlay) overlay.style.display = 'none';
@@ -298,22 +305,30 @@
             else       { btn.textContent = btn.dataset._orig || 'Record Payment'; btn.disabled = false; }
         }
 
+        // Wire every payment form for AJAX (prevent native submit + use fetch)
         document.querySelectorAll('.payment-form').forEach(function (form) {
+            // Defensive: some forms may be malformed due to being rendered inside <tbody>
+            // (invalid HTML). Skip broken ones.
+            if (!form.querySelector('.payment-amount')) {
+                console.warn('[payment] Skipping malformed payment-form (missing expected inputs). This is usually caused by modals being inside the table.');
+                return;
+            }
+
             updatePaymentModal(form);
             var pm = form.querySelector('.payment-method');
             if (pm) pm.addEventListener('change', function () { updatePaymentModal(form); });
 
             form.addEventListener('submit', function (e) {
                 var balance = parseFloat(form.dataset.balance || '0');
-                var amount  = parseFloat(form.querySelector('.payment-amount').value || '0');
+                var amountInput = form.querySelector('.payment-amount');
+                var amount  = amountInput ? parseFloat(amountInput.value || '0') : 0;
 
                 if (isNaN(amount) || amount <= 0 || amount > balance) return; // let HTML5 field UI surface this
 
                 e.preventDefault();
-                console.log('[payment] submit intercepted, amount=', amount);
+                console.log('[payment] submit intercepted via AJAX, amount=', amount);
 
                 var btn  = form.querySelector('.payment-submit-btn');
-                var msg  = form.querySelector('.modal-payment-msg');
                 setSubmitState(btn, true);
 
                 fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' })
@@ -322,7 +337,10 @@
                     console.log('[payment] response data:', data);
                     if (data.success) {
                         showToast('Payment recorded successfully!', 'success');
-                        setTimeout(function () { location.href = '/finance/invoices'; }, 1800);
+                        setSubmitState(btn, false);
+                        var overlay = form.closest ? form.closest('.modal-overlay') : null;
+                        if (overlay) overlay.style.display = 'none';
+                        // No redirect — user stays on the invoices list with the confirmation toast
                     } else {
                         showMsg(form, 'error', data.error || 'Failed to record payment. Please try again.');
                         setSubmitState(btn, false);
@@ -335,7 +353,7 @@
                 });
             });
         });
-    });
+    })();
     </script>
 </body>
 </html>

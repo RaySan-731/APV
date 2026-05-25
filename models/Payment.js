@@ -100,7 +100,16 @@ paymentSchema.index({ schoolId: 1, paymentDate: -1 });
 paymentSchema.index({ paymentType: 1, status: 1 });
 paymentSchema.index({ dueDate: 1 });
 paymentSchema.index({ paidDate: 1 });
+
+// invoiceNumber is denormalized for display/lookup only.
+// It is NOT unique — an invoice can (and should) have multiple Payment documents
+// when partial payments are recorded. The DB may have a leftover unique index
+// from an older schema version; see scripts/fix_payment_indexes.js to clean it.
 paymentSchema.index({ invoiceNumber: 1 });
+
+// Proper relational index for the common query pattern: payments by invoice
+paymentSchema.index({ invoiceId: 1, paymentDate: -1 });
+
 paymentSchema.index({ trainerId: 1 });
 paymentSchema.index({ createdAt: -1 });
 

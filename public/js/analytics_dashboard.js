@@ -38,7 +38,11 @@ function updateKpi(id, value, suffix = '') {
 
 function setActiveTimePill(range) {
   document.querySelectorAll('.time-pill').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.range === range);
+    if (btn.dataset.range === range) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
   });
 }
 
@@ -47,13 +51,16 @@ function attachTimeRangeListeners() {
   if (!pills.length) return;
 
   pills.forEach(pill => {
-    pill.addEventListener('click', () => {
+    // Remove old listeners if any (defensive)
+    pill.onclick = null;
+    pill.addEventListener('click', (e) => {
       const range = pill.dataset.range;
-      if (range === currentTimeRange) return;
+      if (!range || range === currentTimeRange) return;
       currentTimeRange = range;
       setActiveTimePill(range);
-      refreshAnalytics();
-    });
+      // Small delay to let the UI update the active class
+      setTimeout(() => refreshAnalytics(), 10);
+    }, { passive: true });
   });
 }
 
@@ -301,13 +308,24 @@ async function loadAnalyticsWidgets(range = '90d') {
   const timeParam = `timeRange=${range}`;
   const dateParam = `dateRange=${range}`;
 
-  const [dashboardData, trainerReport, eventReport, schoolReport, schoolsAnalytics] = await Promise.all([
-    fetchJson(`/api/dashboard-data?${timeParam}`),
-    fetchJson(`/api/reports/trainer-performance?${dateParam}`),
-    fetchJson(`/api/reports/event-effectiveness?${dateParam}`),
-    fetchJson(`/api/reports/school-engagement?${dateParam}`),
-    fetchJson(`/api/schools/analytics?${timeParam}`).catch(() => ({ byStatus: [], onboardingTrends: [] }))
+  const [dashboardData, trainerReport, eventReport, schoolReport] = await Promise.all([
+    fetchJson(`/api/dashboard-data?${timeParam}`).catch(() => ({})),
+    fetchJson(`/api/reports/trainer-performance?${dateParam}`).catch(() => ({ success: false, data: [] })),
+    fetchJson(`/api/reports/event-effectiveness?${dateParam}`).catch(() => ({ success: false, data: [] })),
+    fetchJson(`/api/reports/school-engagement?${dateParam}`).catch(() => ({ success: false, data: [] }))
   ]);
+
+  // Schools analytics is optional (extra charts only) — never let it break the main dashboard
+  let schoolsAnalytics = { byStatus: [], onboardingTrends: [] };
+  try {
+    const res = await fetch(`/api/schools/analytics?${timeParam}`);
+    if (res.ok) {
+      const sa = await res.json();
+      if (sa) schoolsAnalytics = sa;
+    }
+  } catch (e) {
+    // Silently ignore — status doughnut and trend line will just be empty
+  }
 
   // Update rich KPIs
   updateKpi('kpiTotalSchools', dashboardData.totalSchools || 0);
@@ -339,9 +357,18 @@ async function loadAnalyticsWidgets(range = '90d') {
   renderTrendChart(trendData);
 }
 
+function getCurrentTimeRange() {
+  const activePill = document.querySelector('.time-pill.active');
+  if (activePill && activePill.dataset.range) {
+    currentTimeRange = activePill.dataset.range;
+  }
+  return currentTimeRange;
+}
+
 async function refreshAnalytics() {
   try {
-    await loadAnalyticsWidgets(currentTimeRange);
+    const range = getCurrentTimeRange();
+    await loadAnalyticsWidgets(range);
   } catch (err) {
     console.error('Unable to refresh analytics:', err);
   }

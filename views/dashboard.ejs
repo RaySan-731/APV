@@ -303,10 +303,11 @@
                             <!-- Compose Tab Content -->
                             <div id="composeTabContent" style="max-height: 400px; overflow-y: auto; padding: 0.5rem; display: none;">
                                 <!-- Message Compose Form -->
-                                <form id="dropdownComposeForm" class="form-grid" style="gap: 0.75rem;">
-                                    <label style="grid-column: 1 / -1;">
-                                        To
-                                        <select id="composeRecipientSelect" name="recipientIds" multiple required style="width: 100%; min-height: 80px;">
+                                 <form id="dropdownComposeForm" class="form-grid" style="gap: 0.75rem;">
+                                     <input type="hidden" id="composeParentMessageId" name="parentMessageId">
+                                     <label style="grid-column: 1 / -1;">
+                                         To
+                                         <select id="composeRecipientSelect" name="recipientIds" multiple required style="width: 100%; min-height: 80px;">
                                             <% if (staffList && staffList.length > 0) { %>
                                                 <% staffList.forEach(staff => { %>
                                                     <option value="<%= staff._id %>"><%= staff.name %> (<%= staff.role %>)</option>
@@ -3266,19 +3267,6 @@ async function saveSchoolAllocation() {
 
           markAllReadBtn?.addEventListener('click', markAllRead);
 
-          // Individual actions
-          async function acknowledgeAnnouncement(annId) {
-            try {
-              await fetch(`/api/announcements/${annId}/acknowledge`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes: '' })
-              });
-            } catch (err) {
-              console.error('Error acknowledging:', err);
-            }
-          }
-
           async function markMessageAsRead(msgId) {
             try {
               await fetch(`/api/messages/${msgId}/read`, { method: 'POST' });
@@ -3299,6 +3287,7 @@ async function saveSchoolAllocation() {
             const body = document.getElementById('composeBody').value.trim();
             const priority = document.getElementById('composePriority').value;
             const isImportant = document.getElementById('composeImportant').checked;
+            const parentMessageId = document.getElementById('composeParentMessageId')?.value || undefined;
 
             if (!recipientIds.length || !body) {
               showComposeError('Please fill in required fields');
@@ -3309,7 +3298,7 @@ async function saveSchoolAllocation() {
               const res = await fetch('/api/messages/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ recipientIds, subject, body, priority, isImportant })
+                body: JSON.stringify({ recipientIds, subject, body, priority, isImportant, parentMessageId })
               });
               const data = await res.json();
               if (data.success) {
@@ -3464,11 +3453,41 @@ async function saveSchoolAllocation() {
           window.acknowledgeAnnouncement = acknowledgeAnnouncement;
 
           function replyFromModal() {
-            if (!currentMessage) return;
+            const msg = currentMessage;
+            if (!msg) return;
+
+            const subject = msg.subject || '(No subject)';
+            const rawSender = msg.senderId;
+            const senderId = rawSender ? (rawSender._id || rawSender) : null;
+            const messageId = msg._id || '';
+
             closeMessageModal();
-            // Switch to compose tab and pre-fill
-            document.querySelector('[data-tab="compose"]').click();
-            document.getElementById('composeSubject').value = 'Re: ' + (currentMessage.subject || '(No subject)');
+
+            // Open the notification dropdown if it's not already visible
+            if (notificationDropdown && notificationDropdown.style.display !== 'block') {
+              notificationDropdown.style.display = 'block';
+            }
+
+            // Switch to compose tab
+            const composeTab = document.querySelector('[data-tab="compose"]');
+            if (composeTab) composeTab.click();
+
+            // Pre-fill for reply
+            const subjectInput = document.getElementById('composeSubject');
+            if (subjectInput) subjectInput.value = 'Re: ' + subject;
+
+            const parentInput = document.getElementById('composeParentMessageId');
+            if (parentInput) parentInput.value = messageId;
+
+            // Try to pre-select the original sender as recipient
+            const recipientSelect = document.getElementById('composeRecipientSelect');
+            if (recipientSelect && senderId) {
+              Array.from(recipientSelect.options).forEach(opt => opt.selected = false);
+              const senderOption = Array.from(recipientSelect.options).find(opt => opt.value === senderId.toString());
+              if (senderOption) {
+                senderOption.selected = true;
+              }
+            }
           }
            window.replyFromModal = replyFromModal;
 
@@ -3558,6 +3577,9 @@ async function saveSchoolAllocation() {
               const res = await fetch(`/api/messages/thread/${parentMessageId}`);
               const data = await res.json();
               const threadContainer = document.getElementById('threadReplies');
+
+              let html = '';
+
               if (data.success && data.replies && data.replies.length > 0) {
                 const repliesHtml = data.replies.map(reply => `
                   <div style="padding: 1rem; background: var(--muted); border-radius: var(--radius); margin-bottom: 0.5rem;">
@@ -3568,66 +3590,67 @@ async function saveSchoolAllocation() {
                     <div style="white-space: pre-wrap;">${escapeHtml(reply.body)}</div>
                   </div>
                 `).join('');
-                threadContainer.innerHTML = '<h5>Replies</h5>' + repliesHtml;
+
+                html = '<h5>Replies</h5>' + repliesHtml;
+
+                // Add a Reply button at the bottom of the thread section
+                html += `
+                  <div style="margin-top: 0.75rem; text-align: right;">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="replyToThread('${parentMessageId}')">
+                      Reply to thread
+                    </button>
+                  </div>
+                `;
               } else {
-                threadContainer.innerHTML = '';
+                // Even if no replies yet, we can still allow replying to start the thread
+                html = `
+                  <div style="margin-top: 0.5rem; text-align: right;">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="replyToThread('${parentMessageId}')">
+                      Reply to this message
+                    </button>
+                  </div>
+                `;
               }
+
+              threadContainer.innerHTML = html;
             } catch (err) {
               console.error('Error loading thread:', err);
             }
           }
 
-          function openModal(id) {
-            document.getElementById(id).style.display = 'flex';
-          }
+          function replyToThread(parentMessageId) {
+            if (!parentMessageId) return;
 
-          function closeAnnouncementModal() {
-            closeModal('announcementModal');
-            currentAnnouncement = null;
-            // Refresh notifications list to reflect acknowledgment
-            loadNotificationsData();
-          }
+            closeMessageModal();
 
-          function closeMessageModal() {
-            closeModal('messageDetailModal');
-            currentMessage = null;
-          }
+            // Open the notification dropdown if it's not already visible
+            if (notificationDropdown && notificationDropdown.style.display !== 'block') {
+              notificationDropdown.style.display = 'block';
+            }
 
-          function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-          }
+            // Switch to compose tab in the notification dropdown
+            const composeTab = document.querySelector('[data-tab="compose"]');
+            if (composeTab) composeTab.click();
 
-          async function acknowledgeAnnouncement() {
-            if (!currentAnnouncement) return;
-            try {
-              await fetch(`/api/announcements/${currentAnnouncement._id}/acknowledge`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes: '' })
-              });
-              closeAnnouncementModal();
-            } catch (err) {
-              console.error('Error acknowledging:', err);
+            const subject = currentMessage?.subject || '(No subject)';
+            const subjectInput = document.getElementById('composeSubject');
+            if (subjectInput) subjectInput.value = 'Re: ' + subject;
+
+            const parentInput = document.getElementById('composeParentMessageId');
+            if (parentInput) parentInput.value = parentMessageId;
+
+            // Try to pre-select the original sender if possible
+            const recipientSelect = document.getElementById('composeRecipientSelect');
+            const rawSender = currentMessage?.senderId;
+            const senderId = rawSender ? (rawSender._id || rawSender) : null;
+
+            if (recipientSelect && senderId) {
+              Array.from(recipientSelect.options).forEach(opt => opt.selected = false);
+              const senderOption = Array.from(recipientSelect.options).find(opt => opt.value === senderId.toString());
+              if (senderOption) senderOption.selected = true;
             }
           }
-
-          function replyFromModal() {
-            if (!currentMessage) return;
-            closeMessageModal();
-            // Switch to compose tab and pre-fill
-            document.querySelector('[data-tab="compose"]').click();
-            document.getElementById('composeSubject').value = 'Re: ' + (currentMessage.subject || '(No subject)');
-            // Could also set hidden parentMessageId if needed
-          }
-
-          // Modify notification item click to open modals
-          // This overrides the previous onclick inline handler. We'll attach via JS
-          // In renderNotifications(), instead of inline onclick, we use event delegation:
-          // We'll modify renderNotifications to not include onclick and use the event listener added earlier.
-          // But we already added event listeners in renderNotifications after creating items. That code uses .addEventListener and will call viewAnnouncementModal and markMessageAsRead.
-
-          // I need to update renderNotifications to call viewAnnouncementModal and viewMessageModal instead of redirecting.
-          // But we already added event listeners in renderNotifications after creating items. That code uses .addEventListener and will call viewAnnouncementModal and markMessageAsRead.
+          window.replyToThread = replyToThread;
 
           // Load initial notifications (populates badge count and caches data for instant dropdown open)
           loadNotificationsData();

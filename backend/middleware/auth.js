@@ -60,7 +60,7 @@ const requirePermission = (permission) => {
       // At this point the caller (server.js) already requires Permission model
       // if it is needed beyond the role check. Import here to keep this file
       // free of Mongoose UMD coupling.
-      const Permission = require('../models/Permission');
+      const Permission = require('../../models/Permission');
       const staffPermissions = await Permission.findOne({ role: req.session.user.role });
 
       if (!staffPermissions || !staffPermissions.permissions || !staffPermissions.permissions[permission]) {

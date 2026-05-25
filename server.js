@@ -8253,13 +8253,23 @@ app.get('/api/messages/:messageId', requireAuth, async (req, res) => {
     }
     const staffId = currentStaff._id;
 
-    const message = await Message.findOne({
+    const userRole = req.session.user.role;
+    const isHighLevel = ['admin', 'founder', 'commissioner', 'supervisor'].includes(userRole);
+
+    let messageQuery = {
       _id: req.params.messageId,
-      $or: [
+      'recipients.deleted': { $ne: true }
+    };
+
+    if (!isHighLevel) {
+      messageQuery.$or = [
         { senderId: staffId },
         { 'recipients.staffId': staffId }
-      ]
-    }).populate('senderId', 'name email role')
+      ];
+    }
+
+    const message = await Message.findOne(messageQuery)
+      .populate('senderId', 'name email role')
       .populate('recipients.staffId', 'name email role');
 
     if (!message) {
@@ -8267,8 +8277,8 @@ app.get('/api/messages/:messageId', requireAuth, async (req, res) => {
     }
 
     // Mark as read for current user if they are a recipient
-    if (message.senderId.toString() !== staffId.toString()) {
-      const recipient = message.recipients.find(r => r.staffId.toString() === staffId.toString());
+    if (staffId && message.senderId && message.senderId.toString() !== staffId.toString()) {
+      const recipient = message.recipients.find(r => r.staffId && r.staffId.toString() === staffId.toString());
       if (recipient && recipient.status !== 'read') {
         recipient.status = 'read';
         recipient.readAt = new Date();
@@ -8488,19 +8498,23 @@ app.get('/api/messages/thread/:parentMessageId', requireAuth, async (req, res) =
     }
 
     // Verify access to parent message
-    const hasAccess = parentMessage.senderId.toString() === staffId.toString() ||
+    const userRole = req.session.user.role;
+    const isHighLevel = ['admin', 'founder', 'commissioner', 'supervisor'].includes(userRole);
+    const hasAccess = isHighLevel ||
+      parentMessage.senderId.toString() === staffId.toString() ||
       parentMessage.recipients.some(r => r.staffId.toString() === staffId.toString());
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
-    const replies = await Message.find({
-      parentMessageId: req.params.parentMessageId,
-      $or: [
+    let repliesQuery = { parentMessageId: req.params.parentMessageId };
+    if (!isHighLevel) {
+      repliesQuery.$or = [
         { senderId: staffId },
         { 'recipients.staffId': staffId }
-      ]
-    })
+      ];
+    }
+    const replies = await Message.find(repliesQuery)
       .sort({ sentAt: 1 })
       .populate('senderId', 'name email role')
       .populate('recipients.staffId', 'name email role')

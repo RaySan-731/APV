@@ -70,16 +70,16 @@ exports.getSchoolsAnalytics = async (req, res) => {
   try {
     const { timeRange = '6m' } = req.query;
     let dateFilter = {};
-    if (timeRange === '3m') {
+    if (timeRange === '30d' || timeRange === '3m') {
       dateFilter.createdAt = { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) };
-    } else if (timeRange === '6m') {
+    } else if (timeRange === '90d' || timeRange === '6m') {
       dateFilter.createdAt = { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) };
     } else if (timeRange === '1y') {
       dateFilter.createdAt = { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) };
     }
 
-    const School = require('../models/School');
-    const Event = require('../models/Event');
+    const School = require('../../models/School');
+    const Event = require('../../models/Event');
 
     // Total schools
     const totalSchools = await School.countDocuments();

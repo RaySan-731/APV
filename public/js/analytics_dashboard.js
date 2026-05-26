@@ -200,6 +200,61 @@ function renderSchoolChart(data) {
   });
 }
 
+function renderReportSubmissionChart(trainerData = []) {
+  const canvas = document.getElementById('reportSubmissionChart');
+  if (!canvas) return;
+  destroyChart(analyticsState.reportSubmissionChart);
+
+  const totals = trainerData.reduce((acc, t) => {
+    acc.onTime += t.reportsOnTime || 0;
+    acc.late += t.reportsLate || 0;
+    return acc;
+  }, { onTime: 0, late: 0 });
+
+  const labels = ['On-time', 'Late'];
+  const values = [totals.onTime, totals.late];
+  const bg = [CHART_COLORS.success, CHART_COLORS.warning];
+
+  analyticsState.reportSubmissionChart = buildChart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 2, borderColor: '#fff' }] },
+    options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%', responsive: true, maintainAspectRatio: false }
+  });
+}
+
+function renderEventAttendeesChart(data = []) {
+  const canvas = document.getElementById('eventAttendeesChart');
+  if (!canvas) return;
+  destroyChart(analyticsState.eventAttendeesChart);
+
+  const labels = data.map(i => i.eventType || 'Unknown');
+  const values = data.map(i => i.totalAttended || i.totalRegistered || i.totalEvents || 0);
+
+  analyticsState.eventAttendeesChart = buildChart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Total Attended', data: values, backgroundColor: CHART_COLORS.primaryLight, borderRadius: 6 }] },
+    options: { ...getProfessionalBarOptions(null, false), indexAxis: labels.length > 6 ? 'y' : 'x' }
+  });
+}
+
+function renderRevenueChart(dashboardData = {}) {
+  const canvas = document.getElementById('revenueChart');
+  if (!canvas) return;
+  destroyChart(analyticsState.revenueChart);
+
+  const collected = dashboardData.revenueCollected || 0;
+  const outstanding = dashboardData.outstandingPayments || 0;
+  const labels = ['Collected', 'Outstanding'];
+  const values = [collected, outstanding];
+  const bg = [CHART_COLORS.success, CHART_COLORS.warning];
+
+  analyticsState.revenueChart = buildChart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 2, borderColor: '#fff' }] },
+    options: { plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ₦${Number(ctx.raw).toLocaleString()}` } } }, cutout: '60%', responsive: true, maintainAspectRatio: false }
+  });
+}
+
 function renderStatusChart(byStatus = []) {
   const canvas = document.getElementById('schoolStatusChart');
   if (!canvas) return;
@@ -348,6 +403,11 @@ async function loadAnalyticsWidgets(range = '90d') {
     .sort((a, b) => b.engagementScore - a.engagementScore)
     .slice(0, 10);
   renderSchoolChart(schoolMetrics);
+
+  // New charts: report submission pie, event attendees, revenue
+  renderReportSubmissionChart(topTrainers);
+  renderEventAttendeesChart(eventMetrics);
+  renderRevenueChart(dashboardData);
 
   // Extra real-data charts
   const statusData = schoolsAnalytics.byStatus || [];

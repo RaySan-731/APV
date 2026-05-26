@@ -509,90 +509,84 @@
                              </div>
                          </div>
                      </div>
-                 <% } else if (page === 'analytics') { %>
-                     <!-- Professional Analytics Dashboard -->
-                     <style>
-                       .analytics-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
-                       .analytics-header h2 { margin:0; font-size:1.75rem; font-weight:700; color:#0f172a; }
-                       .analytics-header .subtitle { margin:0.25rem 0 0; color:#64748b; font-size:0.95rem; }
-                       .analytics-controls { display:flex; align-items:center; gap:0.75rem; }
-                       .time-range-pills { display:inline-flex; background:#f1f5f9; border-radius:9999px; padding:3px; }
-                       .time-pill { border:none; background:transparent; padding:6px 16px; font-size:0.875rem; font-weight:600; color:#475569; border-radius:9999px; cursor:pointer; transition:all .15s ease; }
-                       .time-pill.active { background:#fff; color:#0f172a; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
-                       .time-pill:hover:not(.active) { color:#1e2937; }
-                       .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-                       .kpi-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.1rem; display:flex; align-items:center; gap:0.85rem; box-shadow:0 1px 2px rgba(0,0,0,0.03); }
-                       .kpi-card .icon { font-size:1.6rem; width:42px; height:42px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:10px; flex-shrink:0; }
-                       .kpi-card .value { font-size:1.55rem; font-weight:700; line-height:1.1; color:#0f172a; }
-                       .kpi-card .label { font-size:0.8rem; color:#64748b; margin-top:2px; }
-                       .charts-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:1.25rem; }
-                       .chart-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:1.1rem 1.2rem; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:flex; flex-direction:column; }
-                       .chart-card.large { grid-column: span 1; }
-                       @media (min-width: 1100px) { .chart-card.large { grid-column: span 2; } }
-                       .chart-card h4 { margin:0 0 0.75rem; font-size:0.95rem; font-weight:600; color:#334155; }
-                       .chart-card .chart-wrap { flex:1; min-height:240px; position:relative; }
-                       .analytics-insights { margin-top:1.5rem; background:linear-gradient(135deg,#f8fafc,#f1f5f9); border-radius:12px; padding:1rem 1.25rem; font-size:0.9rem; color:#475569; border:1px solid #e2e8f0; }
-                     </style>
+                  <% } else if (page === 'analytics') { %>
+                      <!-- Analytics Dashboard (streamlined) -->
+                      <style>
+                        .analytics-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:1rem; }
+                        .analytics-header h2 { margin:0; font-size:1.5rem; font-weight:700; color:#0f172a; }
+                        .analytics-controls { display:flex; align-items:center; gap:0.5rem; }
+                        .time-range-pills { display:inline-flex; background:#f1f5f9; border-radius:9999px; padding:3px; }
+                        .time-pill { border:none; background:transparent; padding:6px 12px; font-size:0.85rem; font-weight:600; color:#475569; border-radius:9999px; cursor:pointer; }
+                        .time-pill.active { background:#fff; color:#0f172a; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+                        .charts-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:1rem; }
+                        .chart-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:0.9rem; display:flex; flex-direction:column; }
+                        .chart-card.large { grid-column: span 1; }
+                        @media (min-width:1100px) { .chart-card.large { grid-column: span 2; } }
+                        .chart-card h4 { margin:0 0 0.5rem; font-size:0.95rem; font-weight:600; color:#334155; }
+                        .chart-wrap { min-height:220px; }
+                      </style>
 
-                     <div class="analytics-header">
-                       <div>
-                         <h2>Analytics Dashboard</h2>
-                         <p class="subtitle">Real-time KPIs and performance trends across trainers, events, and schools</p>
-                       </div>
-                       <div class="analytics-controls">
-                         <div class="time-range-pills">
-                           <button class="time-pill" data-range="30d">30d</button>
-                           <button class="time-pill" data-range="90d">90d</button>
-                           <button class="time-pill" data-range="1y">1y</button>
-                         </div>
-                         <button class="btn btn-primary" type="button" onclick="refreshAnalytics()">Refresh</button>
-                       </div>
-                     </div>
+                      <div class="analytics-header">
+                        <div>
+                          <h2>Analytics Dashboard</h2>
+                          <div style="font-size:0.9rem; color:#64748b;">Live visualizations driven from database reports</div>
+                        </div>
+                        <div class="analytics-controls">
+                          <div class="time-range-pills">
+                            <button class="time-pill" data-range="30d">30d</button>
+                            <button class="time-pill" data-range="90d">90d</button>
+                            <button class="time-pill" data-range="1y">1y</button>
+                          </div>
+                          <button class="btn btn-primary" type="button" onclick="refreshAnalytics()">Refresh</button>
+                        </div>
+                      </div>
 
-                     <!-- Enhanced KPI Row -->
-                     <div class="kpi-grid">
-                       <div class="kpi-card"><div class="icon">🏫</div><div><div class="value" id="kpiTotalSchools">0</div><div class="label">Total Schools</div></div></div>
-                       <div class="kpi-card"><div class="icon">✅</div><div><div class="value" id="kpiActiveSchools">0</div><div class="label">Active Schools</div></div></div>
-                       <div class="kpi-card"><div class="icon">📅</div><div><div class="value" id="kpiEventsThisMonth">0</div><div class="label">Events This Month</div></div></div>
-                       <div class="kpi-card"><div class="icon">👨‍🎓</div><div><div class="value" id="kpiTotalStudents">0</div><div class="label">Active Students</div></div></div>
-                       <div class="kpi-card"><div class="icon">⚡</div><div><div class="value" id="kpiStaffProductivity">0</div><div class="label">Events per Trainer</div></div></div>
-                       <div class="kpi-card"><div class="icon">📈</div><div><div class="value" id="kpiSchoolParticipation">0</div><div class="label">School Participation</div></div></div>
-                       <div class="kpi-card"><div class="icon">🎯</div><div><div class="value" id="kpiEventEngagement">0</div><div class="label">Event Engagement</div></div></div>
-                       <div class="kpi-card"><div class="icon">⏱</div><div><div class="value" id="kpiBookingLeadTime">0</div><div class="label">Avg Lead Days</div></div></div>
-                     </div>
+                      <div class="charts-grid">
+                        <div class="chart-card large">
+                          <h4>Trainer Productivity (Completed Events)</h4>
+                          <div class="chart-wrap"><canvas id="trainerProductivityChart" height="260"></canvas></div>
+                        </div>
 
-                     <!-- Charts Section -->
-                     <div class="charts-grid">
-                       <div class="chart-card large">
-                         <h4>Trainer Productivity (Completed Events)</h4>
-                         <div class="chart-wrap"><canvas id="trainerProductivityChart" height="260"></canvas></div>
-                       </div>
+                        <div class="chart-card">
+                          <h4>Event Effectiveness by Type</h4>
+                          <div class="chart-wrap"><canvas id="eventEngagementChart" height="220"></canvas></div>
+                        </div>
 
-                       <div class="chart-card">
-                         <h4>Event Effectiveness by Type</h4>
-                         <div class="chart-wrap"><canvas id="eventEngagementChart" height="220"></canvas></div>
-                       </div>
+                        <div class="chart-card">
+                          <h4>Top Schools by Engagement</h4>
+                          <div class="chart-wrap"><canvas id="schoolParticipationChart" height="220"></canvas></div>
+                        </div>
 
-                       <div class="chart-card">
-                         <h4>Top Schools by Engagement</h4>
-                         <div class="chart-wrap"><canvas id="schoolParticipationChart" height="220"></canvas></div>
-                       </div>
+                        <div class="chart-card">
+                          <h4>Report Submission (On-time vs Late)</h4>
+                          <div class="chart-wrap"><canvas id="reportSubmissionChart" height="220"></canvas></div>
+                        </div>
 
-                       <div class="chart-card">
-                         <h4>Schools by Service Status</h4>
-                         <div class="chart-wrap"><canvas id="schoolStatusChart" height="220"></canvas></div>
-                       </div>
+                        <div class="chart-card">
+                          <h4>Event Attendees by Type</h4>
+                          <div class="chart-wrap"><canvas id="eventAttendeesChart" height="220"></canvas></div>
+                        </div>
 
-                       <div class="chart-card">
-                         <h4>School Onboarding Trend</h4>
-                         <div class="chart-wrap"><canvas id="onboardingTrendChart" height="220"></canvas></div>
-                       </div>
-                     </div>
+                        <div class="chart-card">
+                          <h4>Revenue Collected vs Outstanding</h4>
+                          <div class="chart-wrap"><canvas id="revenueChart" height="220"></canvas></div>
+                        </div>
 
-                     <div class="analytics-insights">
-                       Data is computed from live event, school, and feedback records. Use the time range selector above to analyze different periods. Charts update automatically when you change the range or click Refresh.
-                     </div>
-                 <% } else if (page === 'staff') { %>
+                        <div class="chart-card">
+                          <h4>Schools by Service Status</h4>
+                          <div class="chart-wrap"><canvas id="schoolStatusChart" height="220"></canvas></div>
+                        </div>
+
+                        <div class="chart-card">
+                          <h4>School Onboarding Trend</h4>
+                          <div class="chart-wrap"><canvas id="onboardingTrendChart" height="220"></canvas></div>
+                        </div>
+                      </div>
+
+                      <div style="margin-top:1rem; color:#475569; font-size:0.9rem;">
+                        Visualizations are sourced from the API endpoints and reflect live data. Use the time range selector to filter the period.
+                      </div>
+                  <% } else if (page === 'staff') { %>"}]}]}'
                     <div class="stats-grid">
                         <div class="stat-card"><div class="stat-icon">👥</div><div><div class="stat-number"><%= stats ? stats.totalStaff : 0 %></div><div class="stat-label">Total Staff</div></div></div>
                         <div class="stat-card"><div class="stat-icon">🟢</div><div><div class="stat-number"><%= stats ? stats.activeStaff : 0 %></div><div class="stat-label">Active Staff</div></div></div>

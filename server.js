@@ -2100,7 +2100,30 @@ app.post('/book/submit', parseJson, async (req, res) => {
     });
 
     await booking.save();
-    res.render('book_success', { booking });
+
+    // Notify admins/founders about new booking request (non-blocking)
+    (async () => {
+      try {
+        const admins = await Staff.find({ role: { $in: ['admin', 'founder', 'supervisor'] } });
+        for (const admin of admins) {
+          await Notification.create({
+            recipientId: admin._id,
+            type: 'booking_request',
+            title: 'New Booking Request',
+            message: `${booking.requesterName || booking.userEmail || 'Guest'} requested ${booking.program} on ${new Date(booking.date).toLocaleDateString()}`,
+            actionUrl: '/admin/bookings',
+            entityType: 'booking',
+            entityId: booking._id,
+            priority: 'high',
+            channels: ['in-app']
+          });
+        }
+      } catch (nerr) {
+        console.error('Error creating booking notifications:', nerr);
+      }
+    })();
+
+    res.render('book_success', { booking, user: req.session.user });
   } catch (err) {
     console.error('Booking creation error:', err);
     res.status(500).render('404', { user: req.session.user, error: 'Failed to create booking' });

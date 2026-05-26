@@ -33,18 +33,27 @@
         </aside>
 
         <main class="main-content">
-            <header class="dashboard-header">
-                <h1>Trainer Dashboard</h1>
-                <div class="user-info" style="display: flex; align-items: center; gap: 1rem;">
-                    <div class="notification-bell" id="notificationBell" style="position: relative; cursor: pointer;">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
-                        <span class="badge badge-danger" id="notificationBadge" style="position: absolute; top: -5px; right: -5px; display: none;">0</span>
+            <header class="dashboard-header" style="display: flex; flex-direction: column; gap: 0.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 style="margin: 0; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em;">Trainer Dashboard</h1>
+                        <p id="welcomeGreeting" style="margin: 0.25rem 0 0; color: var(--muted-foreground); font-size: 0.95rem;"></p>
                     </div>
-                    <span>Welcome, <%= user.name %></span>
+                    <div class="user-info" style="display: flex; align-items: center; gap: 1rem; flex-shrink: 0;">
+                        <div class="notification-bell" id="notificationBell" style="position: relative; cursor: pointer;">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <span class="badge badge-danger" id="notificationBadge" style="position: absolute; top: -5px; right: -5px; display: none;">0</span>
+                        </div>
+                        <div style="text-align: right; line-height: 1.3;">
+                            <div style="font-weight: 600;"><%= user.name %></div>
+                            <div style="font-size: 0.75rem; color: var(--muted-foreground);">Trainer</div>
+                        </div>
+                    </div>
                 </div>
+                <div id="dashboardQuickSummary" style="font-size: 0.85rem; color: var(--muted-foreground);"></div>
             </header>
 
             <section class="dashboard-content">
@@ -131,39 +140,41 @@
                     </div>
                 </div>
 
-                <!-- Stats Grid -->
+                <!-- Stats Grid - Professional Real-Data Overview -->
                 <div class="stats-grid" id="trainerStats">
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 2l3 3 3-3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V2l3 3 3-3z"></path>
                                 <path d="M2 12h20"></path>
                                 <path d="M6 12v8"></path>
                                 <path d="M18 12v8"></path>
                             </svg>
                         </div>
-    <div id="eventsCompletedThisMonth"><span class="skeleton-loader"></span></div>
-                        <div class="stat-label">Events Completed (This Month)</div>
+                        <div>
+                            <div class="stat-number" id="eventsCompletedThisMonth"><span class="skeleton-loader"></span></div>
+                            <div class="stat-label">Events Completed<br><span style="font-size:0.7em;opacity:0.7;">This Month</span></div>
+                        </div>
                     </div>
-
+ 
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="8.5" cy="7" r="4"></circle>
                                 <path d="M20 21v-2a4 4 0 0 0-4-4h-2"></path>
                                 <circle cx="15.5" cy="7" r="4"></circle>
                             </svg>
                         </div>
-    <div class="stat-number" id="totalScoutsReached">
-                        <span class="skeleton-loader"></span>
+                        <div>
+                            <div class="stat-number" id="totalScoutsReached"><span class="skeleton-loader"></span></div>
+                            <div class="stat-label">Scouts Reached<br><span style="font-size:0.7em;opacity:0.7;">Lifetime</span></div>
+                        </div>
                     </div>
-                        <div class="stat-label">Scouts Reached</div>
-                    </div>
-
+ 
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                 <polyline points="14,2 14,8 20,8"></polyline>
                                 <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -171,86 +182,107 @@
                                 <polyline points="10,9 9,9 8,9"></polyline>
                             </svg>
                         </div>
-                        <div class="stat-number" id="reportsSubmitted">
-                            <span class="skeleton-loader"></span>
+                        <div>
+                            <div class="stat-number" id="reportsSubmitted"><span class="skeleton-loader"></span></div>
+                            <div class="stat-label">Reports Submitted<br><span style="font-size:0.7em;opacity:0.7;">All Time</span></div>
                         </div>
-                        <div class="stat-label">Reports Submitted</div>
                     </div>
-
+ 
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="9" cy="7" r="4"></circle>
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                             </svg>
                         </div>
-                        <div class="stat-number" id="schoolsVisited">
-                            <span class="skeleton-loader"></span>
+                        <div>
+                            <div class="stat-number" id="schoolsVisited"><span class="skeleton-loader"></span></div>
+                            <div class="stat-label">Schools Visited<br><span style="font-size:0.7em;opacity:0.7;">Unique</span></div>
                         </div>
-                        <div class="stat-label">Schools Visited</div>
                     </div>
-
+ 
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 012.37-5.823M15 21H9v-1a3 3 0 00-6 0v1M15 21h3v-1a6 6 0 01-6-6"></path>
                             </svg>
                         </div>
-                        <div class="stat-number" id="studentsManaged">
-                            <span class="skeleton-loader"></span>
+                        <div>
+                            <div class="stat-number" id="studentsManaged"><span class="skeleton-loader"></span></div>
+                            <div class="stat-label">Students Managed<br><span style="font-size:0.7em;opacity:0.7;">Active</span></div>
                         </div>
-                        <div class="stat-label">Students Managed</div>
                     </div>
-
+ 
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                             </svg>
                         </div>
-                        <div class="stat-number" id="performanceRating">
-                            <span class="skeleton-loader"></span>
+                        <div>
+                            <div class="stat-number" id="performanceRating"><span class="skeleton-loader"></span></div>
+                            <div class="stat-label">Performance Rating<br><span style="font-size:0.7em;opacity:0.7;">Admin Feedback</span></div>
                         </div>
-                        <div class="stat-label">Performance Rating</div>
                     </div>
                 </div>
 
                 <!-- Pending Actions Summary -->
-                <div class="content-card" id="pendingActionsCard" style="display: none;">
-                    <h2>Pending Actions</h2>
-                    <div id="pendingActionsList" class="alerts-grid"></div>
+                <div class="content-card" id="pendingActionsCard" style="display: none; margin-bottom: 1.5rem;">
+                    <div class="card-header" style="padding: 0.9rem 1.25rem;">
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+                            <span>⚠️</span> Pending Actions
+                        </div>
+                    </div>
+                    <div id="pendingActionsList" style="padding: 0.75rem 1.25rem;"></div>
                 </div>
-
+ 
                 <!-- Today's Schedule -->
-                <div class="content-card">
-                    <h2>Today's Schedule</h2>
-                    <div id="todaySchedule">
+                <div class="content-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="padding: 0.9rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+                            📅 Today's Schedule
+                        </div>
+                        <a href="/trainer/events?view=calendar" class="btn btn-sm btn-outline" style="font-size:0.75rem; padding: 0.25rem 0.6rem;">View Calendar</a>
+                    </div>
+                    <div id="todaySchedule" style="padding: 0.5rem 1.25rem 1rem;">
                         <p class="placeholder-text">Loading schedule...</p>
                     </div>
                 </div>
-
+ 
                 <!-- Upcoming Events -->
-                <div class="content-card">
-                    <h2>Upcoming Events (Next 7 Days)</h2>
-                    <div id="upcomingEvents">
+                <div class="content-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="padding: 0.9rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+                            🗓️ Upcoming Events (Next 7 Days)
+                        </div>
+                        <a href="/trainer/events" class="btn btn-sm btn-outline" style="font-size:0.75rem; padding: 0.25rem 0.6rem;">View All Events</a>
+                    </div>
+                    <div id="upcomingEvents" style="padding: 0.5rem 1.25rem 1rem;">
                         <p class="placeholder-text">Loading upcoming events...</p>
                     </div>
                 </div>
-
+ 
                 <!-- Pending Reports -->
-                <div class="content-card">
-                    <h2>Pending Reports</h2>
-                    <div id="pendingReports">
+                <div class="content-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="padding: 0.9rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+                            📋 Pending Reports
+                        </div>
+                        <a href="/trainer/events?status=completed" class="btn btn-sm btn-outline" style="font-size:0.75rem; padding: 0.25rem 0.6rem;">Submit Reports</a>
+                    </div>
+                    <div id="pendingReports" style="padding: 0.5rem 1.25rem 1rem;">
                         <p class="placeholder-text">Checking pending reports...</p>
                     </div>
                 </div>
 
                 <!-- Quick Actions -->
-                <div class="content-card" style="margin-bottom: 2rem;">
-                    <h2>Quick Actions</h2>
-                    <div class="quick-actions-grid">
+                <div class="content-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="padding: 0.9rem 1.25rem;">
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">⚡ Quick Actions</div>
+                    </div>
+                    <div class="quick-actions-grid" style="padding: 0.75rem 1.25rem 1rem;">
                         <a href="/trainer/events?status=completed" class="quick-action-card">
                             <div class="quick-action-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -327,17 +359,22 @@
                 </div>
 
                 <!-- Announcements Feed -->
-                <div class="content-card">
-                    <h2>Announcements</h2>
-                    <div id="announcementsFeed" style="max-height: 400px; overflow-y: auto;">
+                <div class="content-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header" style="padding: 0.9rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">📢 Announcements</div>
+                        <a href="/announcements" class="btn btn-sm btn-outline" style="font-size:0.75rem; padding: 0.25rem 0.6rem;">View All</a>
+                    </div>
+                    <div id="announcementsFeed" style="max-height: 380px; overflow-y: auto; padding: 0.5rem 1.25rem 0.75rem;">
                         <p class="placeholder-text">Loading announcements...</p>
                     </div>
                 </div>
 
                 <!-- Availability & Leave Management -->
                 <div class="content-card">
-                    <h2>Availability & Leave Management</h2>
-                    <div class="availability-section">
+                    <div class="card-header" style="padding: 0.9rem 1.25rem;">
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">🕒 Availability &amp; Leave Management</div>
+                    </div>
+                    <div class="availability-section" style="padding: 0 1.25rem 1rem;">
                         <div class="calendar-container">
                             <div class="calendar-header">
                                 <button id="prevMonth" class="btn btn-sm">‹</button>
@@ -443,6 +480,35 @@
             el.textContent = errorMsg;
         }
 
+        function setProfessionalHeader(data) {
+            // Dynamic time-based greeting
+            const hour = new Date().getHours();
+            let greeting = 'Good day';
+            if (hour < 12) greeting = 'Good morning';
+            else if (hour < 17) greeting = 'Good afternoon';
+            else greeting = 'Good evening';
+
+            const greetEl = document.getElementById('welcomeGreeting');
+            if (greetEl) {
+                greetEl.textContent = `${greeting}, ready to make an impact today?`;
+            }
+
+            // Real-data quick summary line
+            const summaryEl = document.getElementById('dashboardQuickSummary');
+            if (summaryEl) {
+                const todayCount = (data.todaySchedule && data.todaySchedule.length) || 0;
+                const upcomingCount = (data.upcomingEvents && data.upcomingEvents.length) || 0;
+                const pendingCount = (data.pendingReports && data.pendingReports.length) || 0;
+                let summaryParts = [];
+                if (todayCount > 0) summaryParts.push(`${todayCount} event${todayCount > 1 ? 's' : ''} today`);
+                if (upcomingCount > 0) summaryParts.push(`${upcomingCount} upcoming this week`);
+                if (pendingCount > 0) summaryParts.push(`${pendingCount} report${pendingCount > 1 ? 's' : ''} pending`);
+                summaryEl.textContent = summaryParts.length > 0 
+                    ? `Overview: ${summaryParts.join(' • ')}` 
+                    : 'No scheduled activities today. Check your availability below.';
+            }
+        }
+
         function showSectionLoading(sectionId, isLoading) {
             const section = document.getElementById(sectionId);
             if (section) {
@@ -489,7 +555,6 @@
                 showSectionLoading('todaySchedule', true);
                 showSectionLoading('upcomingEvents', true);
                 showSectionLoading('pendingReports', true);
-                showSectionLoading('alertsList', true);
                 showSectionLoading('announcementsFeed', true);
 
                 const response = await fetch('/api/trainer/dashboard');
@@ -506,13 +571,23 @@
                 setStatLoaded('reportsSubmitted', data.stats.reportsSubmitted);
                 setStatLoaded('schoolsVisited', data.stats.schoolsVisited);
                 setStatLoaded('studentsManaged', data.stats.studentsManaged);
-                setStatLoaded('performanceRating', data.stats.performanceRating, false);
+                // Performance rating: show 1 decimal or 'N/A' if not rated
+                const ratingVal = data.stats.performanceRating;
+                const perfEl = document.getElementById('performanceRating');
+                const perfSkeleton = perfEl.querySelector('.skeleton-loader');
+                if (perfSkeleton) perfSkeleton.remove();
+                perfEl.classList.add('loaded');
+                perfEl.classList.remove('loading', 'error');
+                perfEl.textContent = (typeof ratingVal === 'number' && ratingVal > 0) ? ratingVal.toFixed(1) : 'N/A';
 
                 renderTodaySchedule(data.todaySchedule);
                 renderUpcomingEvents(data.upcomingEvents);
                 renderPendingReports(data.pendingReports);
                 renderAlerts(data.pendingActions);
                 renderAnnouncementsFeed(data.announcements);
+
+                // Professional header greeting + real-data quick summary
+                setProfessionalHeader(data);
 
                 // Load other async data
                 loadNotificationBadge();
@@ -549,21 +624,21 @@
                         .map(ts => ts.schoolId && typeof ts.schoolId === 'object' ? ts.schoolId.name || 'Unknown' : 'School')
                         .join(', ') || 'General';
                     return `
-                        <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 1rem;">${ev.name}</div>
-                                <div style="color: var(--muted-foreground); font-size: 0.875rem; margin-top: 0.25rem;">
-                                    ${startTime} – ${endTime} &bull; ${ev.location?.name || 'TBD'}
+                        <div style="margin-bottom: 0.6rem; padding: 0.85rem 1rem; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; font-size: 0.95rem; line-height: 1.3;">${ev.name}</div>
+                                <div style="color: var(--muted-foreground); font-size: 0.8rem; margin-top: 0.2rem;">
+                                    ${startTime} – ${endTime} &nbsp;•&nbsp; ${ev.location?.name || 'TBD'}
                                 </div>
-                                <div style="color: var(--muted-foreground); font-size: 0.75rem; margin-top: 0.25rem;">
+                                <div style="color: var(--muted-foreground); font-size: 0.72rem; margin-top: 0.15rem; opacity: 0.85;">
                                     ${schoolNames}
                                 </div>
                             </div>
-                            ${statusTag}
+                            <div style="flex-shrink:0; text-align:right;">${statusTag}</div>
                         </div>`;
                 }).join('');
             } else {
-                container.innerHTML = '<p class="placeholder-text">No events scheduled for today.</p>';
+                container.innerHTML = '<p class="placeholder-text" style="padding:0.5rem 0;">No events scheduled for today. Your calendar is clear.</p>';
             }
         }
 
@@ -578,21 +653,21 @@
                         .map(ts => ts.schoolId && typeof ts.schoolId === 'object' ? ts.schoolId.name || 'Unknown' : 'School')
                         .join(', ') || 'General';
                     return `
-                        <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 1rem;">${ev.name}</div>
-                                <div style="color: var(--muted-foreground); font-size: 0.875rem; margin-top: 0.25rem;">
-                                    ${dateStr} @ ${timeStr} &bull; ${eventType}
+                        <div style="margin-bottom: 0.6rem; padding: 0.85rem 1rem; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; font-size: 0.95rem; line-height: 1.3;">${ev.name}</div>
+                                <div style="color: var(--muted-foreground); font-size: 0.8rem; margin-top: 0.2rem;">
+                                    ${dateStr} @ ${timeStr} &nbsp;•&nbsp; ${eventType}
                                 </div>
-                                <div style="color: var(--muted-foreground); font-size: 0.75rem; margin-top: 0.25rem;">
+                                <div style="color: var(--muted-foreground); font-size: 0.72rem; margin-top: 0.15rem; opacity: 0.85;">
                                     ${schoolNames}
                                 </div>
                             </div>
-                            <span class="badge badge-primary">${ev.status || 'scheduled'}</span>
+                            <div style="flex-shrink:0;"><span class="badge badge-primary">${ev.status || 'scheduled'}</span></div>
                         </div>`;
                 }).join('');
             } else {
-                container.innerHTML = '<p class="placeholder-text">No upcoming events in the next 7 days.</p>';
+                container.innerHTML = '<p class="placeholder-text" style="padding:0.5rem 0;">No upcoming events in the next 7 days. Great time to plan ahead!</p>';
             }
         }
 
@@ -606,16 +681,16 @@
                         .map(ts => ts.schoolId && typeof ts.schoolId === 'object' ? ts.schoolId.name || 'Unknown' : 'School')
                         .join(', ') || 'General';
                     return `
-                        <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 1rem;">${ev.name}</div>
-                                <div style="color: var(--muted-foreground); font-size: 0.75rem;">Ended: ${dateStr} &bull; ${schoolNames}</div>
+                        <div style="margin-bottom: 0.55rem; padding: 0.8rem 1rem; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; font-size: 0.92rem;">${ev.name}</div>
+                                <div style="color: var(--muted-foreground); font-size: 0.72rem; margin-top: 0.15rem;">Ended ${dateStr} &nbsp;•&nbsp; ${schoolNames}</div>
                             </div>
-                            <a href="/trainer/events?view=report&eventId=${ev._id}" class="btn btn-sm btn-primary">Submit Report</a>
+                            <a href="/trainer/events?view=report&eventId=${ev._id}" class="btn btn-sm btn-primary" style="white-space:nowrap;">Submit Report</a>
                         </div>`;
                 }).join('');
             } else {
-                container.innerHTML = '<p class="placeholder-text" style="color: var(--success);">All reports submitted. Great work!</p>';
+                container.innerHTML = '<p class="placeholder-text" style="color: var(--success); padding:0.4rem 0;">All reports submitted. Excellent work!</p>';
             }
         }
 
@@ -634,10 +709,10 @@
                 const badgeClass = action.type === 'report'   ? 'badge-warning' :
                                    action.type === 'message'  ? 'badge-primary' : 'badge-danger';
                 return `
-                    <div class="card" style="padding: 1rem; border-left: 4px solid ${action.type === 'report' ? 'var(--accent)' : action.type === 'message' ? 'var(--primary)' : 'var(--destructive)'}; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span style="font-size: 1.25rem; margin-right: 0.5rem;">${icon}</span>
-                            <span style="font-weight: 500;">${action.message}</span>
+                    <div style="margin-bottom: 0.4rem; padding: 0.75rem 1rem; background: var(--background); border-left: 4px solid ${action.type === 'report' ? 'var(--accent)' : action.type === 'message' ? 'var(--primary)' : 'var(--destructive)'}; border-radius: var(--radius); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <span style="font-size: 1.1rem;">${icon}</span>
+                            <span style="font-weight: 500; font-size: 0.9rem;">${action.message}</span>
                         </div>
                         <span class="badge ${badgeClass}">${action.count}</span>
                     </div>`;
@@ -648,17 +723,17 @@
             const container = document.getElementById('announcementsFeed');
             if (announcements && announcements.length > 0) {
                 container.innerHTML = announcements.map(ann => `
-                    <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${ann.priority === 'urgent' ? 'var(--destructive)' : ann.priority === 'high' ? 'var(--accent)' : 'var(--primary)'};">
-                        <h4 style="margin: 0 0 0.5rem 0;">${ann.title}</h4>
-                        <p style="margin: 0; color: var(--muted-foreground); font-size: 0.9rem;">${ann.content?.substring(0, 120) || ''}${ann.content?.length > 120 ? '...' : ''}</p>
-                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground);">
-                            Posted ${new Date(ann.createdAt).toLocaleDateString()}
-                            ${ann.requiresAcknowledgment ? '<span class="badge badge-warning">Requires Acknowledgment</span>' : ''}
+                    <div style="margin-bottom: 0.6rem; padding: 0.85rem 1rem; border-left: 4px solid ${ann.priority === 'urgent' ? 'var(--destructive)' : ann.priority === 'high' ? 'var(--accent)' : 'var(--primary)'}; background: var(--background); border-radius: var(--radius); border: 1px solid var(--border);">
+                        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${ann.title}</div>
+                        <div style="color: var(--muted-foreground); font-size: 0.82rem; line-height: 1.35;">${ann.content?.substring(0, 135) || ''}${ann.content?.length > 135 ? '...' : ''}</div>
+                        <div style="margin-top: 0.4rem; font-size: 0.7rem; color: var(--muted-foreground); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <span>Posted ${new Date(ann.createdAt).toLocaleDateString()}</span>
+                            ${ann.requiresAcknowledgment ? '<span class="badge badge-warning" style="font-size:0.65rem;">Requires Acknowledgment</span>' : ''}
                         </div>
                     </div>
                 `).join('');
             } else {
-                container.innerHTML = '<p class="placeholder-text">No announcements</p>';
+                container.innerHTML = '<p class="placeholder-text" style="padding:0.4rem 0;">No announcements at this time.</p>';
             }
         }
 
@@ -693,15 +768,17 @@
                 const leaveHistory = await response.json();
                 const container = document.getElementById('leaveHistoryList');
                 if (leaveHistory.length === 0) {
-                    container.innerHTML = '<p>No leave requests found.</p>';
+                    container.innerHTML = '<p style="font-size:0.85rem; color:var(--muted-foreground);">No leave requests submitted yet.</p>';
                     return;
                 }
                 container.innerHTML = leaveHistory.map(leave => `
-                    <div class="leave-item">
-                        <strong>${leave.type} Leave</strong><br>
-                        ${new Date(leave.startDate).toLocaleDateString()} - ${new Date(leave.endDate).toLocaleDateString()}<br>
-                        Status: <span class="badge badge-${leave.status === 'approved' ? 'success' : leave.status === 'pending' ? 'warning' : 'danger'}">${leave.status}</span>
-                        ${leave.notes ? `<br>Notes: ${leave.notes}` : ''}
+                    <div class="leave-item" style="margin-bottom:0.4rem; padding:0.6rem 0.85rem; font-size:0.85rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
+                            <strong>${leave.type} Leave</strong>
+                            <span class="badge badge-${leave.status === 'approved' ? 'success' : leave.status === 'pending' ? 'warning' : 'danger'}" style="font-size:0.7rem;">${leave.status}</span>
+                        </div>
+                        <div style="color:var(--muted-foreground);">${new Date(leave.startDate).toLocaleDateString()} – ${new Date(leave.endDate).toLocaleDateString()}</div>
+                        ${leave.notes ? `<div style="margin-top:0.2rem; font-size:0.75rem; opacity:0.85;">${leave.notes}</div>` : ''}
                     </div>
                 `).join('');
             } catch (error) {

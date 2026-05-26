@@ -616,6 +616,49 @@ body {
   color: var(--muted-foreground);
 }
 
+/* Professional enhancement for trainer dashboard stats */
+#trainerStats .stat-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-left: 4px solid var(--primary);
+}
+
+#trainerStats .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+#trainerStats .stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, rgba(0,0,0,0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+#trainerStats .stat-number {
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--foreground);
+}
+
+#trainerStats .stat-icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0.35rem;
+  background: var(--muted);
+  border-radius: 9999px;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Leave item styling */
 .leave-item {
   padding: 1rem;
@@ -5915,4 +5958,163 @@ fieldset legend {
   margin: 0;
   font-size: 0.8rem;
   color: var(--muted-foreground);
+}
+
+/* ============================================================
+   PROFESSIONAL INVOICE CREATE PAGE
+   - Consistent with invoices list styling
+   - Uses existing .form-section / .section-header patterns
+   - No functional changes — presentation only
+   ============================================================ */
+
+.invoices-create-page {
+  max-width: 980px;
+}
+
+.invoices-create-page .form-section {
+  margin-bottom: 1.75rem;
+  padding-bottom: 0.25rem;
+}
+
+.invoices-create-page .form-section:last-child {
+  margin-bottom: 0.5rem;
+}
+
+.invoices-create-page .section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid var(--primary);
+  color: var(--primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.invoices-create-page .section-header .section-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Cleaner inputs inside the create form */
+.invoices-create-page .form-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--foreground);
+  margin-bottom: 0.25rem;
+}
+
+.invoices-create-page .form-select,
+.invoices-create-page .form-control {
+  border: 1.5px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.65rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.invoices-create-page .form-select:focus,
+.invoices-create-page .form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+  outline: none;
+}
+
+.invoices-create-page .input-group-text {
+  background: var(--secondary);
+  border: 1.5px solid var(--border);
+  font-weight: 600;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+/* Conditional panels look more polished */
+.invoices-create-page #eventFields,
+.invoices-create-page #packageFields,
+.invoices-create-page #customFields {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Advanced JSON textarea */
+.invoices-create-page #customItemsTextarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  background: #f8f9fa;
+  border-color: var(--border);
+}
+
+/* Professional live invoice preview */
+.invoices-create-page .invoice-preview {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  box-shadow: var(--shadow-card);
+  font-size: 0.9rem;
+}
+
+.invoices-create-page .invoice-preview-header,
+.invoices-create-page .invoice-preview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  color: var(--muted-foreground);
+}
+
+.invoices-create-page .invoice-preview-header {
+  font-weight: 500;
+}
+
+.invoices-create-page .invoice-preview-row {
+  font-size: 0.875rem;
+}
+
+.invoices-create-page .invoice-preview-total {
+  margin-top: 0.5rem;
+  padding-top: 0.55rem;
+  border-top: 2px solid var(--primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.invoices-create-page .invoice-preview-total strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Submit button spacing */
+.invoices-create-page .btn-primary {
+  padding-left: 1.75rem;
+  padding-right: 1.75rem;
+  font-weight: 600;
+}
+
+/* Small text improvements */
+.invoices-create-page small.text-muted {
+  font-size: 0.75rem;
+  color: var(--muted-foreground) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .invoices-create-page {
+    max-width: 100%;
+  }
+  .invoices-create-page .invoice-preview-total {
+    font-size: 0.95rem;
+  }
+  .invoices-create-page .invoice-preview-total strong {
+    font-size: 1.05rem;
+  }
 }

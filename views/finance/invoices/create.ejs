@@ -20,126 +20,181 @@
                         <path d="M3 18h18"></path>
                     </svg>
                 </button>
-                <h1 class="page-title">Create Invoice</h1>
+                <h1 class="page-title">Create Invoice <span class="page-subtitle">Generate a new billing document for a school</span></h1>
                 <a href="/finance/invoices" class="btn btn-outline-secondary btn-sm">Back to List</a>
             </header>
 
-            <div class="container-fluid mt-4">
+            <div class="container-fluid mt-4 invoices-create-page">
                 <div class="card">
                     <div class="card-body">
                         <div id="uninvoiceError" style="color:var(--danger);margin:0.5rem 0;font-size:0.875rem;"></div>
                         <form action="/finance/invoices/create" method="POST">
-                            <div class="mb-3">
-                                <label class="form-label">School *</label>
-                                <select name="schoolId" class="form-select" required>
-                                    <option value="">Select school</option>
-                                    <% schools.forEach(s => { %>
-                                        <option value="<%= s._id %>" data-student-count="<%= s.studentCount || 0 %>"><%= s.name %></option>
-                                    <% }); %>
-                                </select>
-                            </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Invoice Type *</label>
-                                <select name="invoiceType" id="invoiceType" class="form-select" required onchange="toggleFields()">
-                                    <option value="custom">Custom</option>
-                                    <option value="event">From Events</option>
-                                    <option value="service_package">From Service Package</option>
-                                </select>
-                            </div>
-
-                            <div id="eventFields" style="display:none;">
-                                <div class="mb-3">
-                                    <label class="form-label">Select Events</label>
-                                    <select name="relatedEvents" class="form-select" multiple size="5">
-                                        <option value="" disabled>Select one or more events to bill</option>
-                                    </select>
-                                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                            <!-- School & Type -->
+                            <div class="form-section">
+                                <div class="section-header">
+                                    <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16"></path>
+                                        <path d="M3 7h18"></path>
+                                    </svg>
+                                    <span>School &amp; Invoice Type</span>
                                 </div>
-                            </div>
 
-                            <div id="packageFields" style="display:none;">
                                 <div class="mb-3">
-                                    <label class="form-label">Service Package</label>
-                                    <select name="servicePackageId" class="form-select">
-                                        <option value="">Load uninvoiced packages</option>
+                                    <label class="form-label">School *</label>
+                                    <select name="schoolId" class="form-select" required>
+                                        <option value="">Select school</option>
+                                        <% schools.forEach(s => { %>
+                                            <option value="<%= s._id %>" data-student-count="<%= s.studentCount || 0 %>"><%= s.name %></option>
+                                        <% }); %>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Invoice Type *</label>
+                                    <select name="invoiceType" id="invoiceType" class="form-select" required onchange="toggleFields()">
+                                        <option value="custom">Custom</option>
+                                        <option value="event">From Events</option>
+                                        <option value="service_package">From Service Package</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div id="customFields">
+                            <!-- Line Items Configuration -->
+                            <div class="form-section">
+                                <div class="section-header">
+                                    <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    </svg>
+                                    <span>Line Items Configuration</span>
+                                </div>
+
+                                <div id="eventFields" style="display:none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Select Events</label>
+                                        <select name="relatedEvents" class="form-select" multiple size="5">
+                                            <option value="" disabled>Select one or more events to bill</option>
+                                        </select>
+                                        <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                                    </div>
+                                </div>
+
+                                <div id="packageFields" style="display:none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Service Package</label>
+                                        <select name="servicePackageId" class="form-select">
+                                            <option value="">Load uninvoiced packages</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div id="customFields">
+                                    <div class="mb-3">
+                                        <label class="form-label">Select Events to build Custom Line Items</label>
+                                        <select id="customEventSelect" class="form-select" multiple size="5">
+                                            <option value="">Load uninvoiced events</option>
+                                        </select>
+                                        <small class="text-muted">Hold Ctrl/Cmd to select multiple events. Custom JSON will be generated automatically.</small>
+                                    </div>
+
+                                    <textarea name="customItems" id="customItemsTextarea" style="display:none;" rows="4"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Billing Details -->
+                            <div class="form-section">
+                                <div class="section-header">
+                                    <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    <span>Billing Details</span>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Issue Date</label>
+                                        <input type="date" name="issueDate" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Due Date</label>
+                                        <input type="date" name="dueDate" class="form-control" value="<%= new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] %>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Currency</label>
+                                        <select name="currency" class="form-select">
+                                            <option value="KES">KES</option>
+                                            <option value="USD">USD</option>
+                                            <option value="EUR">EUR</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div class="mb-3">
-                                    <label class="form-label">Select Events to build Custom Line Items</label>
-                                    <select id="customEventSelect" class="form-select" multiple size="5">
-                                        <option value="">Load uninvoiced events</option>
-                                    </select>
-                                    <small class="text-muted">Hold Ctrl/Cmd to select multiple events. Custom JSON will be generated automatically.</small>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">Custom Line Items (JSON)</label>
-                                    <textarea name="customItems" id="customItemsTextarea" class="form-control" rows="4" placeholder=''></textarea>
-                                </div>
-                            </div>
-
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-4">
-                                    <label class="form-label">Issue Date</label>
-                                    <input type="date" name="issueDate" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Due Date</label>
-                                    <input type="date" name="dueDate" class="form-control" value="<%= new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] %>">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Currency</label>
-                                    <select name="currency" class="form-select">
-                                        <option value="KES">KES</option>
-                                        <option value="USD">USD</option>
-                                        <option value="EUR">EUR</option>
-                                    </select>
+                                    <label class="form-label">Total Invoice Amount</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text" id="currencyContext">KES</span>
+                                        <input type="number"
+                                               name="totalAmount"
+                                               id="totalAmountInput"
+                                               class="form-control"
+                                               placeholder="Enter invoice amount or leave blank to use calculated line total"
+                                               min="0"
+                                               step="0.01">
+                                    </div>
+                                    <div class="form-text">If you enter a value here, it will override the calculated invoice total.</div>
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Total Invoice Amount</label>
-                                <div class="input-group">
-                                    <span class="input-group-text" id="currencyContext">KES</span>
-                                    <input type="number"
-                                           name="totalAmount"
-                                           id="totalAmountInput"
-                                           class="form-control"
-                                           placeholder="Enter invoice amount or leave blank to use calculated line total"
-                                           min="0"
-                                           step="0.01">
+                            <!-- Live Preview -->
+                            <div class="form-section">
+                                <div class="section-header">
+                                    <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    <span>Invoice Preview</span>
                                 </div>
-                                <div class="form-text">If you enter a value here, it will override the calculated invoice total.</div>
-                            </div>
 
-                            <div class="mb-4">
-                                <label class="form-label">Invoice preview</label>
-                                <div class="card bg-light p-3">
-                                    <div class="d-flex justify-content-between mb-2">
+                                <div class="invoice-preview">
+                                    <div class="invoice-preview-header">
                                         <span>Calculated subtotal</span>
                                         <strong id="subtotalDisplay">KES 0.00</strong>
                                     </div>
-                                    <div class="d-flex justify-content-between mb-2">
+                                    <div class="invoice-preview-row">
                                         <span>Manual override</span>
                                         <strong id="overrideDisplay">KES 0.00</strong>
                                     </div>
-                                    <div class="border-top pt-2 d-flex justify-content-between align-items-center">
-                                        <span class="fw-semibold">Invoice total</span>
+                                    <div class="invoice-preview-total">
+                                        <span>Invoice total</span>
                                         <strong id="totalDisplay">KES 0.00</strong>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Notes</label>
-                                <textarea name="notes" class="form-control" rows="2"></textarea>
-                            </div>
+                            <!-- Additional Information -->
+                            <div class="form-section">
+                                <div class="section-header">
+                                    <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    </svg>
+                                    <span>Additional Information</span>
+                                </div>
 
-                            <button type="submit" class="btn btn-primary">Generate Invoice</button>
+                                <div class="mb-3">
+                                    <label class="form-label">Notes</label>
+                                    <textarea name="notes" class="form-control" rows="2"></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">Generate Invoice</button>
+                            </div>
                         </form>
                     </div>
                 </div>

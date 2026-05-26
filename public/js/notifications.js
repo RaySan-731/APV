@@ -230,6 +230,20 @@ async function loadNotificationsPanel() {
                     </div>
                 </div>
             `}).join('');
+
+            // Add click handlers to navigate actionUrl when present
+            document.querySelectorAll('.notification-item').forEach(el => {
+                const id = el.dataset.id;
+                const notif = data.notifications.find(n => String(n._id) === String(id));
+                if (notif && notif.actionUrl) {
+                    el.style.cursor = 'pointer';
+                    el.addEventListener('click', function(e) {
+                        // Avoid triggering buttons inside the card
+                        if (e.target.closest('button')) return;
+                        window.location.href = notif.actionUrl;
+                    });
+                }
+            });
         } else {
             container.innerHTML = '<div class="notification-dropdown-empty">No notifications yet</div>';
         }
@@ -534,4 +548,10 @@ function escapeHtml(text) {
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', function() {
     initNotifications();
+    // Poll unread counts periodically so admins see newly created booking notifications without requiring full page refresh
+    try {
+        setInterval(loadNotificationBadge, 30000); // every 30s
+    } catch (e) {
+        console.warn('Polling setup failed for notifications:', e);
+    }
 });

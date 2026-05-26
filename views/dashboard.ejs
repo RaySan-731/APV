@@ -3123,6 +3123,19 @@ async function saveSchoolAllocation() {
               const msgData = await msgRes.json();
               notificationsData.messages = msgData.messages || [];
               unreadCounts.messages = msgData.unreadCount || 0;
+
+              // Fetch direct notifications (system) so admins see booking/approval notifications
+              try {
+                const notifRes = await fetch('/api/notifications?limit=5');
+                const notifData = await notifRes.json();
+                notificationsData.notifications = notifData.notifications || [];
+                unreadCounts.notifications = notifData.unreadCount || 0;
+              } catch (nerr) {
+                console.warn('Failed loading Notification feed:', nerr);
+                notificationsData.notifications = [];
+                unreadCounts.notifications = 0;
+              }
+
               unreadCounts.announcements = notificationsData.announcements.filter(a => !isAnnouncementAcknowledged(a)).length;
 
               updateBadge();
@@ -3153,65 +3166,83 @@ async function saveSchoolAllocation() {
             }
           }
 
-          // Render notifications list
-          function renderNotifications() {
-            if (!notificationList) return;
-            let items = [];
+            // Render notifications list
+            function renderNotifications() {
+              if (!notificationList) return;
+              let items = [];
 
-            // Combine announcements and messages
-            const annItems = notificationsData.announcements.map(a => ({
-              type: 'announcement',
-              title: a.title,
-              subtitle: `Announcement • ${new Date(a.createdAt).toLocaleDateString()}`,
-              date: new Date(a.createdAt),
-              unread: !isAnnouncementAcknowledged(a),
-              priority: a.priority,
-              _id: a._id
-            }));
-            const msgItems = (notificationsData.messages || []).map(m => ({
-              type: 'message',
-              title: m.subject || '(No subject)',
-              subtitle: `From: ${m.senderId?.name || 'Unknown'}`,
-              date: new Date(m.sentAt),
-              unread: !isMessageRead(m),
-              priority: m.priority,
-              _id: m._id
-            }));
-            items = [...annItems, ...msgItems].sort((a, b) => b.date - a.date);
+              // Direct in-app notifications (system/admin alerts)
+              const directItems = (notificationsData.notifications || []).map(n => ({
+                type: 'notification',
+                title: n.title,
+                subtitle: `${n.priority ? n.priority.toUpperCase() + ' • ' : ''}${new Date(n.createdAt).toLocaleDateString()}`,
+                date: new Date(n.createdAt),
+                unread: !n.isRead && !n.dismissed,
+                priority: n.priority,
+                actionUrl: n.actionUrl,
+                _id: n._id
+              }));
 
-            // Render items
-            if (items.length === 0) {
-              notificationList.innerHTML = '<div class="notification-dropdown-empty">No notifications</div>';
-              return;
-            }
+              // Announcements
+              const annItems = notificationsData.announcements.map(a => ({
+                type: 'announcement',
+                title: a.title,
+                subtitle: `Announcement • ${new Date(a.createdAt).toLocaleDateString()}`,
+                date: new Date(a.createdAt),
+                unread: !isAnnouncementAcknowledged(a),
+                priority: a.priority,
+                _id: a._id
+              }));
 
-            notificationList.innerHTML = items.map(item => `
-              <div class="notification-dropdown-item ${item.unread ? 'unread' : ''}" data-id="${item._id}" data-type="${item.type}">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                  <div style="flex: 1;">
-                    <div style="font-weight: 500; margin-bottom: 0.25rem;">${escapeHtml(item.title)}</div>
-                    <div style="font-size: 0.85rem; color: var(--muted-foreground);">${escapeHtml(item.subtitle)}</div>
+              // Messages
+              const msgItems = (notificationsData.messages || []).map(m => ({
+                type: 'message',
+                title: m.subject || '(No subject)',
+                subtitle: `From: ${m.senderId?.name || 'Unknown'}`,
+                date: new Date(m.sentAt),
+                unread: !isMessageRead(m),
+                priority: m.priority,
+                _id: m._id
+              }));
+
+              items = [...directItems, ...annItems, ...msgItems].sort((a, b) => b.date - a.date);
+
+              // Render items
+              if (items.length === 0) {
+                notificationList.innerHTML = '<div class="notification-dropdown-empty">No notifications</div>';
+                return;
+              }
+
+              notificationList.innerHTML = items.map(item => `
+                <div class="notification-dropdown-item ${item.unread ? 'unread' : ''}" data-id="${item._id}" data-type="${item.type}" data-actionurl="${item.actionUrl || ''}">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                      <div style="font-weight: 500; margin-bottom: 0.25rem;">${escapeHtml(item.title)}</div>
+                      <div style="font-size: 0.85rem; color: var(--muted-foreground);">${escapeHtml(item.subtitle)}</div>
+                    </div>
+                    ${item.priority === 'urgent' || item.priority === 'high' ? '<span class="badge badge-warning" style="margin-left: 0.5rem;">!</span>' : ''}
                   </div>
-                  ${item.priority === 'urgent' || item.priority === 'high' ? '<span class="badge badge-warning" style="margin-left: 0.5rem;">!</span>' : ''}
+                  ${item.unread ? '<div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);"></div>' : ''}
                 </div>
-                ${item.unread ? '<div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);"></div>' : ''}
-              </div>
-            `).join('');
+              `).join('');
 
-             // Add click handlers for notification items
-             document.querySelectorAll('.notification-dropdown-item').forEach(item => {
-               item.addEventListener('click', function() {
-                 const type = this.dataset.type;
-                 const id = this.dataset.id;
-                 notificationDropdown.style.display = 'none';
-                 if (type === 'announcement') {
-                   viewAnnouncementModal(id);
-                 } else if (type === 'message') {
-                   viewMessageModal(id);
-                 }
+               // Add click handlers for notification items
+               document.querySelectorAll('.notification-dropdown-item').forEach(item => {
+                 item.addEventListener('click', function() {
+                   const type = this.dataset.type;
+                   const id = this.dataset.id;
+                   const actionUrl = this.dataset.actionurl;
+                   notificationDropdown.style.display = 'none';
+                   if (type === 'announcement') {
+                     viewAnnouncementModal(id);
+                   } else if (type === 'message') {
+                     viewMessageModal(id);
+                   } else if (actionUrl) {
+                     window.location.href = actionUrl;
+                   }
+                 });
                });
-             });
-          }
+            }
 
           // Helper: Check if announcement is acknowledged by current user
           function isAnnouncementAcknowledged(ann) {

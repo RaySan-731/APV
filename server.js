@@ -2104,19 +2104,51 @@ app.post('/book/submit', parseJson, async (req, res) => {
     // Notify admins/founders about new booking request (non-blocking)
     (async () => {
       try {
-        const admins = await Staff.find({ role: { $in: ['admin', 'founder', 'supervisor'] } });
-        for (const admin of admins) {
-          await Notification.create({
-            recipientId: admin._id,
-            type: 'booking_request',
-            title: 'New Booking Request',
-            message: `${booking.requesterName || booking.userEmail || 'Guest'} requested ${booking.program} on ${new Date(booking.date).toLocaleDateString()}`,
-            actionUrl: '/admin/bookings',
-            entityType: 'booking',
-            entityId: booking._id,
-            priority: 'high',
-            channels: ['in-app']
-          });
+        // Ensure we notify all admin/founder users even if a Staff document hasn't been created yet
+        const adminRoles = ['admin', 'founder', 'supervisor'];
+        const adminUsers = await User.find({ role: { $in: adminRoles } }).lean();
+        const staffIds = [];
+
+        for (const u of adminUsers) {
+          let s = await Staff.findOne({ email: u.email.toLowerCase() });
+          if (!s) {
+            // Create minimal Staff profile for notification routing
+            s = new Staff({
+              name: u.name || u.email.split('@')[0],
+              email: u.email.toLowerCase(),
+              role: u.role === 'founder' ? 'admin' : u.role,
+              status: 'Active',
+              department: 'Administration'
+            });
+            try { await s.save(); } catch (saveErr) { console.warn('Could not create Staff profile for user', u.email, saveErr.message); }
+          }
+          if (s && s._id) staffIds.push(s._id);
+        }
+
+        // Fallback: if no admin users found, still try to find any Staff records with admin-like roles
+        if (staffIds.length === 0) {
+          const staffAdmins = await Staff.find({ role: { $in: adminRoles } }).select('_id').lean();
+          staffAdmins.forEach(s => staffIds.push(s._id));
+        }
+
+        for (const recipientId of staffIds) {
+          try {
+            await Notification.create({
+              recipientId,
+              type: 'approval_required',
+              title: 'New Booking Request',
+              message: `${booking.requesterName || booking.userEmail || 'Guest'} requested ${booking.program} on ${new Date(booking.date).toLocaleDateString()}`,
+              actionUrl: '/admin/bookings',
+              actionLabel: 'Review Booking',
+              entityType: 'event',
+              entityId: booking._id,
+              priority: 'high',
+              channels: ['in-app'],
+              metadata: { relatedNames: [booking.program], extra: { participants: booking.participants } }
+            });
+          } catch (innerErr) {
+            console.error('Error creating notification for recipient', recipientId, innerErr.message);
+          }
         }
       } catch (nerr) {
         console.error('Error creating booking notifications:', nerr);
@@ -8420,10 +8452,18 @@ app.post('/api/messages/mark-all-read', requireAuth, async (req, res) => {
     }
     const staffId = currentStaff._id;
 
+    // Use arrayFilters to update the recipients array element(s) matching this staffId
     await Message.updateMany(
       { 'recipients.staffId': staffId, 'recipients.status': 'sent' },
-      { $set: { 'recipients.$.status': 'read', 'recipients.$.readAt': new Date() } }
+      { $set: { 'recipients.$[elem].status': 'read', 'recipients.$[elem].readAt': new Date() } },
+      { arrayFilters: [{ 'elem.staffId': staffId, 'elem.status': 'sent' }], multi: true }
     );
+    // Also update lastReadAt on message documents where applicable
+    await Message.updateMany(
+      { 'recipients.staffId': staffId },
+      { $set: { lastReadAt: new Date() } }
+    );
+
     res.json({ success: true });
   } catch (err) {
     console.error('Error marking all messages as read:', err);

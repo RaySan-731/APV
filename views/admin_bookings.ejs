@@ -8,44 +8,84 @@
 </head>
 <body>
   <div class="container" style="padding:2rem 1rem;">
-    <a href="/dashboard" style="display:inline-block; margin-bottom:1rem;">← Back</a>
-    <h1>Bookings</h1>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <a href="/dashboard" class="btn btn-outline" style="padding:0.5rem 0.75rem;">← Back</a>
+        <div>
+          <h1 style="margin:0; font-family:var(--font-heading); font-size:1.25rem;">Bookings</h1>
+          <div style="color:var(--muted-foreground); font-size:0.9rem;">Manage and review program bookings</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <input id="bookingSearch" type="search" placeholder="Search bookings..." style="padding:0.5rem 0.75rem; border-radius:calc(var(--radius) / 1.2); border:1px solid var(--border); min-width:220px; background:var(--card);">
+        <a href="/admin/bookings/export?format=csv" class="btn btn-primary" target="_blank" rel="noopener">Export CSV</a>
+        <a href="/admin/bookings/export?format=pdf" class="btn btn-outline" target="_blank" rel="noopener" style="display:inline-flex; align-items:center;">Export PDF</a>
+      </div>
+    </div>
 
     <section class="card">
+      <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.75rem 1rem;">
+        <h3 style="margin:0; font-size:1rem;">All bookings</h3>
+        <div style="color:var(--muted-foreground); font-size:0.9rem;"></div>
+      </div>
       <div class="card-content">
-        <table style="width:100%; border-collapse:collapse;">
-          <thead>
-            <tr>
-              <th style="padding:0.5rem; text-align:left;">ID</th>
-              <th style="padding:0.5rem; text-align:left;">Program</th>
-              <th style="padding:0.5rem; text-align:left;">For</th>
-              <th style="padding:0.5rem; text-align:left;">Date</th>
-              <th style="padding:0.5rem; text-align:left;">Participants</th>
-              <th style="padding:0.5rem; text-align:left;">Requester</th>
-              <th style="padding:0.5rem; text-align:left;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% bookings.forEach(function(b){ %>
+        <div class="table-responsive">
+          <table class="data-table sticky-header" style="min-width:800px;">
+            <thead>
               <tr>
-                <td style="padding:0.5rem;"><%= b.id %></td>
-                <td style="padding:0.5rem;"><%= b.program %></td>
-                <td style="padding:0.5rem;"><%= b.type %></td>
-                <td style="padding:0.5rem;"><%= b.date %></td>
-                <td style="padding:0.5rem;"><%= b.participants %></td>
-                <td style="padding:0.5rem;"><%= b.userEmail %></td>
-                <td style="padding:0.5rem;">
-                  <form action="/admin/bookings/delete" method="POST" style="display:inline-block;">
-                    <input type="hidden" name="id" value="<%= b.id %>">
-                    <button class="btn btn-outline" type="submit">Delete</button>
-                  </form>
-                </td>
+                <th>ID</th>
+                <th>Program</th>
+                <th>For</th>
+                <th>Date</th>
+                <th>Participants</th>
+                <th>Requester</th>
+                <th>Actions</th>
               </tr>
-            <% }) %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody id="bookingsTable">
+              <% bookings.forEach(function(b){ %>
+                <tr>
+                  <td><code style="font-family:monospace; font-size:0.9rem; color:var(--muted-foreground);"><%= b.id %></code></td>
+                  <td style="font-weight:600; color:var(--foreground);"><%= b.program %></td>
+                  <td><span class="badge badge-secondary badge-sm"><%= b.type %></span></td>
+                  <td><%= b.date %></td>
+                  <td><%= b.participants %></td>
+                  <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><%= b.userEmail %></td>
+                  <td>
+                    <form action="/admin/bookings/delete" method="POST" class="delete-form" style="display:inline-block; margin:0;">
+                      <input type="hidden" name="id" value="<%= b.id %>">
+                      <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   </div>
+
+  <script>
+    (function(){
+      var search = document.getElementById('bookingSearch');
+      var tbody = document.getElementById('bookingsTable');
+      if (search && tbody) {
+        search.addEventListener('input', function(e){
+          var q = e.target.value.toLowerCase().trim();
+          Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function(row){
+            var text = row.textContent.toLowerCase();
+            row.classList.toggle('hidden', q !== '' && text.indexOf(q) === -1);
+          });
+        });
+      }
+      Array.prototype.forEach.call(document.querySelectorAll('.delete-form'), function(f){
+        f.addEventListener('submit', function(ev){
+          var ok = confirm('Delete this booking? This action cannot be undone.');
+          if (!ok) ev.preventDefault();
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

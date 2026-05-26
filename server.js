@@ -2237,6 +2237,48 @@ app.post('/admin/bookings/delete', requireAuth, requireFounder, parseJson, async
   }
 });
 
+// Export bookings as CSV or PDF (matches finance reports structure)
+app.get('/admin/bookings/export', requireAuth, requireFounder, async (req, res) => {
+  try {
+    const format = (req.query.format || 'csv').toLowerCase();
+    const bookings = await Booking.find({}).sort({ createdAt: -1 }).lean();
+
+    const headers = ['ID', 'Program', 'Type', 'Date', 'Participants', 'Requester', 'Status', 'Created At'];
+    const rows = bookings.map((b) => ({
+      'ID': (b.legacyId && b.legacyId.trim()) ? b.legacyId : (b._id ? String(b._id) : ''),
+      'Program': b.program || '',
+      'Type': b.type || '',
+      'Date': b.date ? new Date(b.date).toISOString().split('T')[0] : '',
+      'Participants': b.participants != null ? String(b.participants) : '',
+      'Requester': b.userEmail || b.requesterName || '',
+      'Status': b.status || '',
+      'Created At': b.createdAt ? new Date(b.createdAt).toISOString().replace(/T/, ' ').replace(/\..+/, '') : ''
+    }));
+
+    const baseFilename = 'bookings';
+    const dateSuffix = new Date().toISOString().split('T')[0];
+
+    if (format === 'csv') {
+      // Use shared CSV builder
+      const { buildCsv } = require('./backend/utils/exportUtils');
+      const csv = buildCsv(headers, rows);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${baseFilename}_${dateSuffix}.csv"`);
+      return res.send('\uFEFF' + csv);
+    }
+
+    if (format === 'pdf') {
+      const { streamBrandedPdf } = require('./backend/utils/exportUtils');
+      return await streamBrandedPdf(res, headers, rows, 'Bookings', baseFilename);
+    }
+
+    return res.status(400).send('Unsupported export format. Use ?format=csv or ?format=pdf');
+  } catch (err) {
+    console.error('Bookings export error:', err);
+    res.status(500).send('Export failed');
+  }
+});
+
 // Add staff from dashboard page
 app.post('/dashboard/staff/add', requireAuth, requirePermission('canCreateStaff'), staffAddLimiter, parseJson, async (req, res) => {
   try {
